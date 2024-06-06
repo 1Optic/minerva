@@ -34,6 +34,15 @@ lint-openapi:
     - redocly lint api-spec/api.yaml
   allow_failure: true
 
+lint-openapi:
+  stage: test
+  image:
+    name: redocly/cli
+    entrypoint: [""]
+  script:
+    - redocly lint api-spec/api.yaml
+  allow_failure: true
+
 # Use cargo to test the project
 test-minerva-cli:cargo:
   stage: test
