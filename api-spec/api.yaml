@@ -1073,6 +1073,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Threshold'
+    ShortTrigger:
+      type: object
+      properties:
+        name:
+          type: string
+          description: name of the trigger
+        thresholds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Threshold'
     EntitySet:
       type: object
       properties:
