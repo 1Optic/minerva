@@ -1,14 +1,14 @@
 use actix_web::error::ResponseError;
 use actix_web::{http::StatusCode, HttpResponse};
 use core::fmt::Display;
-use derive_more::{Display, From};
+use derive_more::From;
 use log::error;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
 use super::error::{Error, ExtendedError};
 
-#[derive(Display, From, Debug, Serialize)]
+#[derive(derive_more::Display, From, Debug, Serialize)]
 pub enum ServiceErrorKind {
     NotFound,
     PoolError,
