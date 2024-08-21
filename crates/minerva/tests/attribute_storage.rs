@@ -6,6 +6,7 @@ mod tests {
     use log::debug;
     use minerva::entity::CachingEntityMapping;
     use std::path::PathBuf;
+    use std::time::Duration;
 
     use minerva::attribute_storage::{AttributeDataRow, RawAttributeStore};
     use minerva::attribute_store::{AddAttributeStore, AttributeStore};
@@ -112,6 +113,7 @@ mod tests {
             let first_row = rows.first().unwrap();
 
             let now = Utc::now();
+            let ten_minutes_ago = now - Duration::from_secs(600);
 
             let first_timestamp: DateTime<Utc> = first_row.get(1);
             assert!(first_timestamp < now);
@@ -125,6 +127,17 @@ mod tests {
             assert!(last_timestamp < now);
             let last_hash: String = last_row.get(2);
             assert_eq!(last_hash, "4d29f20f44be7506e75e657b30571581");
+
+            let row = client
+                .query_one(
+                    "SELECT modified FROM attribute_directory.attribute_store ast JOIN attribute_directory.attribute_store_modified asm ON asm.attribute_store_id = ast.id WHERE ast::text = $1",
+                    &[&"hub_node"]
+                ).await?;
+
+            let modified: DateTime<Utc> = row.get(0);
+
+            assert!(modified < now);
+            assert!(modified > ten_minutes_ago);
         }
 
         Ok(())

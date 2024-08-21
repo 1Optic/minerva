@@ -221,6 +221,10 @@ impl RawAttributeStore for AttributeStore {
             .await
             .map_err(AttributeStorageError::DatabaseError)?;
 
+        tx.execute("SELECT attribute_directory.mark_modified(ast.id) FROM attribute_directory.attribute_store ast WHERE ast::text = $1", &[&table_name])
+            .await
+            .map_err(AttributeStorageError::DatabaseError)?;
+
         debug!(
             "Stored {} rows with {} attributes for '{}'",
             rows.len(),
