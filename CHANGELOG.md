@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.3.0] - 2024-08-22
+
+### Added
+
+- Added subcommand to update relation definitions.
+
 ## [9.2.0] - 2024-08-21
 
 ### Added
@@ -57,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.2.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.3.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -66,3 +72,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.0.0...9.1.0
 [9.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.1.0...9.1.1
 [9.2.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.1.1...9.2.0
+[9.3.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.2.0...9.3.0

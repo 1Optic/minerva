@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 
 use minerva::change::Change;
-use minerva::relation::{load_relation_from_file, AddRelation};
+use minerva::relation::{load_relation_from_file, AddRelation, UpdateRelation};
 
 use clap::{Parser, Subcommand};
 
@@ -39,6 +39,35 @@ impl Cmd for RelationCreate {
 }
 
 #[derive(Debug, Parser, PartialEq)]
+pub struct RelationUpdate {
+    #[arg(help = "relation definition file")]
+    definition: PathBuf,
+}
+
+#[async_trait]
+impl Cmd for RelationUpdate {
+    async fn run(&self) -> CmdResult {
+        let relation = load_relation_from_file(&self.definition)?;
+
+        println!("Loaded definition, updating relation");
+
+        let mut client = connect_db().await?;
+
+        let change = UpdateRelation { relation };
+
+        let mut tx = client.transaction().await?;
+
+        let message = change.apply(&mut tx).await?;
+
+        tx.commit().await?;
+
+        println!("{message}");
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Parser, PartialEq)]
 pub struct RelationOpt {
     #[command(subcommand)]
     command: RelationOptCommands,
@@ -48,12 +77,15 @@ pub struct RelationOpt {
 pub enum RelationOptCommands {
     #[command(about = "create a relation")]
     Create(RelationCreate),
+    #[command(about = "update a relation")]
+    Update(RelationUpdate),
 }
 
 impl RelationOpt {
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             RelationOptCommands::Create(create) => create.run().await,
+            RelationOptCommands::Update(update) => update.run().await,
         }
     }
 }

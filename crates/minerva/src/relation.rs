@@ -139,3 +139,36 @@ impl From<Relation> for AddRelation {
         AddRelation { relation }
     }
 }
+
+pub struct UpdateRelation {
+    pub relation: Relation,
+}
+
+impl fmt::Display for UpdateRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UpdateRelation({})", &self.relation)
+    }
+}
+
+#[async_trait]
+impl Change for UpdateRelation {
+    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+        let query = format!(
+            "CREATE OR REPLACE VIEW relation_def.\"{}\" AS {}",
+            self.relation.name, self.relation.query
+        );
+
+        client
+            .query(&query, &[])
+            .await
+            .map_err(|e| DatabaseError::from_msg(format!("Error updating relation view: {e}")))?;
+
+        Ok(format!("Updated relation {}", &self.relation))
+    }
+}
+
+impl From<Relation> for UpdateRelation {
+    fn from(relation: Relation) -> Self {
+        UpdateRelation { relation }
+    }
+}
