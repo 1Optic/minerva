@@ -10,6 +10,7 @@ use tokio_postgres::Transaction;
 
 use postgres_protocol::escape::escape_identifier;
 use tokio_postgres::{types::ToSql, types::Type, GenericClient};
+use thiserror::Error;
 
 use humantime::format_duration;
 
@@ -141,6 +142,7 @@ impl TrendViewMaterialization {
     async fn create<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_view(client).await?;
         self.define_materialization(client).await?;
+        self.connect_sources(client).await?;
         self.create_fingerprint_function(client).await?;
 
         Ok(())
@@ -222,42 +224,7 @@ impl TrendViewMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let query = concat!(
-            "INSERT INTO trend_directory.materialization_trend_store_link(materialization_id, trend_store_part_id, timestamp_mapping_func) ",
-            "SELECT m.id, ",
-            "stsp.id, ",
-            "$1::regprocedure ",
-            "FROM trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
-            "ON m.dst_trend_store_part_id = dstp.id, ",
-            "trend_directory.trend_store_part stsp ",
-            "WHERE dstp.name = $2 AND stsp.name = $3"
-        );
-
-        let statement = client
-            .prepare_typed(query, &[Type::TEXT, Type::TEXT, Type::TEXT])
-            .await?;
-
-        for source in &self.sources {
-            let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
-
-            client
-                .query(
-                    &statement,
-                    &[
-                        &mapping_function,
-                        &self.target_trend_store_part,
-                        &source.trend_store_part,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    Error::Database(DatabaseError::from_msg(format!(
-                        "Error connecting sources: {e}"
-                    )))
-                })?;
-        }
-
-        Ok(())
+        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources).await
     }
 
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
@@ -541,42 +508,7 @@ impl TrendFunctionMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let query = concat!(
-            "INSERT INTO trend_directory.materialization_trend_store_link(materialization_id, trend_store_part_id, timestamp_mapping_func) ",
-            "SELECT m.id, ",
-            "stsp.id, ",
-            "$1::regprocedure ",
-            "FROM trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
-            "ON m.dst_trend_store_part_id = dstp.id, ",
-            "trend_directory.trend_store_part stsp ",
-            "WHERE dstp.name = $2 AND stsp.name = $3"
-        );
-
-        let statement = client
-            .prepare_typed(query, &[Type::TEXT, Type::TEXT, Type::TEXT])
-            .await?;
-
-        for source in &self.sources {
-            let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
-
-            client
-                .query(
-                    &statement,
-                    &[
-                        &mapping_function,
-                        &self.target_trend_store_part,
-                        &source.trend_store_part,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    Error::Database(DatabaseError::from_msg(format!(
-                        "Error connecting sources: {e}"
-                    )))
-                })?;
-        }
-
-        Ok(())
+        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources).await
     }
 
     async fn drop_sources<T: GenericClient + Send + Sync>(
@@ -1176,10 +1108,20 @@ impl Change for UpdateTrendMaterialization {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum PopulateSourceFingerprintError {
+    #[error("Could not load materialization sources: {0}")]
+    SourcesLoading(tokio_postgres::Error),
+    #[error("No sources found for materialization")]
+    NoSources,
+    #[error("Could not update fingerprints: {0}")]
+    FingerprintUpdating(tokio_postgres::Error),
+}
+
 pub async fn populate_source_fingerprint<T: GenericClient + Send + Sync>(
     client: &mut T,
     materialization: &str,
-) -> Result<(), String> {
+) -> Result<(), PopulateSourceFingerprintError> {
     let sources_query = concat!(
         "SELECT mtsl.timestamp_mapping_func::regproc::text, tsp.name ",
         "FROM trend_directory.materialization m ",
@@ -1191,10 +1133,14 @@ pub async fn populate_source_fingerprint<T: GenericClient + Send + Sync>(
     let sources: Vec<(String, String)> = client
         .query(sources_query, &[&materialization])
         .await
-        .map_err(|e| format!("Error loading trend materializations: {e}"))?
+        .map_err(PopulateSourceFingerprintError::SourcesLoading)?
         .iter()
         .map(|row| (row.get(0), row.get(1)))
         .collect();
+
+    if sources.is_empty() {
+        return Err(PopulateSourceFingerprintError::NoSources);
+    }
 
     let mut ctes: Vec<String> = Vec::new();
     let mut query_parts: Vec<String> = Vec::new();
@@ -1230,7 +1176,7 @@ pub async fn populate_source_fingerprint<T: GenericClient + Send + Sync>(
     client
         .execute(&query, &[&materialization])
         .await
-        .map_err(|e| format!("Error loading trend materializations: {e}"))?;
+        .map_err(PopulateSourceFingerprintError::FingerprintUpdating)?;
 
     Ok(())
 }
@@ -1254,6 +1200,60 @@ pub async fn reset_source_fingerprint<T: GenericClient + Send + Sync>(
         .execute(&query, &[&materialization])
         .await
         .map_err(|e| format!("Error loading trend materializations: {e}"))?;
+
+    Ok(())
+}
+
+async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    target_trend_store_part_name: &str,
+    sources: &[TrendMaterializationSource],
+) -> Result<(), Error> {
+    let query = concat!(
+        "INSERT INTO trend_directory.materialization_trend_store_link(materialization_id, trend_store_part_id, timestamp_mapping_func) ",
+        "SELECT m.id, $3, $1::regprocedure ",
+        "FROM trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
+        "ON m.dst_trend_store_part_id = dstp.id ",
+        "WHERE dstp.name = $2"
+    );
+
+    let statement = client
+        .prepare_typed(query, &[Type::TEXT, Type::TEXT, Type::INT4])
+        .await?;
+
+    for source in sources {
+        let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
+
+        let rows = client.query(source_query, &[&source.trend_store_part]).await?;
+
+        if rows.is_empty() {
+            return Err(Error::Database(DatabaseError::from_msg(format!("Materialization source '{}' does not exist", source.trend_store_part))));
+        }
+
+        let source_trend_store_part_id: i32 = rows[0].get(0);
+
+        let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
+
+        let insert_count = client
+            .execute(
+                &statement,
+                &[
+                    &mapping_function,
+                    &target_trend_store_part_name,
+                    &source_trend_store_part_id,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                Error::Database(DatabaseError::from_msg(format!(
+                    "Error connecting sources: {e}"
+                )))
+            })?;
+
+        if insert_count == 0 {
+            return Err(Error::Runtime(RuntimeError::from_msg(format!("Unexpectedly no link was created for source '{}'", source.trend_store_part))));
+        }
+    }
 
     Ok(())
 }

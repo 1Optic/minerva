@@ -5,7 +5,6 @@ use clap::{Parser, Subcommand, ValueHint};
 
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
-use minerva::trend_materialization::{self, TrendMaterialization};
 use minerva::trend_materialization::{
     load_materializations, populate_source_fingerprint, reset_source_fingerprint,
     trend_materialization_from_config, AddTrendMaterialization, UpdateTrendMaterialization,
@@ -22,8 +21,7 @@ pub struct TrendMaterializationCreate {
 #[async_trait]
 impl Cmd for TrendMaterializationCreate {
     async fn run(&self) -> CmdResult {
-        let trend_materialization =
-            trend_materialization::trend_materialization_from_config(&self.definition)?;
+        let trend_materialization = trend_materialization_from_config(&self.definition)?;
 
         println!("Loaded definition, creating trend materialization");
         let mut client = connect_db().await?;
@@ -178,20 +176,31 @@ pub struct TrendMaterializationList {}
 #[async_trait]
 impl Cmd for TrendMaterializationList {
     async fn run(&self) -> CmdResult {
-        let mut client = connect_db().await?;
+        let client = connect_db().await?;
 
-        let materializations = load_materializations(&mut client).await?;
+        let rows = client
+            .query(
+                "SELECT m.id, tsp.name FROM trend_directory.materialization m JOIN trend_directory.trend_store_part tsp ON tsp.id = m.dst_trend_store_part_id",
+                &[]
+            )
+            .await
+            .unwrap();
 
-        for materialization in materializations {
-            match materialization {
-                TrendMaterialization::View(view_materialization) => {
-                    println!("{}", view_materialization.target_trend_store_part);
-                }
-                TrendMaterialization::Function(function_materialization) => {
-                    println!("{}", function_materialization.target_trend_store_part);
-                }
-            }
+        let mut table = comfy_table::Table::new();
+        let style = "     ═╪ ┆          ";
+        table.load_preset(style);
+        table.set_header(vec!["Id", "Name"]);
+
+        for row in rows {
+            let id: i32 = row.get(0);
+            let name: &str = row.get(1);
+            table.add_row(vec![
+                id.to_string(),
+                name.to_string(),
+            ]);
         }
+
+        println!("{table}");
 
         Ok(())
     }
