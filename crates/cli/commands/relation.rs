@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use tokio_postgres::Client;
 
 use minerva::change::Change;
-use minerva::relation::{load_relation_from_file, AddRelation, UpdateRelation};
+use minerva::relation::{load_relation_from_file, AddRelation, UpdateRelation, materialize_relation};
 
 use clap::{Parser, Subcommand};
 
@@ -68,6 +69,51 @@ impl Cmd for RelationUpdate {
 }
 
 #[derive(Debug, Parser, PartialEq)]
+pub struct RelationMaterialize {
+    #[arg(help = "relation name")]
+    name: Option<String>,
+}
+
+async fn get_relation_names(client: &Client) -> Vec<String> {
+    let rows = client.query("SELECT name FROM relation_directory.type", &[]).await.unwrap();
+
+    rows.iter().map(|row| row.get(0)).collect()
+}
+
+#[async_trait]
+impl Cmd for RelationMaterialize {
+    async fn run(&self) -> CmdResult {
+        let mut client = connect_db().await?;
+
+        let relation_names = match &self.name {
+            Some(name) => vec![name.clone()],
+            None => get_relation_names(&client).await,
+        };
+
+        for name in relation_names {
+            let mut tx = client.transaction().await?;
+
+            match materialize_relation(&mut tx, &name).await {
+                Ok(changed) => {
+                    tx.commit().await?;
+                    println!(
+                        "Materialized relation '{name}' (deleted {}, inserted {})",
+                        changed.deleted_count,
+                        changed.inserted_count
+                    );
+                },
+                Err(e) => {
+                    tx.rollback().await?;
+                    println!("Error materializing relation '{name}': {e}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Parser, PartialEq)]
 pub struct RelationOpt {
     #[command(subcommand)]
     command: RelationOptCommands,
@@ -79,6 +125,8 @@ pub enum RelationOptCommands {
     Create(RelationCreate),
     #[command(about = "update a relation")]
     Update(RelationUpdate),
+    #[command(about = "materialize a relation")]
+    Materialize(RelationMaterialize),
 }
 
 impl RelationOpt {
@@ -86,6 +134,7 @@ impl RelationOpt {
         match &self.command {
             RelationOptCommands::Create(create) => create.run().await,
             RelationOptCommands::Update(update) => update.run().await,
+            RelationOptCommands::Materialize(materialize) => materialize.run().await,
         }
     }
 }
