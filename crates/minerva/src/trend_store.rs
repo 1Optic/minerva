@@ -1,5 +1,6 @@
 use futures_util::pin_mut;
 use humantime::format_duration;
+use log::debug;
 use postgres_protocol::escape::escape_identifier;
 use postgres_types::Type;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,6 @@ use std::time::Duration;
 use tokio_postgres::error::SqlState;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{binary_copy::BinaryCopyInWriter, Client, GenericClient, Row, Transaction};
-use log::debug;
 
 use chrono::{DateTime, Utc};
 use rust_decimal::prelude::*;
@@ -54,17 +54,13 @@ pub trait RawMeasurementStore {
 pub trait MeasurementStore {
     async fn store(
         &self,
-        client: &mut Client, 
+        client: &mut Client,
         job_id: i64,
         trends: &[String],
         data_package: &[ValueRow],
     ) -> Result<(), Error>;
 
-    async fn store_package<U>(
-        &self,
-        client: &mut Client,
-        data_package: &U,
-    ) -> Result<(), Error>
+    async fn store_package<U>(&self, client: &mut Client, data_package: &U) -> Result<(), Error>
     where
         U: DataPackage + std::marker::Sync;
 
@@ -400,16 +396,17 @@ impl RawMeasurementStore for TrendStore {
         records: &[(String, DateTime<chrono::Utc>, Vec<String>)],
         null_value: String,
     ) -> Result<(), Error> {
-        let entity_ids: Vec<i32> = entity_mapping.names_to_entity_ids(
-            client,
-            &self.entity_type,
-            records
-                .iter()
-                .map(|(entity_name, _timestamp, _values)| entity_name.clone())
-                .collect(),
-        )
-        .await
-        .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string())))?;
+        let entity_ids: Vec<i32> = entity_mapping
+            .names_to_entity_ids(
+                client,
+                &self.entity_type,
+                records
+                    .iter()
+                    .map(|(entity_name, _timestamp, _values)| entity_name.clone())
+                    .collect(),
+            )
+            .await
+            .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string())))?;
 
         let mut extractors: HashMap<&str, SubPackageExtractor> = HashMap::new();
 
@@ -473,9 +470,7 @@ impl MeasurementStore for TrendStorePart {
             .store_copy_from(client, job_id, trends, data_package)
             .await
         {
-            Ok(_) => {
-                Ok(())
-            },
+            Ok(_) => Ok(()),
             Err(e) => {
                 debug!("ERROR!!!: {e}");
                 match e {
@@ -485,7 +480,7 @@ impl MeasurementStore for TrendStorePart {
                                 .await?;
 
                             Ok(())
-                        },
+                        }
                         _ => Err(Error::Database(dbe)),
                     },
                     _ => Err(e),
@@ -494,11 +489,7 @@ impl MeasurementStore for TrendStorePart {
         }
     }
 
-    async fn store_package<U>(
-        &self,
-        client: &mut Client,
-        data_package: &U,
-    ) -> Result<(), Error>
+    async fn store_package<U>(&self, client: &mut Client, data_package: &U) -> Result<(), Error>
     where
         U: DataPackage + std::marker::Sync,
     {
@@ -696,7 +687,10 @@ impl TrendStorePart {
             // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
             // The string representation of the error does contain the 'duplicate key' violation
             // indication.
-            let kind = if e.to_string().contains("duplicate key value violates unique constraint") {
+            let kind = if e
+                .to_string()
+                .contains("duplicate key value violates unique constraint")
+            {
                 crate::error::DatabaseErrorKind::UniqueViolation
             } else {
                 crate::error::DatabaseErrorKind::Default
@@ -1574,7 +1568,7 @@ mod tests {
 
         match transformed_value {
             MeasValue::Int8(v) => assert_eq!(v.unwrap(), 42),
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1585,7 +1579,7 @@ mod tests {
 
         match transformed_value {
             MeasValue::Numeric(v) => assert_eq!(v.unwrap(), Decimal::from_i32(42).unwrap()),
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 }

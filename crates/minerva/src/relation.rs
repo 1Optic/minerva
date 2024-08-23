@@ -1,11 +1,11 @@
 use std::fmt;
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::Transaction;
 use thiserror::Error;
-use async_trait::async_trait;
+use tokio_postgres::Transaction;
 
 use crate::change::ChangeResult;
 
@@ -179,14 +179,13 @@ pub enum MaterializeRelationError {
     #[error("Could not delete current relations: {source}")]
     Delete {
         #[source]
-        source: tokio_postgres::Error
+        source: tokio_postgres::Error,
     },
     #[error("Could not insert new relations: {source}")]
     Insert {
         #[source]
-        source: tokio_postgres::Error
+        source: tokio_postgres::Error,
     },
-
 }
 
 pub struct MaterializeRelationResult {
@@ -194,13 +193,16 @@ pub struct MaterializeRelationResult {
     pub inserted_count: u64,
 }
 
-pub async fn materialize_relation(tx: &mut Transaction<'_>, name: &str) -> Result<MaterializeRelationResult, MaterializeRelationError> {
+pub async fn materialize_relation(
+    tx: &mut Transaction<'_>,
+    name: &str,
+) -> Result<MaterializeRelationResult, MaterializeRelationError> {
     let delete_query = format!("DELETE FROM relation.{}", escape_identifier(name));
 
     let deleted_count = tx
         .execute(&delete_query, &[])
         .await
-        .map_err(|e| MaterializeRelationError::Delete{source: e})?;
+        .map_err(|e| MaterializeRelationError::Delete { source: e })?;
 
     let insert_query = format!(
         "INSERT INTO relation.{}(source_id, target_id) SELECT source_id, target_id FROM relation_def.{}",
@@ -211,7 +213,7 @@ pub async fn materialize_relation(tx: &mut Transaction<'_>, name: &str) -> Resul
     let inserted_count = tx
         .execute(&insert_query, &[])
         .await
-        .map_err(|e| MaterializeRelationError::Insert{source: e})?;
+        .map_err(|e| MaterializeRelationError::Insert { source: e })?;
 
     Ok(MaterializeRelationResult {
         deleted_count,

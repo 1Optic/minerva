@@ -1,5 +1,5 @@
+use std::env;
 use std::path::PathBuf;
-use std::{env, u8};
 
 use log::info;
 

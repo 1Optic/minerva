@@ -1204,13 +1204,14 @@ pub async fn load_triggers<T: GenericClient + Send + Sync>(
     Ok(triggers)
 }
 
-pub async fn get_notifications<T: GenericClient + Send + Sync, Ts: ToSql + Send + Sync>(
+pub async fn get_notifications<T, Ts>(
     conn: &mut T,
     name: &str,
     timestamp: Ts,
 ) -> Result<Vec<(i32, String, i32, String, String)>, Error>
 where
-    Ts: ToSql,
+    T: GenericClient + Send + Sync,
+    Ts: ToSql + Send + Sync,
 {
     let query = format!("SELECT entity_id, timestamp::text, weight, details, data::text FROM trigger_rule.\"{}_create_notification\"($1::timestamptz)", name);
 
@@ -1266,13 +1267,14 @@ where
     }
 }
 
-pub async fn create_notifications<T: GenericClient + Send + Sync, Ts: ToSql + Send + Sync>(
+pub async fn create_notifications<T, Ts>(
     conn: &mut T,
     name: &str,
     timestamp: Option<Ts>,
 ) -> Result<String, Error>
 where
-    Ts: ToSql,
+    T: GenericClient + Send + Sync,
+    Ts: ToSql + Send + Sync,
 {
     let outer_t: Ts;
 
@@ -1517,7 +1519,7 @@ mod tests {
     fn test_rule_extraction_single_line() {
         let condition_function_source = r#" SELECT * FROM trigger_rule."4G/hourly/PacketDropRate_with_threshold"($1) WHERE "packet_drop_rate" > "packet_drop_rate_max"; "#;
 
-        let rule = extract_rule_from_src(&condition_function_source).unwrap();
+        let rule = extract_rule_from_src(condition_function_source).unwrap();
 
         assert_eq!(rule, r#""packet_drop_rate" > "packet_drop_rate_max""#);
     }
@@ -1527,7 +1529,7 @@ mod tests {
         let condition_function_source = r#" SELECT * FROM trigger_rule."4G/hourly/PacketDropRate_with_threshold"($1) WHERE "packet_drop_rate" > "packet_drop_rate_max" AND
         "packet_drop_amount" > "packet_drop_amount_min"; "#;
 
-        let rule = extract_rule_from_src(&condition_function_source).unwrap();
+        let rule = extract_rule_from_src(condition_function_source).unwrap();
 
         assert_eq!(
             rule,

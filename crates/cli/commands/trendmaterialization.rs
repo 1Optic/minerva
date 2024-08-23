@@ -194,10 +194,7 @@ impl Cmd for TrendMaterializationList {
         for row in rows {
             let id: i32 = row.get(0);
             let name: &str = row.get(1);
-            table.add_row(vec![
-                id.to_string(),
-                name.to_string(),
-            ]);
+            table.add_row(vec![id.to_string(), name.to_string()]);
         }
 
         println!("{table}");

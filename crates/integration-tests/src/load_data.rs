@@ -94,8 +94,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
         let log_level = std::env::var("RUST_LOG").unwrap_or("error".to_string());
 
         let mut cmd = Command::cargo_bin("minerva")?;
-        cmd
-            .env("RUST_LOG", log_level)
+        cmd.env("RUST_LOG", log_level)
             .env("PGUSER", "postgres")
             .env("PGHOST", cluster.controller_host.to_string())
             .env("PGPORT", cluster.controller_port.to_string())
@@ -108,10 +107,9 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
 
         let instance_root_path = std::fs::canonicalize("../../examples/tiny_instance_v1").unwrap();
 
-        let file_path: PathBuf = [
-            instance_root_path,
-            "sample-data/sample.csv".into()
-        ].iter().collect();
+        let file_path: PathBuf = [instance_root_path, "sample-data/sample.csv".into()]
+            .iter()
+            .collect();
 
         cmd.arg("load-data")
             .arg("--data-source")
@@ -173,8 +171,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
         let log_level = std::env::var("RUST_LOG").unwrap_or("error".to_string());
 
         let mut cmd = Command::cargo_bin("minerva")?;
-        cmd
-            .env("RUST_LOG", log_level.clone())
+        cmd.env("RUST_LOG", log_level.clone())
             .env("PGUSER", "postgres")
             .env("PGHOST", cluster.controller_host.to_string())
             .env("PGPORT", cluster.controller_port.to_string())
@@ -195,8 +192,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
         println!("e >> {}", String::from_utf8(output.stderr).unwrap());
 
         let mut cmd = Command::cargo_bin("minerva")?;
-        cmd
-            .env("RUST_LOG", log_level)
+        cmd.env("RUST_LOG", log_level)
             .env("PGUSER", "postgres")
             .env("PGHOST", cluster.controller_host.to_string())
             .env("PGPORT", cluster.controller_port.to_string())
@@ -230,7 +226,8 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
 
             let row = client
                 .query_one(query, &[&"hillside14", &"2023-03-25T14:00:00Z"])
-                .await.expect("Exactly one record for hillside14");
+                .await
+                .expect("Exactly one record for hillside14");
 
             let expected_value: Decimal = dec!(212.4);
             let value: Decimal = row.get(0);
@@ -239,7 +236,8 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
 
             let row = client
                 .query_one(query, &[&"hillside15", &"2023-03-25T14:00:00Z"])
-                .await.expect("Exactly one record for hillside15");
+                .await
+                .expect("Exactly one record for hillside15");
 
             let expected_value: Decimal = dec!(200.0);
             let value: Decimal = row.get(0);

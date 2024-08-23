@@ -218,10 +218,10 @@ fn get_db_config() -> Result<Config, Error> {
             };
 
             let config = config
-                .host(&env::var("PGHOST").unwrap_or("localhost".into()))
+                .host(env::var("PGHOST").unwrap_or("localhost".into()))
                 .port(port)
-                .user(&env::var("PGUSER").unwrap_or("postgres".into()))
-                .dbname(&env::var("PGDATABASE").unwrap_or("postgres".into()))
+                .user(env::var("PGUSER").unwrap_or("postgres".into()))
+                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
                 .ssl_mode(sslmode);
 
             let pg_password = env::var("PGPASSWORD");

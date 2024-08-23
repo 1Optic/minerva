@@ -88,7 +88,9 @@ mod tests {
             let start = std::time::Instant::now();
 
             let tx = client.transaction().await?;
-            let stored_count = attribute_store.store(&tx, &entity_mapping, attributes, rows).await?;
+            let stored_count = attribute_store
+                .store(&tx, &entity_mapping, attributes, rows)
+                .await?;
             tx.commit().await?;
 
             (start.elapsed(), stored_count)
@@ -119,7 +121,6 @@ mod tests {
             assert!(first_timestamp < now);
             let first_hash: String = first_row.get(2);
             assert_eq!(first_hash, "a0bd39a96dab92bf492a1dc8c380c96a");
-
 
             let last_row = rows.last().unwrap();
 

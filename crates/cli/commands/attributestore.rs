@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
 use async_trait::async_trait;
+use clap::{Parser, Subcommand};
 use tokio_postgres::{Client, Row};
 
 use minerva::attribute_store::{
@@ -28,7 +28,10 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
         let client = connect_db().await?;
 
         if let Some(id) = self.id {
-            println!("Materializing curr-ptr table for attribute store with Id {}", id);
+            println!(
+                "Materializing curr-ptr table for attribute store with Id {}",
+                id
+            );
 
             let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
 
@@ -36,9 +39,15 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
 
             let record_count: i32 = row.get(0);
 
-            println!("Materialized curr-ptr table for attribute store with Id {}: {} records", id, record_count);
+            println!(
+                "Materialized curr-ptr table for attribute store with Id {}: {} records",
+                id, record_count
+            );
         } else if let Some(name) = &self.name {
-            println!("Materializing curr-ptr table for attribute store '{}'", name);
+            println!(
+                "Materializing curr-ptr table for attribute store '{}'",
+                name
+            );
 
             let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE ast::text = $1";
 
@@ -46,7 +55,10 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
 
             let record_count: i32 = row.get(0);
 
-            println!("Materialized curr-ptr table for attribute store '{}': {} records", name, record_count);
+            println!(
+                "Materialized curr-ptr table for attribute store '{}': {} records",
+                name, record_count
+            );
         } else if self.all_modified {
             let query = "SELECT ast.id, ast::text FROM attribute_directory.attribute_store ast LEFT JOIN attribute_directory.attribute_store_curr_materialized ascm ON ascm.attribute_store_id = ast.id LEFT JOIN attribute_directory.attribute_store_modified asm ON asm.attribute_store_id = ascm.attribute_store_id WHERE asm.modified <> ascm.materialized";
 
@@ -56,7 +68,10 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 let id: i32 = row.get(0);
                 let name: &str = row.get(1);
 
-                println!("Materializing curr-ptr table for attribute store '{}'", name);
+                println!(
+                    "Materializing curr-ptr table for attribute store '{}'",
+                    name
+                );
 
                 let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
 
@@ -64,7 +79,10 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
 
                 let record_count: i32 = row.get(0);
 
-                println!("Materialized curr-ptr table for attribute store '{}': {} records", name, record_count);
+                println!(
+                    "Materialized curr-ptr table for attribute store '{}': {} records",
+                    name, record_count
+                );
             }
         }
 
@@ -75,9 +93,7 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreList {}
 
-pub async fn list_attribute_stores(
-    conn: &mut Client,
-) -> Result<Vec<(i32, String)>, String> {
+pub async fn list_attribute_stores(conn: &mut Client) -> Result<Vec<(i32, String)>, String> {
     let query = concat!(
         "SELECT ast.id, ast::text ",
         "FROM attribute_directory.attribute_store ast",
@@ -87,12 +103,7 @@ pub async fn list_attribute_stores(
 
     let attribute_stores = result
         .into_iter()
-        .map(|row: Row| {
-            (
-                row.get::<usize, i32>(0),
-                row.get::<usize, String>(1),
-            )
-        })
+        .map(|row: Row| (row.get::<usize, i32>(0), row.get::<usize, String>(1)))
         .collect();
 
     Ok(attribute_stores)
@@ -111,10 +122,7 @@ impl Cmd for AttributeStoreList {
         table.set_header(vec!["Id", "Name"]);
 
         for trend_store in trend_stores {
-            table.add_row(vec![
-                trend_store.0.to_string(),
-                trend_store.1,
-            ]);
+            table.add_row(vec![trend_store.0.to_string(), trend_store.1]);
         }
 
         println!("{table}");
@@ -159,7 +167,9 @@ impl AttributeStoreOpt {
             AttributeStoreOptCommands::List(list) => list.run().await,
             AttributeStoreOptCommands::Create(args) => run_attribute_store_create_cmd(args).await,
             AttributeStoreOptCommands::Update(args) => run_attribute_store_update_cmd(args).await,
-            AttributeStoreOptCommands::MaterializeCurrPtr(materialize_curr_ptr) => materialize_curr_ptr.run().await,
+            AttributeStoreOptCommands::MaterializeCurrPtr(materialize_curr_ptr) => {
+                materialize_curr_ptr.run().await
+            }
         }
     }
 }

@@ -21,10 +21,7 @@ pub async fn start_job<T: GenericClient + Send + Sync>(
     Ok(job_id)
 }
 
-pub async fn end_job<T: GenericClient + Send + Sync>(
-    client: &T,
-    job_id: i64,
-) -> Result<(), Error> {
+pub async fn end_job<T: GenericClient + Send + Sync>(client: &T, job_id: i64) -> Result<(), Error> {
     let query = "SELECT logging.end_job($1)";
 
     client

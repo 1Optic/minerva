@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use tokio_postgres::Client;
 
 use minerva::change::Change;
-use minerva::relation::{load_relation_from_file, AddRelation, UpdateRelation, materialize_relation};
+use minerva::relation::{
+    load_relation_from_file, materialize_relation, AddRelation, UpdateRelation,
+};
 
 use clap::{Parser, Subcommand};
 
@@ -75,7 +77,10 @@ pub struct RelationMaterialize {
 }
 
 async fn get_relation_names(client: &Client) -> Vec<String> {
-    let rows = client.query("SELECT name FROM relation_directory.type", &[]).await.unwrap();
+    let rows = client
+        .query("SELECT name FROM relation_directory.type", &[])
+        .await
+        .unwrap();
 
     rows.iter().map(|row| row.get(0)).collect()
 }
@@ -98,10 +103,9 @@ impl Cmd for RelationMaterialize {
                     tx.commit().await?;
                     println!(
                         "Materialized relation '{name}' (deleted {}, inserted {})",
-                        changed.deleted_count,
-                        changed.inserted_count
+                        changed.deleted_count, changed.inserted_count
                     );
-                },
+                }
                 Err(e) => {
                     tx.rollback().await?;
                     println!("Error materializing relation '{name}': {e}");

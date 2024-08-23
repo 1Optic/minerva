@@ -1,5 +1,5 @@
-use std::future::Future;
 use std::collections::HashMap;
+use std::future::Future;
 
 use postgres_protocol::escape::escape_identifier;
 use quick_cache::sync::Cache;
@@ -22,7 +22,12 @@ type EntityTypeName = String;
 type EntityName = String;
 
 pub trait EntityMapping {
-    fn names_to_entity_ids<T: GenericClient + Sync>(&self, client: &T, entity_type: &EntityTypeName, names: Vec<EntityName>) -> impl Future<Output=Result<Vec<i32>, EntityMappingError>> + Send;
+    fn names_to_entity_ids<T: GenericClient + Sync>(
+        &self,
+        client: &T,
+        entity_type: &EntityTypeName,
+        names: Vec<EntityName>,
+    ) -> impl Future<Output = Result<Vec<i32>, EntityMappingError>> + Send;
 }
 
 pub struct CachingEntityMapping {
@@ -32,7 +37,7 @@ pub struct CachingEntityMapping {
 impl CachingEntityMapping {
     pub fn new(size: usize) -> Self {
         CachingEntityMapping {
-            cache: Cache::new(size)
+            cache: Cache::new(size),
         }
     }
 }
@@ -56,8 +61,9 @@ impl EntityMapping for CachingEntityMapping {
         let mut names_list: Vec<&str> = Vec::new();
 
         for name in &names {
-            if let Some(entity_id) =
-                self.cache.get(&(entity_type.to_string(), String::from(name)))
+            if let Some(entity_id) = self
+                .cache
+                .get(&(entity_type.to_string(), String::from(name)))
             {
                 entity_ids.insert(name.clone(), entity_id);
             } else {
@@ -81,7 +87,8 @@ impl EntityMapping for CachingEntityMapping {
                     None => create_entity(client, entity_type, &name).await?,
                 };
 
-                self.cache.insert((entity_type.to_string(), name.clone()), entity_id);
+                self.cache
+                    .insert((entity_type.to_string(), name.clone()), entity_id);
 
                 entity_ids.insert(name, entity_id);
             }
@@ -98,7 +105,6 @@ impl EntityMapping for CachingEntityMapping {
             .collect()
     }
 }
-
 
 async fn create_entity<T: GenericClient>(
     client: &T,

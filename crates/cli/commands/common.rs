@@ -45,10 +45,10 @@ pub fn get_db_config() -> Result<Config, Error> {
             let default_user_name = env::var("USER").unwrap_or("postgres".into());
 
             let config = config
-                .host(&env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
+                .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
                 .port(port)
-                .user(&env::var("PGUSER").unwrap_or(default_user_name))
-                .dbname(&env::var("PGDATABASE").unwrap_or("postgres".into()))
+                .user(env::var("PGUSER").unwrap_or(default_user_name))
+                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
                 .ssl_mode(sslmode);
 
             let pg_password = env::var("PGPASSWORD");

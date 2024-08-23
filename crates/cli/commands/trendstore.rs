@@ -73,10 +73,10 @@ impl Cmd for TrendStoreDiff {
     async fn run(&self) -> CmdResult {
         let trend_store = load_trend_store_from_file(&self.definition)?;
 
-        let mut client = connect_db().await?;
+        let client = connect_db().await?;
 
         let result = load_trend_store(
-            &mut client,
+            &client,
             &trend_store.data_source,
             &trend_store.entity_type,
             &trend_store.granularity,
@@ -120,7 +120,7 @@ impl Cmd for TrendStoreUpdate {
         let mut client = connect_db().await?;
 
         let result = load_trend_store(
-            &mut client,
+            &client,
             &trend_store.data_source,
             &trend_store.entity_type,
             &trend_store.granularity,
@@ -358,11 +358,11 @@ impl Cmd for TrendStorePartAnalyze {
         for stat in result.trend_stats {
             table.add_row(Row::new(vec![
                 TableCell::new(&stat.name),
-                TableCell::builder(&stat.min_value.unwrap_or("N/A".into()))
+                TableCell::builder(stat.min_value.unwrap_or("N/A".into()))
                     .col_span(1)
                     .alignment(Alignment::Right)
                     .build(),
-                TableCell::builder(&stat.max_value.unwrap_or("N/A".into()))
+                TableCell::builder(stat.max_value.unwrap_or("N/A".into()))
                     .col_span(1)
                     .alignment(Alignment::Right)
                     .build(),
@@ -464,10 +464,10 @@ pub struct TrendStoreDump {
 #[async_trait]
 impl Cmd for TrendStoreDump {
     async fn run(&self) -> CmdResult {
-        let mut client = connect_db().await?;
+        let client = connect_db().await?;
 
         let trend_store = load_trend_store(
-            &mut client,
+            &client,
             &self.data_source,
             &self.entity_type,
             &self.granularity,

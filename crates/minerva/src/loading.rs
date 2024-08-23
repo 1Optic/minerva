@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use log::debug;
 use chrono::DateTime;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio_postgres::Client;
@@ -128,13 +128,9 @@ pub async fn load_data<P: AsRef<Path>>(
 
     if create_partitions {
         for record in &raw_data_package {
-            create_partitions_for_trend_store_and_timestamp(
-                client,
-                trend_store_id,
-                record.1,
-            )
-            .await
-            .map_err(|e| format!("Error creating partition for timestamp: {e}"))?;
+            create_partitions_for_trend_store_and_timestamp(client, trend_store_id, record.1)
+                .await
+                .map_err(|e| format!("Error creating partition for timestamp: {e}"))?;
         }
     }
 

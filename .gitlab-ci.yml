@@ -6,17 +6,24 @@ variables:
 image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.80.0"
 
 stages:
+  - lint
   - test
   - build
   - build-image
 
 lint-openapi:
-  stage: test
+  stage: lint
   image:
     name: redocly/cli
     entrypoint: [""]
   script:
     - redocly lint api-spec/api.yaml
+
+lint:
+  stage: lint
+  script:
+    - cargo fmt --check
+    - RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 
 # Use cargo to test the project
 test-minerva-cli:cargo:

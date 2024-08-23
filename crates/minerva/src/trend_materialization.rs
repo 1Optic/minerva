@@ -9,8 +9,8 @@ use std::time::Duration;
 use tokio_postgres::Transaction;
 
 use postgres_protocol::escape::escape_identifier;
-use tokio_postgres::{types::ToSql, types::Type, GenericClient};
 use thiserror::Error;
+use tokio_postgres::{types::ToSql, types::Type, GenericClient};
 
 use humantime::format_duration;
 
@@ -1224,10 +1224,15 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
     for source in sources {
         let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
 
-        let rows = client.query(source_query, &[&source.trend_store_part]).await?;
+        let rows = client
+            .query(source_query, &[&source.trend_store_part])
+            .await?;
 
         if rows.is_empty() {
-            return Err(Error::Database(DatabaseError::from_msg(format!("Materialization source '{}' does not exist", source.trend_store_part))));
+            return Err(Error::Database(DatabaseError::from_msg(format!(
+                "Materialization source '{}' does not exist",
+                source.trend_store_part
+            ))));
         }
 
         let source_trend_store_part_id: i32 = rows[0].get(0);
@@ -1251,7 +1256,10 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
             })?;
 
         if insert_count == 0 {
-            return Err(Error::Runtime(RuntimeError::from_msg(format!("Unexpectedly no link was created for source '{}'", source.trend_store_part))));
+            return Err(Error::Runtime(RuntimeError::from_msg(format!(
+                "Unexpectedly no link was created for source '{}'",
+                source.trend_store_part
+            ))));
         }
     }
 

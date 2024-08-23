@@ -271,7 +271,7 @@ impl MinervaCluster {
         let mut config = Config::new();
 
         config
-            .host(&self.controller_host.to_string())
+            .host(self.controller_host.to_string())
             .port(self.controller_port)
             .user("postgres")
             .dbname(database_name)
