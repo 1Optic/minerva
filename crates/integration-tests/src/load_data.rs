@@ -2,6 +2,7 @@
 mod tests {
     use assert_cmd::prelude::*;
     use predicates::prelude::*;
+    use toxiproxy_rust::proxy::ProxyPack;
     use std::env;
     use std::io::Write;
     use std::path::PathBuf;
@@ -10,6 +11,8 @@ mod tests {
     use log::info;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
+
+    use testcontainers::{GenericImage, ImageExt, ContainerRequest, core::ContainerPort, runners::AsyncRunner};
 
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
@@ -53,6 +56,16 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
 
     "###;
 
+    const TOXIPROXY_IMAGE: &str = "ghcr.io/shopify/toxiproxy";
+    const TOXIPROXY_TAG: &str = "2.5.0";
+
+    pub fn create_toxiproxy_container(
+    ) -> ContainerRequest<GenericImage> {
+        let image = GenericImage::new(TOXIPROXY_IMAGE, TOXIPROXY_TAG);
+
+        image.with_exposed_port(ContainerPort::Tcp(8474)).into()
+    }
+
     #[tokio::test]
     async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
         crate::setup();
@@ -64,6 +77,27 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
         let cluster = MinervaCluster::start(&config_file, 3).await?;
+
+        let toxiproxy_container = create_toxiproxy_container()
+            .with_network(&cluster.network)
+            .start()
+            .await
+            .map_err(|e| {
+                minerva::error::Error::Runtime(format!("Could not start toxiproxy container: {e}").into())
+            })?;
+
+        let toxiproxy_host = toxiproxy_container.get_host().await.unwrap();
+        let toxiproxy_port = toxiproxy_container
+            .get_host_port_ipv4(8474)
+            .await
+            .unwrap();
+
+        let toxiproxy_addr = format!("{}:{}", toxiproxy_host, toxiproxy_port);
+
+        let toxiproxy_client = toxiproxy_rust::client::Client::new(toxiproxy_addr);
+        let proxies = toxiproxy_client.populate(vec![
+            ProxyPack::new("controller", "localhost:", upstream)
+        ]).expect("Populate completed");
 
         let data_source_name = "hub";
 

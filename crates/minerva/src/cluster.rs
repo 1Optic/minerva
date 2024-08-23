@@ -146,6 +146,7 @@ pub struct MinervaCluster {
     worker_containers: Vec<std::pin::Pin<Box<ContainerAsync<GenericImage>>>>,
     pub controller_host: url::Host,
     pub controller_port: u16,
+    pub network: String,
 }
 
 impl MinervaCluster {
@@ -241,6 +242,7 @@ impl MinervaCluster {
             worker_containers: node_containers,
             controller_host,
             controller_port,
+            network: network_name,
         })
     }
 
