@@ -11,7 +11,6 @@ use std::fmt;
 use std::iter::zip;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio_postgres::error::SqlState;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{binary_copy::BinaryCopyInWriter, Client, GenericClient, Row, Transaction};
 
@@ -471,21 +470,18 @@ impl MeasurementStore for TrendStorePart {
             .await
         {
             Ok(_) => Ok(()),
-            Err(e) => {
-                debug!("ERROR!!!: {e}");
-                match e {
-                    Error::Database(dbe) => match dbe.kind {
-                        DatabaseErrorKind::UniqueViolation => {
-                            self.store_insert(client, job_id, trends, data_package)
-                                .await?;
+            Err(e) => match e {
+                Error::Database(dbe) => match dbe.kind {
+                    DatabaseErrorKind::UniqueViolation => {
+                        self.store_insert(client, job_id, trends, data_package)
+                            .await?;
 
-                            Ok(())
-                        }
-                        _ => Err(Error::Database(dbe)),
-                    },
-                    _ => Err(e),
-                }
-            }
+                        Ok(())
+                    }
+                    _ => Err(Error::Database(dbe)),
+                },
+                _ => Err(e),
+            },
         }
     }
 
@@ -771,11 +767,16 @@ impl TrendStorePart {
             .await?;
 
         binary_copy_writer.finish().await.map_err(|e| {
-            let kind = match e.code() {
-                Some(&SqlState::UNIQUE_VIOLATION) => {
-                    crate::error::DatabaseErrorKind::UniqueViolation
-                }
-                _ => crate::error::DatabaseErrorKind::Default,
+            // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
+            // The string representation of the error does contain the 'duplicate key' violation
+            // indication.
+            let kind = if e
+                .to_string()
+                .contains("duplicate key value violates unique constraint")
+            {
+                crate::error::DatabaseErrorKind::UniqueViolation
+            } else {
+                crate::error::DatabaseErrorKind::Default
             };
 
             Error::Database(DatabaseError {
