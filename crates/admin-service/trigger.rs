@@ -115,7 +115,7 @@ pub(super) async fn change_thresholds(
         {
             Some(_) => {}
             None => {
-                reports.insert(threshold.name.clone(), "This field is required".into());
+                reports.insert(threshold.name.clone(), "This field does not exist".into());
             }
         }
     }
@@ -124,7 +124,7 @@ pub(super) async fn change_thresholds(
         match data.thresholds.iter().find(|th| th.name == threshold.name) {
             Some(_) => {}
             None => {
-                reports.insert(threshold.name.clone(), "This field does not exist".into());
+                reports.insert(threshold.name.clone(), "This field is required".into());
             }
         }
     }
