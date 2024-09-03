@@ -60,7 +60,7 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 name, record_count
             );
         } else if self.all_modified {
-            let query = "SELECT ast.id, ast::text FROM attribute_directory.attribute_store ast LEFT JOIN attribute_directory.attribute_store_curr_materialized ascm ON ascm.attribute_store_id = ast.id LEFT JOIN attribute_directory.attribute_store_modified asm ON asm.attribute_store_id = ascm.attribute_store_id WHERE asm.modified <> ascm.materialized";
+            let query = "SELECT ast.id, ast::text FROM attribute_directory.attribute_store ast LEFT JOIN attribute_directory.attribute_store_curr_materialized ascm ON ascm.attribute_store_id = ast.id LEFT JOIN attribute_directory.attribute_store_modified asm ON asm.attribute_store_id = ascm.attribute_store_id WHERE asm.modified <> ascm.materialized or (ascm.materialized is null and asm.modified is not null)";
 
             let rows = client.query(query, &[]).await?;
 
