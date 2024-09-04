@@ -975,6 +975,7 @@ impl TrendStorePart {
 
         changes
     }
+
 }
 
 impl fmt::Display for TrendStorePart {
@@ -1027,6 +1028,7 @@ impl TrendStore {
             )))
         })
     }
+
 }
 
 impl fmt::Display for TrendStore {
@@ -1450,6 +1452,24 @@ pub async fn create_partitions_for_trend_store_and_timestamp<T: GenericClient>(
         );
     }
 
+    Ok(())
+}
+
+pub async fn columnarize_partitions<T: GenericClient>(
+    client: &mut T,
+) -> Result<(), Error> {
+    debug!("Columnarizing partitions");
+    let query = concat!(
+        "SELECT trend_directory.convert_to_columnar(p) ",
+        "FROM trend_directory.partition p ",
+        "WHERE trend_directory.needs_columnar_store(p)",
+    );
+
+    client
+        .query(query, &[])
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error columnarizing partitions: {e}")))?;
+    
     Ok(())
 }
 
