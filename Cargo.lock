@@ -561,7 +561,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.7.2",
  "rustls-pemfile",
  "rustls-pki-types",
  "serde",
@@ -1657,7 +1657,7 @@ dependencies = [
  "hyper-util",
  "log",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.7.2",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls",
@@ -1810,7 +1810,7 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2005,7 +2005,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2044,7 +2044,7 @@ dependencies = [
  "predicates",
  "regex",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2069,7 +2069,7 @@ dependencies = [
  "postgres",
  "reqwest",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.8.0",
  "serde",
  "serde_json",
  "tokio",
@@ -2100,7 +2100,7 @@ dependencies = [
  "postgres-types",
  "regex",
  "rustls",
- "rustls-native-certs",
+ "rustls-native-certs 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2986,6 +2986,19 @@ name = "rustls-native-certs"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04182dffc9091a404e0fc069ea5cd60e5b866c3adf881eff99a32d048242dffa"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile",
+ "rustls-pki-types",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcaf18a4f2be7326cd874a5fa579fae794320a0f388d365dca7e480e55f83f8a"
 dependencies = [
  "openssl-probe",
  "rustls-pemfile",

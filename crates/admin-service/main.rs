@@ -1,6 +1,6 @@
 use std::{env, process::exit};
 
-use log::info;
+use log::{error, info};
 
 use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpServer};
@@ -13,7 +13,7 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use minerva::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
+use minerva::error::{ConfigurationError, DatabaseError, Error};
 
 mod trendmaterialization;
 use trendmaterialization::{
@@ -287,10 +287,13 @@ async fn make_db_pool(config: &Config) -> Result<Pool, Error> {
     } else {
         let mut roots = rustls::RootCertStore::empty();
 
-        let certificates = rustls_native_certs::load_native_certs()
-            .map_err(|e| RuntimeError::from(format!("Could not load native certificates: {e}")))?;
+        let load_result = rustls_native_certs::load_native_certs();
 
-        for cert in certificates {
+        for e in load_result.errors {
+            error!("Issue while loading TLS certificates: {e}");
+        }
+
+        for cert in load_result.certs {
             roots.add(cert).unwrap();
         }
 
