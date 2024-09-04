@@ -875,6 +875,7 @@ objects:
       CREATE OR REPLACE FUNCTION create_distributed_table(text, text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
       CREATE OR REPLACE FUNCTION create_reference_table(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
       CREATE OR REPLACE FUNCTION create_distributed_function(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
+      CREATE OR REPLACE FUNCTION run_command_on_workers(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
 
 - aggregate:
     name: first
@@ -1971,10 +1972,6 @@ objects:
     - name: partition_size
       data_type: interval
       nullable: false
-    - name: columnar_period
-      data_type: interval
-      nullable: false
-      default: '''1d''::interval'
     - name: retention_period
       data_type: interval
       nullable: false
@@ -2015,6 +2012,18 @@ objects:
     - name: trend_store_unique_constraint
       unique: true
       definition: btree (entity_type_id, data_source_id, granularity)
+
+- function:
+    name: default_columnar_period
+    schema: trend_directory
+    return_type: interval
+    language: sql
+    volatility: immutable
+    strict: false
+    secdef: false
+    arguments: []
+    source: |-
+      SELECT '2w'::interval;
 
 - table:
     name: trend_store_part
@@ -3727,10 +3736,10 @@ objects:
     arguments:
     - data_type: trend_directory.partition
     source: |-
-      SELECT not p.is_columnar and p.from + ts.columnar_period < now()
+      SELECT not p.is_columnar and p.to + COALESCE(m.reprocessing_period, trend_directory.default_columnar_period()) < now()
       FROM trend_directory.partition p
         JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id
-        JOIN trend_directory.trend_store ts ON tsp.trend_store_id = ts.id
+        LEFT JOIN trend_directory.materialization m ON m.dst_trend_store_part_id = p.id
       WHERE p.id = $1.id;
 
 - function:
@@ -6572,7 +6581,7 @@ objects:
               columns_part,
               job_id,
               columns_part,
-              mat.src_view::name
+              mat.src_view
           ) USING timestamp;
 
           GET DIAGNOSTICS row_count = ROW_COUNT;
@@ -10456,6 +10465,9 @@ objects:
     - name: data_source_id
       data_type: integer
       nullable: true
+    - name: entity_type_id
+      data_type: integer
+      nullable: true
     primary_key:
       name: notification_store_pkey
       columns:
@@ -10471,6 +10483,16 @@ objects:
         columns:
         - id
       on_delete: cascade
+    - name: notification_store_entity_type_id_fkey
+      columns:
+      - entity_type_id
+      references:
+        table:
+          name: entity_type
+          schema: directory
+        columns:
+        - id
+      on_delete: set null
     indexes:
     - name: uniqueness
       unique: true
@@ -10606,6 +10628,90 @@ objects:
       privilege: SELECT
     - role: minerva_writer
       privilege: INSERT,UPDATE,DELETE
+
+- table:
+    name: last_notification
+    schema: notification_directory
+    columns:
+    - name: name
+      data_type: text
+      nullable: false
+    - name: notification_store
+      data_type: text
+      nullable: true
+    - name: last_notification
+      data_type: integer
+      nullable: false
+    primary_key:
+      name: last_notification_pkey
+      columns:
+      - name
+      - notification_store
+    description: |-
+      Specifies the id of the last notification seen by a client of
+      the notification service
+
+- function:
+    name: get_last_notification
+    schema: notification_directory
+    return_type: integer
+    language: plpgsql
+    volatility: stable
+    arguments:
+    - name: client
+      data_type: text
+    - name: notification_store
+      data_type: text
+    source: |-
+      DECLARE
+        result integer;
+      BEGIN
+        SELECT ln.last_notification FROM notification_directory.last_notification ln WHERE ln.name = $1 AND ln.notification_store = $2 INTO result;
+        RETURN COALESCE(result, -1);
+      END;
+
+- function:
+    name: get_last_notification
+    schema: notification_directory
+    return_type: integer
+    language: sql
+    volatility: stable
+    arguments:
+    - name: client
+      data_type: text
+    source: |-
+      SELECT notification_directory.get_last_notification($1, $1);
+
+- function:
+    name: set_last_notification
+    schema: notification_directory
+    return_type: void
+    language: sql
+    volatility: volatile
+    arguments:
+    - name: client
+      data_type: text
+    - name: notification_store
+      data_type: text
+    - name: value
+      data_type: integer
+    source: |-
+      INSERT INTO notification_directory.last_notification (name, notification_store, last_notification)
+        VALUES ($1, $2, $3) ON CONFLICT (name, notification_store) DO UPDATE SET last_notification = $3;
+
+- function:
+    name: set_last_notification
+    schema: notification_directory
+    return_type: void
+    language: sql
+    volatility: volatile
+    arguments:
+    - name: client
+      data_type: text
+    - name: value
+      data_type: integer
+    source: |-
+      SELECT notification_directory.set_last_notification($1, $1, $2);
 
 - function:
     name: notification_store_schema
@@ -11264,6 +11370,99 @@ objects:
       name: to_char
     implicit: false
 
+- composite_type:
+    name: generic_notification
+    schema: notification
+    columns:
+    - name: id
+      data_type: integer
+      nullable: false
+    - name: timestamp
+      data_type: timestamptz
+      nullable: false
+    - name: rule
+      data_type: text
+      nullable: false
+    - name: entity
+      data_type: text
+      nullable: false
+    - name: weight
+      data_type: integer
+      nullable: false
+    - name: details
+      data_type: text
+      nullable: false
+    - name: data
+      data_type: json
+      nullable: false
+
+- function:
+    name: get_next_notifications
+    schema: notification_directory
+    return_type: SETOF notification.generic_notification
+    language: plpgsql
+    volatility: stable
+    arguments:
+    - data_type: text
+      name: notification_store
+    - data_type: integer
+      name: last_notification_seen
+    - data_type: integer
+      name: max_notifications
+    source: |-
+      DECLARE
+        entity_type text;
+      BEGIN
+        SELECT et.name FROM notification_directory.notification_store ns
+          JOIN directory.data_source ds ON ds.id = ns.data_source_id
+          JOIN directory.entity_type et ON et.id = ns.entity_type_id
+          WHERE ds.name = $1
+          INTO entity_type;
+        RETURN QUERY EXECUTE(FORMAT(
+          'SELECT n.id as id, timestamp, r.name::text as rule, e.name::text as entity, weight, details, data '
+          'FROM notification.%I n '
+          'JOIN trigger.rule r ON n.rule_id = r.id '
+          'JOIN entity.%I e on n.entity_id = e.id '
+          'WHERE n.id > %s ORDER BY n.id  LIMIT %s',
+          $1,
+          entity_type,
+          $2,
+          $3
+        ));
+      END;
+     
+- function:
+    name: get_last_notifications
+    schema: notification_directory
+    return_type: SETOF notification.generic_notification
+    language: plpgsql
+    volatility: stable
+    arguments:
+    - data_type: text
+      name: notification_store
+    - data_type: integer
+      name: max_notifications
+    source: |-
+      DECLARE
+        entity_type text;
+      BEGIN
+        SELECT et.name FROM notification_directory.notification_store ns
+          JOIN directory.data_source ds ON ds.id = ns.data_source_id
+          JOIN directory.entity_type et ON et.id = ns.entity_type_id
+          WHERE ds.name = $1
+          INTO entity_type;
+        RETURN QUERY EXECUTE(FORMAT(
+          'SELECT n.id as id, timestamp, r.name::text as rule, e.name::text as entity, weight, details, data '
+          'FROM notification.%I n '
+          'JOIN trigger.rule r ON n.rule_id = r.id '
+          'JOIN entity.%I e on n.entity_id = e.id '
+          'ORDER BY n.id DESC LIMIT %s',
+          $1,
+          entity_type,
+          $2
+        ));
+      END;
+
 - function:
     name: cleanup_on_data_source_delete
     schema: directory
@@ -11273,8 +11472,8 @@ objects:
     strict: false
     secdef: false
     arguments:
-      - data_type: integer
-        name: data_source_id
+    - data_type: integer
+      name: data_source_id
     source: |-
       SELECT attribute_directory.delete_attribute_store(s.id) FROM attribute_directory.attribute_store s WHERE s.data_source_id = $1;
       DELETE FROM notification_directory.notification_store WHERE data_source_id = $1;
@@ -12537,7 +12736,7 @@ objects:
     source: |-
       SELECT format(
           $def$CREATE OR REPLACE FUNCTION trigger_rule.%I(%s)
-          RETURNS integer AS
+          RETURNS integer SECURITY DEFINER AS
           $function$
           BEGIN
               EXECUTE format('CREATE OR REPLACE VIEW trigger_rule.%I AS SELECT %s', %s);

@@ -1,5 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS citus;
 
+
 DO
 $do$
 BEGIN
@@ -612,6 +613,7 @@ CREATE OR REPLACE FUNCTION create_reference_table(text) RETURNS VOID AS $$ SELEC
 CREATE OR REPLACE FUNCTION create_distributed_function(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION run_command_on_workers(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
 $function$ LANGUAGE sql VOLATILE;
+
 
 CREATE AGGREGATE first (anyelement) (
     sfunc = fst,
@@ -1267,7 +1269,6 @@ CREATE TABLE "trend_directory"."trend_store"
   "data_source_id" integer,
   "granularity" interval NOT NULL,
   "partition_size" interval NOT NULL,
-  "columnar_period" interval NOT NULL DEFAULT '1d'::interval,
   "retention_period" interval NOT NULL DEFAULT '1 mon'::interval,
   PRIMARY KEY (id)
 );
@@ -1281,6 +1282,13 @@ GRANT SELECT ON TABLE "trend_directory"."trend_store" TO minerva;
 
 GRANT INSERT,UPDATE,DELETE ON TABLE "trend_directory"."trend_store" TO minerva_writer;
 
+
+
+CREATE FUNCTION "trend_directory"."default_columnar_period"()
+    RETURNS interval
+AS $$
+SELECT '2w'::interval;
+$$ LANGUAGE sql IMMUTABLE;
 
 
 CREATE TABLE "trend_directory"."trend_store_part"
@@ -2199,10 +2207,10 @@ $$ LANGUAGE plpgsql VOLATILE;
 CREATE FUNCTION "trend_directory"."needs_columnar_store"(trend_directory.partition)
     RETURNS boolean
 AS $$
-SELECT not p.is_columnar and p.from + ts.columnar_period < now()
+SELECT not p.is_columnar and p.to + COALESCE(m.reprocessing_period, trend_directory.default_columnar_period()) < now()
 FROM trend_directory.partition p
   JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id
-  JOIN trend_directory.trend_store ts ON tsp.trend_store_id = ts.id
+  LEFT JOIN trend_directory.materialization m ON m.dst_trend_store_part_id = p.id
 WHERE p.id = $1.id;
 $$ LANGUAGE sql STABLE;
 
