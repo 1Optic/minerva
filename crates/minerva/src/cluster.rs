@@ -139,6 +139,25 @@ impl TestDatabase {
     pub async fn connect(&self) -> Result<Client, crate::error::Error> {
         connect_to_db(&self.connect_config).await
     }
+
+    pub fn get_env(&self) -> Vec<(String, String)> {
+        let host = match &self.connect_config.get_hosts()[0] {
+            tokio_postgres::config::Host::Tcp(tcp_host) => tcp_host.to_string(),
+            tokio_postgres::config::Host::Unix(path) => path.to_string_lossy().to_string(),
+        };
+
+        let port = self.connect_config.get_ports()[0].to_string();
+
+        vec![
+            ("PGHOST".to_string(), host),
+            ("PGPORT".to_string(), port),
+            ("PGDATABASE".to_string(), self.name.clone()),
+            (
+                "PGUSER".to_string(),
+                self.connect_config.get_user().unwrap().to_string(),
+            ),
+        ]
+    }
 }
 
 pub struct MinervaCluster {

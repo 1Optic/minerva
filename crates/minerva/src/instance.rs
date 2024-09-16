@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -94,11 +95,16 @@ impl MinervaInstance {
         }
     }
 
-    pub async fn initialize(&self, client: &mut Client) -> Result<(), Error> {
+    pub async fn initialize<K, V>(&self, client: &mut Client, env: &[(K, V)]) -> Result<(), Error>
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
         if let Some(instance_root) = &self.instance_root {
             initialize_custom(
                 client,
                 &format!("{}/custom/pre-init/**/*", instance_root.to_string_lossy()),
+                env,
             )
             .await
         }
@@ -120,6 +126,7 @@ impl MinervaInstance {
                     "{}/custom/pre-materialization-init/**/*",
                     instance_root.to_string_lossy()
                 ),
+                env,
             )
             .await
         }
@@ -133,6 +140,7 @@ impl MinervaInstance {
                     "{}/custom/pre-trigger-init/**/*",
                     instance_root.to_string_lossy()
                 ),
+                env,
             )
             .await
         }
@@ -143,6 +151,7 @@ impl MinervaInstance {
             initialize_custom(
                 client,
                 &format!("{}/custom/post-init/**/*", instance_root.to_string_lossy()),
+                env,
             )
             .await
         }
@@ -647,10 +656,19 @@ fn load_psql(path: &PathBuf) -> Result<String, String> {
     }
 }
 
-fn execute_custom(path: &PathBuf) -> Result<String, String> {
-    let cmd = Command::new(path).output();
+fn execute_custom<I, K, V>(path: &PathBuf, env: I) -> Result<String, String>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: AsRef<OsStr>,
+    V: AsRef<OsStr>,
+{
+    let mut cmd = Command::new(path);
 
-    match cmd {
+    cmd.envs(env);
+
+    let cmd_result = cmd.output();
+
+    match cmd_result {
         Ok(output) => match output.status.success() {
             true => {
                 let stdout = std::str::from_utf8(&output.stderr).unwrap();
@@ -667,8 +685,14 @@ fn execute_custom(path: &PathBuf) -> Result<String, String> {
     }
 }
 
-async fn initialize_custom<'a>(client: &'a mut Client, glob_pattern: &'a str) {
+async fn initialize_custom<'a, K, V>(client: &'a mut Client, glob_pattern: &'a str, env: &[(K, V)])
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
     let paths = glob(glob_pattern).expect("Failed to read glob pattern");
+
+    let envs = env.iter().collect::<Vec<_>>();
 
     for entry in paths {
         match entry {
@@ -719,7 +743,11 @@ async fn initialize_custom<'a>(client: &'a mut Client, glob_pattern: &'a str) {
                                         }
                                         Ok(metadata) => {
                                             if (metadata.permissions().mode() & 0o111) != 0 {
-                                                match execute_custom(&path) {
+                                                let env_pairs: Vec<(&str, &str)> = envs
+                                                    .iter()
+                                                    .map(|(k, v)| (k.as_ref(), v.as_ref()))
+                                                    .collect();
+                                                match execute_custom(&path, env_pairs) {
                                                     Ok(msg) => {
                                                         println!(
                                                             "Executed '{}': {}",

@@ -104,10 +104,13 @@ impl Cmd for InitializeOpt {
 
         // We need to set the environment variable for any child processes that might be
         // started during initialization.
-        std::env::set_var(ENV_MINERVA_INSTANCE_ROOT, &self.instance_root);
+        let env = vec![(
+            ENV_MINERVA_INSTANCE_ROOT,
+            self.instance_root.to_string_lossy(),
+        )];
 
         MinervaInstance::load_from(&self.instance_root)
-            .initialize(&mut client)
+            .initialize(&mut client, env.as_slice())
             .await?;
 
         if self.create_partitions {

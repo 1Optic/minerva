@@ -67,7 +67,15 @@ impl Cmd for StartOpt {
                 );
 
                 let minerva_instance = MinervaInstance::load_from(&minerva_instance_root);
-                minerva_instance.initialize(&mut client).await?;
+
+                let mut env: Vec<(String, String)> = vec![(
+                    "MINERVA_INSTANCE_ROOT".to_string(),
+                    minerva_instance_root.to_string_lossy().to_string(),
+                )];
+
+                env.append(&mut test_database.get_env());
+
+                minerva_instance.initialize(&mut client, &env).await?;
 
                 if self.create_partitions {
                     create_partitions(&mut client, None).await?;
@@ -76,8 +84,6 @@ impl Cmd for StartOpt {
                 println!("Initialized");
             }
         }
-
-        //client.execute("SET citus.multi_shard_modify_mode TO 'sequential';", &[]).await.unwrap();
 
         println!("Minerva cluster is running (press CTRL-C to stop)");
         println!("Connect to the cluster on port {}", cluster.controller_port);
