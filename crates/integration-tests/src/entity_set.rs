@@ -106,7 +106,7 @@ mod tests {
                 body,
                 json!({
                     "code": 200,
-                    "message": "Entity set created",
+                    "message": "Entity set number 1 created",
                 })
             );
         }

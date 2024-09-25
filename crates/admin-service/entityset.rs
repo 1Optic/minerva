@@ -7,7 +7,9 @@ use actix_web::{get, post, put, web::Data, web::Json, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 
 use minerva::change::Change;
-use minerva::entity_set::{load_entity_sets, ChangeEntitySet, CreateEntitySet, EntitySet};
+use minerva::entity_set::{
+    load_entity_sets, ChangeEntitySet, CreateEntitySet, EntitySet, NewEntitySet,
+};
 
 use super::serviceerror::{ServiceError, ServiceErrorKind};
 use crate::error::{Error, Success};
@@ -22,11 +24,22 @@ pub struct EntitySetData {
     pub owner: String,
     pub description: Option<String>,
     pub entities: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct EntitySetDataFull {
+    pub id: i32,
+    pub name: PostgresName,
+    pub group: Option<String>,
+    pub entity_type: Option<String>,
+    pub owner: String,
+    pub description: Option<String>,
+    pub entities: Vec<String>,
     pub created: Option<DateTime<Utc>>,
     pub modified: Option<DateTime<Utc>>,
 }
 
-impl EntitySetData {
+impl EntitySetDataFull {
     fn entity_set(&self) -> EntitySet {
         let group = match &self.group {
             None => "".to_string(),
@@ -41,6 +54,7 @@ impl EntitySetData {
             Some(value) => value.to_string(),
         };
         EntitySet {
+            id: self.id,
             name: self.name.to_string(),
             group,
             entity_type,
@@ -49,6 +63,33 @@ impl EntitySetData {
             entities: self.entities.to_vec(),
             created: self.created.unwrap_or(Utc::now()),
             modified: self.modified.unwrap_or(Utc::now()),
+        }
+    }
+}
+
+impl EntitySetData {
+    fn entity_set(&self) -> NewEntitySet {
+        let group = match &self.group {
+            None => "".to_string(),
+            Some(value) => value.to_string(),
+        };
+        let entity_type = match &self.entity_type {
+            None => "".to_string(),
+            Some(value) => value.to_string(),
+        };
+        let description = match &self.description {
+            None => "".to_string(),
+            Some(value) => value.to_string(),
+        };
+        NewEntitySet {
+            name: self.name.to_string(),
+            group,
+            entity_type,
+            owner: self.owner.to_string(),
+            description,
+            entities: self.entities.to_vec(),
+            created: Utc::now(),
+            modified: Utc::now(),
         }
     }
 }
@@ -80,7 +121,7 @@ pub(super) async fn get_entity_sets(pool: Data<Pool>) -> Result<HttpResponse, Se
 
 async fn change_entity_set_fn(
     pool: Data<Pool>,
-    data: Json<EntitySetData>,
+    data: Json<EntitySetDataFull>,
 ) -> Result<HttpResponse, Error> {
     let mut manager = pool.get().await.map_err(|e| Error {
         code: 500,
@@ -126,7 +167,7 @@ async fn change_entity_set_fn(
 #[put("/entitysets")]
 pub(super) async fn change_entity_set(
     pool: Data<Pool>,
-    data: Json<EntitySetData>,
+    data: Json<EntitySetDataFull>,
 ) -> impl Responder {
     let result = change_entity_set_fn(pool, data).await;
     match result {
@@ -163,7 +204,7 @@ async fn create_entity_set_fn(
         message: e.to_string(),
     })?;
 
-    action.apply(&mut tx).await.map_err(|e| Error {
+    let result = action.apply(&mut tx).await.map_err(|e| Error {
         code: 409,
         message: format!("Creation of entity set failed: {e}"),
     })?;
@@ -175,7 +216,7 @@ async fn create_entity_set_fn(
 
     Ok(HttpResponse::Ok().json(Success {
         code: 200,
-        message: "Entity set created".to_string(),
+        message: result,
     }))
 }
 
