@@ -113,7 +113,7 @@ async fn change_entity_set_fn(
         messages.insert("general".to_string(), Value::String(e.to_string()));
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
-            messages: messages,
+            messages,
         }
     })?;
 
@@ -122,7 +122,7 @@ async fn change_entity_set_fn(
         messages.insert("general".to_string(), Value::String(e.to_string()));
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
-            messages: messages,
+            messages,
         }
     })?;
 
@@ -170,7 +170,7 @@ async fn change_entity_set_fn(
             let mut messages = Map::new();
             messages.insert(
                 "general".to_string(),
-                format!("Entity set cannot be empty").into(),
+                "Entity set cannot be empty".into(),
             );
             Ok(HttpResponse::BadRequest().json(messages))
         }
@@ -179,7 +179,7 @@ async fn change_entity_set_fn(
             messages.insert("general".to_string(), "Unexpected Error".into());
             Err(ExtendedServiceError {
                 kind: ServiceErrorKind::InternalError,
-                messages: messages,
+                messages,
             })
         }
     }
@@ -220,7 +220,7 @@ async fn create_entity_set_fn(
         messages.insert("general".to_string(), Value::String(e.to_string()));
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
-            messages: messages,
+            messages,
         }
     })?;
 
@@ -229,7 +229,7 @@ async fn create_entity_set_fn(
         messages.insert("general".to_string(), Value::String(e.to_string()));
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
-            messages: messages,
+            messages,
         }
     })?;
 
@@ -262,7 +262,7 @@ async fn create_entity_set_fn(
             let mut messages = Map::new();
             messages.insert(
                 "general".to_string(),
-                format!("Entity set cannot be empty").into(),
+                "Entity set cannot be empty".into(),
             );
             Ok(HttpResponse::BadRequest().json(messages))
         }
@@ -278,7 +278,7 @@ async fn create_entity_set_fn(
             messages.insert("general".to_string(), "Unexpected Error".into());
             Err(ExtendedServiceError {
                 kind: ServiceErrorKind::InternalError,
-                messages: messages,
+                messages,
             })
         }
     }
