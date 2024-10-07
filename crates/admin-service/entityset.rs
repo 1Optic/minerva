@@ -168,10 +168,7 @@ async fn change_entity_set_fn(
         }
         Err(EntitySetError::EmptyEntitySet) => {
             let mut messages = Map::new();
-            messages.insert(
-                "general".to_string(),
-                "Entity set cannot be empty".into(),
-            );
+            messages.insert("general".to_string(), "Entity set cannot be empty".into());
             Ok(HttpResponse::BadRequest().json(messages))
         }
         Err(_) => {
@@ -260,10 +257,7 @@ async fn create_entity_set_fn(
         }
         Err(EntitySetError::EmptyEntitySet) => {
             let mut messages = Map::new();
-            messages.insert(
-                "general".to_string(),
-                "Entity set cannot be empty".into(),
-            );
+            messages.insert("general".to_string(), "Entity set cannot be empty".into());
             Ok(HttpResponse::BadRequest().json(messages))
         }
         Err(EntitySetError::MissingEntities(missing_entities)) => {
