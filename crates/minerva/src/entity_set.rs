@@ -11,6 +11,7 @@ use super::change::{Change, ChangeResult};
 use super::error::{DatabaseError, DatabaseErrorKind, Error, RuntimeError};
 
 type PostgresName = String;
+use log::info;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntitySet {
@@ -33,8 +34,30 @@ pub struct NewEntitySet {
     pub owner: String,
     pub description: String,
     pub entities: Vec<String>,
-    pub created: DateTime<Utc>,
-    pub modified: DateTime<Utc>,
+}
+
+pub enum EntitySetError {
+    DatabaseError(DatabaseError),
+    NotFound(DatabaseError),
+    ExistingEntitySet(String, String),
+    EmptyEntitySet,
+    MissingEntities(Vec<String>),
+    UnchangeableFields(Vec<String>),
+}
+
+impl From<DatabaseError> for EntitySetError {
+    fn from(e: DatabaseError) -> EntitySetError {
+        EntitySetError::DatabaseError(e)
+    }
+}
+
+impl From<String> for EntitySetError {
+    fn from(e: String) -> EntitySetError {
+        EntitySetError::DatabaseError(DatabaseError {
+            msg: e,
+            kind: DatabaseErrorKind::Default,
+        })
+    }
 }
 
 impl fmt::Display for EntitySet {
@@ -125,6 +148,102 @@ pub async fn load_entity_set(
     Ok(entity_set)
 }
 
+impl EntitySet {
+    pub async fn update(&self, conn: &mut Transaction<'_>) -> Result<EntitySet, EntitySetError> {
+        let row = conn
+            .query_one(
+                "SELECT name, owner, source_entity_type FROM attribute.minerva_entity_set WHERE id = $1",
+                &[&self.id],
+            )
+            .await
+            .map_err(|e| EntitySetError::NotFound(DatabaseError::from_msg(e.to_string())))?;
+
+        let mut incorrect_fields: Vec<String> = vec![];
+        let foundname: String = row.get(0);
+        if self.name != foundname {
+            incorrect_fields.push("name".to_string())
+        };
+        let foundowner: String = row.get(1);
+        if self.owner != foundowner {
+            incorrect_fields.push("owner".to_string())
+        };
+        let foundentitytype: String = row.get(2);
+        if self.entity_type != foundentitytype {
+            incorrect_fields.push("entity_type".to_string())
+        };
+        if incorrect_fields.is_empty() {
+            match self.entities.len() {
+                0 => Err(EntitySetError::EmptyEntitySet),
+                _ => {
+                    let entitieslist = self.entities.join("', '");
+
+                    let query = format!(
+                        concat!("SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])"),
+                        self.id.to_string(),
+                        entitieslist
+                    );
+                    let row = conn.query_one(&query, &[]).await.map_err(|e| {
+                        EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                    })?;
+
+                    let missing_entities: Vec<String> = row.get(0);
+                    if missing_entities.is_empty() {
+                        let query = concat!(
+                            "INSERT INTO attribute_staging.minerva_entity_set ",
+                            "(entity_id, timestamp, name, fullname, \"group\", source_entity_type, owner, description, last_update) ",
+                            "VALUES ($1, now(), $2, $3, $4, $5, $6, $7, CURRENT_DATE::text)",
+                        );
+
+                        conn.execute(
+                            query,
+                            &[
+                                &self.id,
+                                &self.name,
+                                &format!("{}__{}", &self.name, &self.owner),
+                                &self.group,
+                                &self.entity_type,
+                                &self.owner,
+                                &self.description,
+                            ],
+                        )
+                        .await
+                        .map_err(|e| {
+                            EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                        })?;
+
+                        let query = "SELECT attribute_directory.transfer_staged(at) FROM attribute_directory.attribute_store at WHERE id = $1";
+                        conn.execute(query, &[&self.id]).await.map_err(|e| {
+                            EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                        })?;
+
+                        let newdata = conn.query_one(
+                            "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE id = $1",
+                                &[&self.id,])
+                            .await
+                            .map_err(|e| EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+                        let changed_entity_set = EntitySet {
+                            id: self.id,
+                            name: newdata.get(0),
+                            group: newdata.get(1),
+                            entity_type: newdata.get(2),
+                            owner: newdata.get(3),
+                            description: newdata.get(4),
+                            entities: self.entities.to_vec(),
+                            created: newdata.get(5),
+                            modified: newdata.get(5),
+                        };
+                        Ok(changed_entity_set)
+                    } else {
+                        Err(EntitySetError::MissingEntities(missing_entities))
+                    }
+                }
+            }
+        } else {
+            Err(EntitySetError::UnchangeableFields(incorrect_fields))
+        }
+    }
+}
+
 pub struct ChangeEntitySet {
     pub entity_set: EntitySet,
     pub entities: Vec<String>,
@@ -143,30 +262,112 @@ impl fmt::Display for ChangeEntitySet {
 #[async_trait]
 impl Change for ChangeEntitySet {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let entitieslist = self.entities.join("', '");
+        let result = self.entity_set.update(client).await;
+        match result {
+            Ok(_) => Ok("Entity set updated".to_string()),
+            Err(EntitySetError::DatabaseError(err)) => Err(Error::Database(err)),
+            Err(EntitySetError::ExistingEntitySet(name, owner)) => {
+                Err(Error::Database(DatabaseError {
+                    msg: format!(
+                        "An entity set with name {} and owner {} already exists.",
+                        &name, &owner,
+                    ),
+                    kind: DatabaseErrorKind::UniqueViolation,
+                }))
+            }
+            Err(EntitySetError::EmptyEntitySet) => Err(Error::Runtime(RuntimeError::from_msg(
+                "Entity sets cannot be empty".to_string(),
+            ))),
+            Err(EntitySetError::MissingEntities(missing_entities)) => {
+                Err(Error::Runtime(RuntimeError::from_msg(format!(
+                    "The following entities do not exist: {}",
+                    missing_entities.join(", ")
+                ))))
+            }
+            Err(_) => Err(Error::Database(DatabaseError {
+                msg: "Unexpected Error".to_string(),
+                kind: DatabaseErrorKind::Default,
+            })),
+        }
+    }
+}
 
-        let query = format!(
-            concat!("SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])"),
-            self.entity_set.id.to_string(),
-            entitieslist
-        );
-        let row = client.query_one(&query, &[]).await.map_err(|e| {
-            DatabaseError::from_msg(format!(
-                "Error changing entity set '{}:{}': {}",
-                &self.entity_set.owner, &self.entity_set.name, e
-            ))
-        })?;
+impl NewEntitySet {
+    pub async fn create(&self, conn: &mut Transaction<'_>) -> Result<EntitySet, EntitySetError> {
+        let row = conn
+            .query_one(
+                "SELECT relation_directory.entity_set_exists($1, $2)",
+                &[&self.owner, &self.name],
+            )
+            .await
+            .map_err(|e| EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-        let missing_entities: Vec<String> = row.get(0);
+        match row.get(0) {
+            true => Err(EntitySetError::ExistingEntitySet(
+                self.name.clone(),
+                self.owner.clone(),
+            )),
+            false => match self.entities.len() {
+                0 => Err(EntitySetError::EmptyEntitySet),
+                _ => {
+                    let entitieslist = self.entities.join("', '");
+                    let query = format!(
+                        concat!(
+                            "SELECT relation_directory.create_entity_set_guarded(",
+                            "$1, $2, $3, $4, $5, ARRAY['{}'])"
+                        ),
+                        entitieslist
+                    );
 
-        if missing_entities.is_empty() {
-            Ok("Entity set updated".to_string())
-        } else {
-            let missing_entities_list = missing_entities.join(", ");
-            Err(Error::Runtime(RuntimeError::from_msg(format!(
-                "The following entities do not exist: {}",
-                missing_entities_list
-            ))))
+                    info!(
+                        "SELECT relation_directory.create_entity_set_guarded('{}', '{}', '{}', '{}', '{}', ARRAY['{}'])",                       
+                        &self.name,
+                        &self.group,
+                        &self.entity_type,
+                        &self.owner,
+                        &self.description,
+                        entitieslist
+                    );
+
+                    let row = conn
+                        .query_one(
+                            &query,
+                            &[
+                                &self.name,
+                                &self.group,
+                                &self.entity_type,
+                                &self.owner,
+                                &self.description,
+                            ],
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    let missing_entities: Vec<String> = row.get(0);
+
+                    if missing_entities.is_empty() {
+                        let iddata = conn.query_one(
+                            "SELECT id, first_appearance, modified FROM attribute.minerva_entity_set es WHERE name = $1 AND owner = $2",
+                                &[&self.name, &self.owner,])
+                            .await
+                            .map_err(|e| EntitySetError::DatabaseError(DatabaseError{msg: e.to_string(), kind: DatabaseErrorKind::Default}))?;
+                        let created_entity_set = EntitySet {
+                            id: iddata.get(0),
+                            name: self.name.clone(),
+                            group: self.group.clone(),
+                            entity_type: self.entity_type.clone(),
+                            owner: self.owner.clone(),
+                            description: self.description.clone(),
+                            entities: self.entities.to_vec(),
+                            created: iddata.get(1),
+                            modified: iddata.get(2),
+                        };
+                        Ok(created_entity_set)
+                    } else {
+                        Err(EntitySetError::MissingEntities(missing_entities))
+                    }
+                }
+            },
         }
     }
 }
@@ -188,84 +389,31 @@ impl fmt::Display for CreateEntitySet {
 #[async_trait]
 impl Change for CreateEntitySet {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let row = client
-            .query_one(
-                "SELECT relation_directory.entity_set_exists($1, $2)",
-                &[&self.entity_set.owner, &self.entity_set.name],
-            )
-            .await
-            .map_err(|e| {
-                DatabaseError::from_msg(format!(
-                    "Error checking existence of entity set '{}:{}': {}",
-                    &self.entity_set.owner, &self.entity_set.name, e
-                ))
-            })?;
-
-        match row.get(0) {
-            true => Err(Error::Database(DatabaseError {
-                msg: format!(
-                    "An entity set with name {} and owner {} already exists.",
-                    &self.entity_set.name, &self.entity_set.owner,
-                ),
-                kind: DatabaseErrorKind::UniqueViolation,
-            })),
-            false => match self.entity_set.entities.len() {
-                0 => Err(Error::Runtime(RuntimeError::from_msg(
-                    "Entity sets cannot be empty".to_string(),
-                ))),
-                _ => {
-                    let entitieslist = self.entity_set.entities.join("', '");
-                    let query = format!(
-                        concat!(
-                            "SELECT relation_directory.create_entity_set_guarded(",
-                            "$1, $2, $3, $4, $5, ARRAY['{}'])"
-                        ),
-                        entitieslist
-                    );
-
-                    let row = client
-                        .query_one(
-                            &query,
-                            &[
-                                &self.entity_set.name,
-                                &self.entity_set.group,
-                                &self.entity_set.entity_type,
-                                &self.entity_set.owner,
-                                &self.entity_set.description,
-                            ],
-                        )
-                        .await
-                        .map_err(|e| {
-                            DatabaseError::from_msg(format!(
-                                "Error creating entity set '{}:{}': {}",
-                                &self.entity_set.owner, &self.entity_set.name, e
-                            ))
-                        })?;
-
-                    let missing_entities: Vec<String> = row.get(0);
-
-                    if missing_entities.is_empty() {
-                        let iddata = client.query_one(
-                                "SELECT id FROM attribute.minerva_entity_set es WHERE name = $1 AND owner = $2",
-                                &[&self.entity_set.name, &self.entity_set.owner,])
-                                .await
-                                .map_err(|e| {
-                                    DatabaseError::from_msg(format!(
-                                        "Entity set created, but unable to get id: {}",
-                                        e
-                                    ))
-                                })?;
-                        let id: i32 = iddata.get(0);
-                        Ok(format!("Entity set number {} created", &id))
-                    } else {
-                        let missing_entities_list = missing_entities.join(", ");
-                        Err(Error::Runtime(RuntimeError::from_msg(format!(
-                            "The following entities do not exist: {}",
-                            missing_entities_list
-                        ))))
-                    }
-                }
-            },
+        let result = self.entity_set.create(client).await;
+        match result {
+            Ok(entity_set) => Ok(format!("Entity set number {} created", &entity_set.id)),
+            Err(EntitySetError::DatabaseError(err)) => Err(Error::Database(err)),
+            Err(EntitySetError::ExistingEntitySet(name, owner)) => {
+                Err(Error::Database(DatabaseError {
+                    msg: format!(
+                        "An entity set with name {} and owner {} already exists.",
+                        &name, &owner,
+                    ),
+                    kind: DatabaseErrorKind::UniqueViolation,
+                }))
+            }
+            Err(EntitySetError::EmptyEntitySet) => Err(Error::Runtime(RuntimeError::from_msg(
+                "Entity sets cannot be empty".to_string(),
+            ))),
+            Err(EntitySetError::MissingEntities(missing_entities)) => {
+                Err(Error::Runtime(RuntimeError::from_msg(format!(
+                    "The following entities do not exist: {}",
+                    missing_entities.join(", ")
+                ))))
+            }
+            Err(_) => Err(Error::Runtime(RuntimeError::from_msg(
+                "Unexpected Error".to_string(),
+            ))),
         }
     }
 }

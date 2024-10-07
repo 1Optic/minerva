@@ -1,17 +1,16 @@
 use deadpool_postgres::Pool;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::ops::DerefMut;
 use utoipa::ToSchema;
 
 use actix_web::{get, post, put, web::Data, web::Json, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 
-use minerva::change::Change;
-use minerva::entity_set::{
-    load_entity_sets, ChangeEntitySet, CreateEntitySet, EntitySet, NewEntitySet,
-};
+use minerva::entity_set::{load_entity_sets, EntitySet, EntitySetError, NewEntitySet};
+use minerva::error::DatabaseError;
 
-use super::serviceerror::{ServiceError, ServiceErrorKind};
+use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};
 use crate::error::{Error, Success};
 
 type PostgresName = String;
@@ -30,10 +29,10 @@ pub struct EntitySetData {
 pub struct EntitySetDataFull {
     pub id: i32,
     pub name: PostgresName,
-    pub group: Option<String>,
-    pub entity_type: Option<String>,
+    pub group: String,
+    pub entity_type: String,
     pub owner: String,
-    pub description: Option<String>,
+    pub description: String,
     pub entities: Vec<String>,
     pub created: Option<DateTime<Utc>>,
     pub modified: Option<DateTime<Utc>>,
@@ -41,25 +40,13 @@ pub struct EntitySetDataFull {
 
 impl EntitySetDataFull {
     fn entity_set(&self) -> EntitySet {
-        let group = match &self.group {
-            None => "".to_string(),
-            Some(value) => value.to_string(),
-        };
-        let entity_type = match &self.entity_type {
-            None => "".to_string(),
-            Some(value) => value.to_string(),
-        };
-        let description = match &self.description {
-            None => "".to_string(),
-            Some(value) => value.to_string(),
-        };
         EntitySet {
             id: self.id,
             name: self.name.to_string(),
-            group,
-            entity_type,
+            group: self.group.to_string(),
+            entity_type: self.entity_type.to_string(),
             owner: self.owner.to_string(),
-            description,
+            description: self.description.to_string(),
             entities: self.entities.to_vec(),
             created: self.created.unwrap_or(Utc::now()),
             modified: self.modified.unwrap_or(Utc::now()),
@@ -88,8 +75,6 @@ impl EntitySetData {
             owner: self.owner.to_string(),
             description,
             entities: self.entities.to_vec(),
-            created: Utc::now(),
-            modified: Utc::now(),
         }
     }
 }
@@ -122,36 +107,82 @@ pub(super) async fn get_entity_sets(pool: Data<Pool>) -> Result<HttpResponse, Se
 async fn change_entity_set_fn(
     pool: Data<Pool>,
     data: Json<EntitySetDataFull>,
-) -> Result<HttpResponse, Error> {
-    let mut manager = pool.get().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
+) -> Result<HttpResponse, ExtendedServiceError> {
+    let mut manager = pool.get().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), Value::String(e.to_string()));
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: messages,
+        }
     })?;
 
-    let action = ChangeEntitySet {
-        entity_set: data.entity_set(),
-        entities: data.entities.clone(),
-    };
-
-    let mut tx = manager.transaction().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
+    let mut tx = manager.transaction().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), Value::String(e.to_string()));
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: messages,
+        }
     })?;
 
-    action.apply(&mut tx).await.map_err(|e| Error {
-        code: 409,
-        message: format!("Change of entity set failed: {e}"),
-    })?;
+    let entity_set = data.entity_set();
 
-    tx.commit().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
-    })?;
+    let result = entity_set.update(&mut tx).await;
 
-    Ok(HttpResponse::Ok().json(Success {
-        code: 200,
-        message: "Entity set changed".to_string(),
-    }))
+    match result {
+        Ok(_) => {
+            tx.commit().await?;
+            Ok(HttpResponse::Ok().json(Success {
+                code: 200,
+                message: "Entity set updated".into(),
+            }))
+        }
+        Err(EntitySetError::NotFound(DatabaseError { msg: e, kind: _ })) => {
+            let mut messages = Map::new();
+            messages.insert(
+                "id".to_string(),
+                format!("Unable to find entity set with id {}", entity_set.id).into(),
+            );
+            messages.insert("general".to_string(), e.to_string().into());
+            Ok(HttpResponse::NotFound().json(messages))
+        }
+        Err(EntitySetError::UnchangeableFields(fields)) => {
+            let mut messages = Map::new();
+            for field in fields {
+                messages.insert(field, "Field cannot be changed".into());
+            }
+            Ok(HttpResponse::Conflict().json(messages))
+        }
+        Err(EntitySetError::DatabaseError(DatabaseError { msg: e, kind: _ })) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            Ok(HttpResponse::InternalServerError().json(messages))
+        }
+        Err(EntitySetError::MissingEntities(missing_entities)) => {
+            let mut messages = Map::new();
+            for entity in missing_entities {
+                messages.insert(entity, "Entity does not exist".into());
+            }
+            Ok(HttpResponse::Conflict().json(messages))
+        }
+        Err(EntitySetError::EmptyEntitySet) => {
+            let mut messages = Map::new();
+            messages.insert(
+                "general".to_string(),
+                format!("Entity set cannot be empty").into(),
+            );
+            Ok(HttpResponse::BadRequest().json(messages))
+        }
+        Err(_) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), "Unexpected Error".into());
+            Err(ExtendedServiceError {
+                kind: ServiceErrorKind::InternalError,
+                messages: messages,
+            })
+        }
+    }
 }
 
 #[utoipa::path(
@@ -173,15 +204,9 @@ pub(super) async fn change_entity_set(
     match result {
         Ok(res) => res,
         Err(e) => {
-            let err = Error {
-                code: e.code,
-                message: e.message,
-            };
-            match err.code {
-                400 => HttpResponse::BadRequest().json(err),
-                409 => HttpResponse::Conflict().json(err),
-                _ => HttpResponse::InternalServerError().json(err),
-            }
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            HttpResponse::InternalServerError().json(messages)
         }
     }
 }
@@ -189,35 +214,74 @@ pub(super) async fn change_entity_set(
 async fn create_entity_set_fn(
     pool: Data<Pool>,
     data: Json<EntitySetData>,
-) -> Result<HttpResponse, Error> {
-    let mut manager = pool.get().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
+) -> Result<HttpResponse, ExtendedServiceError> {
+    let mut manager = pool.get().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), Value::String(e.to_string()));
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: messages,
+        }
     })?;
 
-    let action = CreateEntitySet {
-        entity_set: data.entity_set(),
-    };
-
-    let mut tx = manager.transaction().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
+    let mut tx = manager.transaction().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), Value::String(e.to_string()));
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: messages,
+        }
     })?;
 
-    let result = action.apply(&mut tx).await.map_err(|e| Error {
-        code: 409,
-        message: format!("Creation of entity set failed: {e}"),
-    })?;
+    let entity_set = data.entity_set();
 
-    tx.commit().await.map_err(|e| Error {
-        code: 500,
-        message: e.to_string(),
-    })?;
+    let result = entity_set.create(&mut tx).await;
 
-    Ok(HttpResponse::Ok().json(Success {
-        code: 200,
-        message: result,
-    }))
+    match result {
+        Ok(entity_set) => {
+            tx.commit().await?;
+            Ok(HttpResponse::Ok().json(Success {
+                code: 200,
+                message: format!("Entity set number {} created", &entity_set.id),
+            }))
+        }
+        Err(EntitySetError::DatabaseError(DatabaseError { msg: e, kind: _ })) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            Ok(HttpResponse::InternalServerError().json(messages))
+        }
+        Err(EntitySetError::ExistingEntitySet(_name, _owner)) => {
+            let mut messages = Map::new();
+            messages.insert(
+                "name".to_string(),
+                "Entity set with name and owner already exists".into(),
+            );
+            Ok(HttpResponse::Conflict().json(messages))
+        }
+        Err(EntitySetError::EmptyEntitySet) => {
+            let mut messages = Map::new();
+            messages.insert(
+                "general".to_string(),
+                format!("Entity set cannot be empty").into(),
+            );
+            Ok(HttpResponse::BadRequest().json(messages))
+        }
+        Err(EntitySetError::MissingEntities(missing_entities)) => {
+            let mut messages = Map::new();
+            for entity in missing_entities {
+                messages.insert(entity, "Entity does not exist".into());
+            }
+            Ok(HttpResponse::Conflict().json(messages))
+        }
+        Err(_) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), "Unexpected Error".into());
+            Err(ExtendedServiceError {
+                kind: ServiceErrorKind::InternalError,
+                messages: messages,
+            })
+        }
+    }
 }
 
 #[utoipa::path(
@@ -239,15 +303,9 @@ pub(super) async fn create_entity_set(
     match result {
         Ok(res) => res,
         Err(e) => {
-            let err = Error {
-                code: e.code,
-                message: e.message,
-            };
-            match err.code {
-                400 => HttpResponse::BadRequest().json(err),
-                409 => HttpResponse::Conflict().json(err),
-                _ => HttpResponse::InternalServerError().json(err),
-            }
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            HttpResponse::InternalServerError().json(messages)
         }
     }
 }
