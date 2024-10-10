@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.7.0] - 2024-10-10
+
+### Changed
+
+- Use Id instead of name for entity set identification in API
+
+### Fixed
+
+- Fix passing of MINERVA_INSTANCE_ROOT to child processes for initialization
+
 ## [9.6.2] - 2024-09-03
 
 ### Fixed
@@ -94,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.2...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.7.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -109,3 +119,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.6.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.5.0...9.6.0
 [9.6.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.0...9.6.1
 [9.6.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.1...9.6.2
+[9.7.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.2...9.7.0
