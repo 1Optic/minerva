@@ -22,9 +22,9 @@ use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_store::{
-    analyze_trend_store_part, create_partitions, create_partitions_for_timestamp,
-    delete_trend_store, list_trend_stores, load_trend_store, load_trend_store_from_file,
-    columnarize_partitions,
+    analyze_trend_store_part, columnarize_partitions, create_partitions,
+    create_partitions_for_timestamp, delete_trend_store, list_trend_stores, load_trend_store,
+    load_trend_store_from_file,
 };
 
 use super::common::{connect_db, Cmd, CmdResult};
@@ -199,9 +199,7 @@ pub struct TrendStorePartitionRemove {
 }
 
 #[derive(Debug, Parser, PartialEq)]
-pub struct ColumnarizePartitions {
-
-}
+pub struct ColumnarizePartitions {}
 
 #[async_trait]
 impl Cmd for TrendStorePartitionRemove {
@@ -282,7 +280,7 @@ pub enum TrendStorePartitionCommands {
     #[command(about = "remove partitions")]
     Remove(TrendStorePartitionRemove),
     #[command(about = "change partitions to columnar storage")]
-    Columnar(ColumnarizePartitions)
+    Columnar(ColumnarizePartitions),
 }
 
 #[derive(Debug, Parser, PartialEq)]
