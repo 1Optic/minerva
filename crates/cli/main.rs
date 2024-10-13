@@ -18,6 +18,7 @@ use crate::commands::trendmaterialization::TrendMaterializationOpt;
 use crate::commands::trendstore::TrendStoreOpt;
 use crate::commands::trigger::TriggerOpt;
 use crate::commands::update::UpdateOpt;
+use crate::commands::aggregation::AggregationOpt;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, name = "minerva", arg_required_else_help = true)]
@@ -55,6 +56,8 @@ enum Commands {
     #[cfg(feature = "test-containers")]
     #[command(about = "Start Minerva instance")]
     Start(StartOpt),
+    #[command(about = "Generate standard aggregations")]
+    Aggregation(AggregationOpt),
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -90,6 +93,7 @@ async fn main() {
         Some(Commands::Relation(relation)) => relation.run().await,
         #[cfg(feature = "test-containers")]
         Some(Commands::Start(start)) => start.run().await,
+        Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         None => return,
     };
 
