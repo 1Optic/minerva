@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::{collections::HashMap, fmt::Display, path::{Path, PathBuf}};
 
 use async_trait::async_trait;
@@ -61,7 +62,7 @@ fn generate_all_standard_aggregations(instance_root: &Path) -> Result<(), String
             if title.to_lowercase().contains("raw") {
                 // For now, we determine the raw data trend stores based on the title, but this
                 // should be done based on the fact that there is no materialization as source.
-                generate_standard_aggregations(trend_store, &instance.relations, &aggregation_hints);
+                generate_standard_aggregations(instance_root, trend_store, &instance.relations, &aggregation_hints);
             }
         }
     }
@@ -160,33 +161,66 @@ fn load_aggregation_hints(instance_root: &Path) -> Result<Vec<AggregationHint>, 
     Ok(aggregation_hints)
 }
 
-fn generate_standard_aggregations(trend_store: TrendStore, relations: &[Relation], aggregation_hints: &[AggregationHint]) {
-    let entity_relations: Vec<&Relation> = relations.iter().filter(|r| {
+fn generate_standard_aggregations(instance_root: &Path, trend_store: TrendStore, relations: &[Relation], aggregation_hints: &[AggregationHint]) {
+    let entity_relations: Vec<(&Relation, String)> = relations.iter().filter_map(|r| {
         let mut split = r.name.split("->");
 
         let source_type = split.next().unwrap();
 
-        if let Some(_target_type) = split.next() {
+        if let Some(target_type) = split.next() {
             if source_type == trend_store.entity_type {
-                return true
+                return Some((r, target_type.to_string()))
             }
         }
 
-        false
+        None
     }).collect();
 
-    for relation in entity_relations {
-        generate_entity_aggregation(&trend_store, relation, aggregation_hints);
+    for (relation, target_type) in entity_relations {
+        generate_entity_aggregation(instance_root, &trend_store, relation, &target_type, aggregation_hints);
     }
 }
 
-fn generate_entity_aggregation(trend_store: &TrendStore, relation: &Relation, aggregation_hints: &[AggregationHint]) {
+fn generate_entity_aggregation(instance_root: &Path, trend_store: &TrendStore, relation: &Relation, target_entity_type: &str, aggregation_hints: &[AggregationHint]) -> Result<(), String> {
     let default_hint = AggregationHint { relation: relation.name.clone(), aggregation_type: AggregationType::FunctionMaterialization, prefix: None};
     let aggregation_hint = aggregation_hints
         .iter()
         .find(|hint| hint.relation == relation.name)
         .unwrap_or(&default_hint);
-    println!("{:?}", relation);
+
+    println!("{}", relation.name);
+
+    generate_entity_aggregation_yaml(instance_root, trend_store, target_entity_type, aggregation_hint.prefix.clone())?;
+
+    Ok(())
+}
+
+fn generate_entity_aggregation_yaml(instance_root: &Path, trend_store: &TrendStore, target_entity_type: &str, aggregation_prefix: Option<String>) -> Result<(), String> {
+    let granularity_suffix = granularity_to_suffix(trend_store.granularity)?;
+    let name = match aggregation_prefix {
+        Some(prefix) => format!("{}_{}_{}_{}", trend_store.data_source, prefix, target_entity_type, granularity_suffix),
+        None => format!("{}_{}_{}", trend_store.data_source, target_entity_type, granularity_suffix),
+    };
+
+    let base_name = format!("{}_{}_{}", trend_store.data_source, target_entity_type, granularity_suffix);
+    let file_name = format!("{}.yaml", name);
+    let aggregation_file_path: PathBuf = [
+        instance_root,
+        Path::new("aggregation"),
+        Path::new(&file_name),
+    ].iter().collect();
+
+    println!("{name}");
+    Ok(())
+}
+
+const GRAN_15M: Duration = Duration::from_secs(900);
+
+fn granularity_to_suffix(granularity: Duration) -> Result<String, String> {
+    match granularity {
+        GRAN_15M => Ok("15m".to_string()),
+        _ => Err(format!("No predefined granularity '{:?}'", granularity))
+    }
 }
 
 #[derive(Debug, Parser, PartialEq)]
