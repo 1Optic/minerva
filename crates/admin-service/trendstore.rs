@@ -196,6 +196,7 @@ impl TrendStoreBasicData {
             Ok(trendstore) => Ok(trendstore),
             Err(_) => {
                 let new_trend_store = TrendStore {
+                    title: None,
                     data_source: self.data_source.clone(),
                     entity_type: self.entity_type.clone(),
                     granularity: self.granularity,

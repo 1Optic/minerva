@@ -1,3 +1,4 @@
+pub mod aggregation;
 pub mod attributestore;
 pub mod common;
 pub mod diff;
