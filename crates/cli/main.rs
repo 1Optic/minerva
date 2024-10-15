@@ -4,6 +4,7 @@ use std::io;
 
 pub mod commands;
 
+use crate::commands::aggregation::AggregationOpt;
 use crate::commands::attributestore::AttributeStoreOpt;
 use crate::commands::common::Cmd;
 use crate::commands::diff::DiffOpt;
@@ -55,6 +56,8 @@ enum Commands {
     #[cfg(feature = "test-containers")]
     #[command(about = "Start Minerva instance")]
     Start(StartOpt),
+    #[command(about = "Generate standard aggregations")]
+    Aggregation(AggregationOpt),
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -90,6 +93,7 @@ async fn main() {
         Some(Commands::Relation(relation)) => relation.run().await,
         #[cfg(feature = "test-containers")]
         Some(Commands::Start(start)) => start.run().await,
+        Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         None => return,
     };
 

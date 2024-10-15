@@ -9,7 +9,7 @@ use tokio_postgres::types::ToSql;
 
 use crate::error::Error;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DataType {
     #[serde(rename = "boolean")]
     Boolean,

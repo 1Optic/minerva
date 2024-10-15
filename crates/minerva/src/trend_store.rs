@@ -985,6 +985,7 @@ impl fmt::Display for TrendStorePart {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendStore {
+    pub title: Option<String>,
     pub data_source: String,
     pub entity_type: String,
     #[serde(with = "humantime_serde")]
@@ -1138,6 +1139,7 @@ pub async fn load_trend_store<T: GenericClient>(
     let partition_size = parse_interval(&partition_size_str).unwrap();
 
     Ok(TrendStore {
+        title: None,
         data_source: String::from(data_source),
         entity_type: String::from(entity_type),
         granularity: *granularity,
@@ -1242,6 +1244,7 @@ pub async fn load_trend_stores(conn: &mut Client) -> Result<Vec<TrendStore>, Err
         })?;
 
         trend_stores.push(TrendStore {
+            title: None,
             data_source: String::from(data_source),
             entity_type: String::from(entity_type),
             granularity,

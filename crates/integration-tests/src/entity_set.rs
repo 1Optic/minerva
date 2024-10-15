@@ -34,6 +34,7 @@ mod tests {
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = TrendStore {
+                title: None,
                 data_source: "integration_test".to_string(),
                 entity_type: "pvpanel".to_string(),
                 granularity: Duration::from_secs(300),
