@@ -1,3 +1,4 @@
+pub mod aggregation_generation;
 pub mod attribute_storage;
 pub mod attribute_store;
 pub mod change;
@@ -18,7 +19,6 @@ pub mod trend_materialization;
 pub mod trend_store;
 pub mod trigger;
 pub mod virtual_entity;
-pub mod aggregation_generation;
 
 #[cfg(feature = "test-containers")]
 pub mod cluster;

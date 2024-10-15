@@ -29,7 +29,9 @@ pub enum AggregationGenerationError {
     TimeAggregation(String),
 }
 
-pub fn generate_all_standard_aggregations(instance_root: &Path) -> Result<(), AggregationGenerationError> {
+pub fn generate_all_standard_aggregations(
+    instance_root: &Path,
+) -> Result<(), AggregationGenerationError> {
     let instance = MinervaInstance::load_from(instance_root);
 
     let aggregation_hints = load_aggregation_hints(instance_root)?;
@@ -109,7 +111,9 @@ impl Display for AggregationHint {
     }
 }
 
-fn load_aggregation_hints(instance_root: &Path) -> Result<Vec<AggregationHint>, AggregationGenerationError> {
+fn load_aggregation_hints(
+    instance_root: &Path,
+) -> Result<Vec<AggregationHint>, AggregationGenerationError> {
     let mut aggregation_hints: Vec<AggregationHint> = Vec::new();
 
     let path: PathBuf = [
@@ -137,7 +141,10 @@ fn load_aggregation_hints(instance_root: &Path) -> Result<Vec<AggregationHint>, 
     })?;
 
     for (key, value) in &raw_hints {
-        aggregation_hints.push(AggregationHint::parse(key.to_string(), value).map_err(|e| AggregationGenerationError::HintLoading(e))?);
+        aggregation_hints.push(
+            AggregationHint::parse(key.to_string(), value)
+                .map_err(|e| AggregationGenerationError::HintLoading(e))?,
+        );
     }
 
     Ok(aggregation_hints)
@@ -177,7 +184,8 @@ fn generate_standard_aggregations(
             relation,
             target_type,
             aggregation_hints,
-        ).map_err(AggregationGenerationError::EntityAggregation)?;
+        )
+        .map_err(AggregationGenerationError::EntityAggregation)?;
     }
 
     static STANDARD_AGGREGATIONS: OnceLock<HashMap<Duration, Vec<(Duration, Duration)>>> =
@@ -226,7 +234,8 @@ fn generate_standard_aggregations(
             &trend_store,
             source_granularity,
             target_granularity,
-        ).map_err(AggregationGenerationError::TimeAggregation)?;
+        )
+        .map_err(AggregationGenerationError::TimeAggregation)?;
 
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
@@ -235,7 +244,8 @@ fn generate_standard_aggregations(
                 relation,
                 target_type,
                 aggregation_hints,
-            ).map_err(AggregationGenerationError::EntityAggregation)?;
+            )
+            .map_err(AggregationGenerationError::EntityAggregation)?;
         }
     }
 
@@ -1056,4 +1066,3 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
         .ok_or(format!("No predefined granularity '{:?}'", granularity))
         .cloned()
 }
-
