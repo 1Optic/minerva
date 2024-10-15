@@ -12,8 +12,10 @@ use async_trait::async_trait;
 
 use clap::{Parser, Subcommand};
 use minerva::meas_value::DataType;
-use minerva::trend_materialization::{TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationSource};
-use minerva::trend_store::{TrendStore, TrendStorePart, Trend};
+use minerva::trend_materialization::{
+    TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationSource,
+};
+use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
 use minerva::{instance::MinervaInstance, relation::Relation};
 
 use super::common::{Cmd, CmdResult};
@@ -212,7 +214,8 @@ fn generate_standard_aggregations(
         )?;
     }
 
-    static STANDARD_AGGREGATIONS: OnceLock<HashMap<Duration, Vec<(Duration, Duration)>>> = OnceLock::new();
+    static STANDARD_AGGREGATIONS: OnceLock<HashMap<Duration, Vec<(Duration, Duration)>>> =
+        OnceLock::new();
 
     let standard_aggregations = STANDARD_AGGREGATIONS.get_or_init(|| {
         vec![
@@ -221,24 +224,43 @@ fn generate_standard_aggregations(
                 vec![
                     (Duration::from_secs(900), Duration::from_secs(3600)),
                     (Duration::from_secs(900), Duration::from_secs(86400)),
-                    (Duration::from_secs(86400), humantime::parse_duration("1w").unwrap()),
-                    (Duration::from_secs(86400), humantime::parse_duration("1month").unwrap()),
-                ]
+                    (
+                        Duration::from_secs(86400),
+                        humantime::parse_duration("1w").unwrap(),
+                    ),
+                    (
+                        Duration::from_secs(86400),
+                        humantime::parse_duration("1month").unwrap(),
+                    ),
+                ],
             ),
             (
                 Duration::from_secs(86400),
                 vec![
-                    (Duration::from_secs(86400), humantime::parse_duration("1w").unwrap()),
-                    (Duration::from_secs(86400), humantime::parse_duration("1month").unwrap()),
-                ]
+                    (
+                        Duration::from_secs(86400),
+                        humantime::parse_duration("1w").unwrap(),
+                    ),
+                    (
+                        Duration::from_secs(86400),
+                        humantime::parse_duration("1month").unwrap(),
+                    ),
+                ],
             ),
-        ].into_iter().collect()
+        ]
+        .into_iter()
+        .collect()
     });
 
     let aggregations = &standard_aggregations[&trend_store.granularity];
 
     for (source_granularity, target_granularity) in aggregations {
-        let target_trend_store = build_time_aggregation(minerva_instance, &trend_store, source_granularity, target_granularity)?;
+        let target_trend_store = build_time_aggregation(
+            minerva_instance,
+            &trend_store,
+            source_granularity,
+            target_granularity,
+        )?;
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
                 minerva_instance,
@@ -257,14 +279,18 @@ fn build_time_aggregation(
     minerva_instance: &MinervaInstance,
     trend_store: &TrendStore,
     source_granularity: &Duration,
-    target_granularity: &Duration
+    target_granularity: &Duration,
 ) -> Result<TrendStore, String> {
-    let time_aggregation = generate_time_aggregation(trend_store, source_granularity, target_granularity)?;
+    let time_aggregation =
+        generate_time_aggregation(trend_store, source_granularity, target_granularity)?;
 
     compile_time_aggregation(minerva_instance, &time_aggregation)
 }
 
-fn compile_time_aggregation(minerva_instance: &MinervaInstance, aggregation: &TimeAggregation) -> Result<TrendStore, String> {
+fn compile_time_aggregation(
+    minerva_instance: &MinervaInstance,
+    aggregation: &TimeAggregation,
+) -> Result<TrendStore, String> {
     let target_trend_store = write_time_aggregations(minerva_instance, aggregation)?;
 
     let trend_store_file_name = format!("{}.yaml", trend_store_name(&target_trend_store)?);
@@ -273,7 +299,9 @@ fn compile_time_aggregation(minerva_instance: &MinervaInstance, aggregation: &Ti
         minerva_instance.instance_root.clone().unwrap(),
         PathBuf::from("trend"),
         trend_store_file_name.into(),
-    ].iter().collect();
+    ]
+    .iter()
+    .collect();
 
     let file = File::create(trend_store_file_path).unwrap();
 
@@ -293,37 +321,54 @@ fn trend_store_name(trend_store: &TrendStore) -> Result<String, String> {
     ))
 }
 
-fn write_time_aggregations(minerva_instance: &MinervaInstance, aggregation: &TimeAggregation) -> Result<TrendStore, String> {
+fn write_time_aggregations(
+    minerva_instance: &MinervaInstance,
+    aggregation: &TimeAggregation,
+) -> Result<TrendStore, String> {
     let mut target_trend_store_parts: Vec<TrendStorePart> = Vec::new();
 
-    let trend_store = minerva_instance.trend_stores.iter().find(|trend_store| {
-        aggregation.source.eq(&trend_store_name(trend_store).unwrap())
-    }).unwrap();
+    let trend_store = minerva_instance
+        .trend_stores
+        .iter()
+        .find(|trend_store| {
+            aggregation
+                .source
+                .eq(&trend_store_name(trend_store).unwrap())
+        })
+        .unwrap();
 
     for agg_part in &aggregation.parts {
         let source_part = trend_store
             .parts
             .iter()
             .find(|part| part.name == agg_part.source)
-            .ok_or(format!("No source definition found for aggregation part '{}'(source: '{}')", agg_part.name, agg_part.source))?;
+            .ok_or(format!(
+                "No source definition found for aggregation part '{}'(source: '{}')",
+                agg_part.name, agg_part.source
+            ))?;
 
         let materialization_file_path: PathBuf = [
             minerva_instance.instance_root.clone().unwrap(),
             PathBuf::from("materialization"),
             PathBuf::from(format!("{}.yaml", agg_part.name)),
-        ].iter().collect();
+        ]
+        .iter()
+        .collect();
 
         let (aggregation, target_trend_store_part) = define_part_time_aggregation(
             source_part,
             &trend_store.granularity,
             aggregation.mapping_function.clone(),
             &aggregation.granularity,
-            agg_part.name.clone()
+            agg_part.name.clone(),
         )?;
 
         target_trend_store_parts.push(target_trend_store_part);
 
-        println!("Writing time materialization to '{}'", materialization_file_path.to_string_lossy());
+        println!(
+            "Writing time materialization to '{}'",
+            materialization_file_path.to_string_lossy()
+        );
 
         let file = File::create(materialization_file_path).unwrap();
 
@@ -334,48 +379,77 @@ fn write_time_aggregations(minerva_instance: &MinervaInstance, aggregation: &Tim
 
     static PARTITION_SIZE_MAPPING: OnceLock<HashMap<Duration, Duration>> = OnceLock::new();
 
-    let partition_size_mapping: &HashMap<Duration, Duration> = PARTITION_SIZE_MAPPING.get_or_init(|| {
-        vec![ 
-            (Duration::from_secs(900), Duration::from_secs(86400)),
-            (Duration::from_secs(1800), Duration::from_secs(86400 * 2)),
-            (Duration::from_secs(3600), Duration::from_secs(86400 * 4)),
-            (Duration::from_secs(86400), humantime::parse_duration("3month").unwrap()),
-            (humantime::parse_duration("1w").unwrap(), humantime::parse_duration("1y").unwrap()),
-            (humantime::parse_duration("1month").unwrap(), humantime::parse_duration("5y").unwrap()),
-        ].into_iter().collect()
-    });
+    let partition_size_mapping: &HashMap<Duration, Duration> =
+        PARTITION_SIZE_MAPPING.get_or_init(|| {
+            vec![
+                (Duration::from_secs(900), Duration::from_secs(86400)),
+                (Duration::from_secs(1800), Duration::from_secs(86400 * 2)),
+                (Duration::from_secs(3600), Duration::from_secs(86400 * 4)),
+                (
+                    Duration::from_secs(86400),
+                    humantime::parse_duration("3month").unwrap(),
+                ),
+                (
+                    humantime::parse_duration("1w").unwrap(),
+                    humantime::parse_duration("1y").unwrap(),
+                ),
+                (
+                    humantime::parse_duration("1month").unwrap(),
+                    humantime::parse_duration("5y").unwrap(),
+                ),
+            ]
+            .into_iter()
+            .collect()
+        });
 
     Ok(TrendStore {
         title: Some("Generated by Minerva aggregation generation command".to_string()),
         data_source: trend_store.data_source.clone(),
         entity_type: trend_store.entity_type.clone(),
         granularity: aggregation.granularity,
-        partition_size: *partition_size_mapping.get(&aggregation.granularity).unwrap(),
+        partition_size: *partition_size_mapping
+            .get(&aggregation.granularity)
+            .unwrap(),
         parts: target_trend_store_parts,
     })
 }
 
-fn define_part_time_aggregation(source_part: &TrendStorePart, source_granularity: &Duration, mapping_function: String, target_granularity: &Duration, name: String) -> Result<(TrendFunctionMaterialization, TrendStorePart), String> {
+fn define_part_time_aggregation(
+    source_part: &TrendStorePart,
+    source_granularity: &Duration,
+    mapping_function: String,
+    target_granularity: &Duration,
+    name: String,
+) -> Result<(TrendFunctionMaterialization, TrendStorePart), String> {
     let materialization = TrendFunctionMaterialization {
         target_trend_store_part: name.clone(),
         enabled: true,
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
-        reprocessing_period: Duration::from_secs(86400*7),
-        sources: vec![
-            TrendMaterializationSource {
-                trend_store_part: source_part.name.clone(),
-                mapping_function,
-            }
-        ],
+        reprocessing_period: Duration::from_secs(86400 * 7),
+        sources: vec![TrendMaterializationSource {
+            trend_store_part: source_part.name.clone(),
+            mapping_function,
+        }],
         function: time_aggregate_function(source_part, target_granularity)?,
-        fingerprint_function: define_time_fingerprint_sql(source_part, source_granularity, target_granularity),
+        fingerprint_function: define_time_fingerprint_sql(
+            source_part,
+            source_granularity,
+            target_granularity,
+        ),
         description: None,
     };
 
-    let mut aggregate_trends: Vec<Trend> = source_part.trends.iter().map(define_time_aggregate_trend).collect();
+    let mut aggregate_trends: Vec<Trend> = source_part
+        .trends
+        .iter()
+        .map(define_time_aggregate_trend)
+        .collect();
 
-    if !aggregate_trends.iter().any(|trend| trend.name.eq("samples")) {
+    if !aggregate_trends
+        .iter()
+        .any(|trend| trend.name.eq("samples"))
+    {
         aggregate_trends.push(Trend {
             name: "samples".to_string(),
             data_type: DataType::Integer,
@@ -406,7 +480,11 @@ fn define_time_aggregate_trend(trend: &Trend) -> Trend {
     }
 }
 
-fn define_time_fingerprint_sql(source_part: &TrendStorePart, source_granularity: &Duration, target_granularity: &Duration) -> String {
+fn define_time_fingerprint_sql(
+    source_part: &TrendStorePart,
+    source_granularity: &Duration,
+    target_granularity: &Duration,
+) -> String {
     let source_granularity_suffix = granularity_to_suffix(source_granularity).unwrap();
     let target_granularity_suffix = granularity_to_suffix(target_granularity).unwrap();
     [
@@ -421,23 +499,34 @@ fn define_time_fingerprint_sql(source_part: &TrendStorePart, source_granularity:
     ].join("")
 }
 
-fn time_aggregate_function(source_part: &TrendStorePart, target_granularity: &Duration) -> Result<TrendMaterializationFunction, String> {
+fn time_aggregate_function(
+    source_part: &TrendStorePart,
+    target_granularity: &Duration,
+) -> Result<TrendMaterializationFunction, String> {
     let trend_columns: Vec<String> = source_part
         .trends
         .iter()
-        .map(|trend| format!("  \"{}\" {}", trend.name, aggregate_data_type(trend.data_type, &trend.time_aggregation)))
+        .map(|trend| {
+            format!(
+                "  \"{}\" {}",
+                trend.name,
+                aggregate_data_type(trend.data_type, &trend.time_aggregation)
+            )
+        })
         .collect();
 
     let trend_column_expressions: Vec<String> = source_part
         .trends
         .iter()
-        .map(|trend| format!(
+        .map(|trend| {
+            format!(
                 "      {}(t.\"{}\")::{} AS \"{}\"",
                 trend.time_aggregation,
                 trend.name,
                 aggregate_data_type(trend.data_type, &trend.time_aggregation),
                 trend.name,
-        ))
+            )
+        })
         .collect();
 
     let mut column_expressions = vec![
@@ -450,7 +539,11 @@ fn time_aggregate_function(source_part: &TrendStorePart, target_granularity: &Du
         "  \"timestamp\" timestamp with time zone".to_string(),
     ];
 
-    if !source_part.trends.iter().any(|trend| trend.name.eq("samples")) {
+    if !source_part
+        .trends
+        .iter()
+        .any(|trend| trend.name.eq("samples"))
+    {
         column_expressions.push("      (count(*))::integer AS samples".to_string());
         result_columns.push("  samples integer".to_string());
     }
@@ -470,9 +563,13 @@ fn time_aggregate_function(source_part: &TrendStorePart, target_granularity: &Du
         format!("    FROM trend.\"{}\" AS t\n", source_part.name),
         "    WHERE $1 < timestamp AND timestamp <= $2\n".to_string(),
         "    GROUP BY entity_id\n".to_string(),
-        format!("$query$ USING $1 - interval '{}', $1;\n", humantime::format_duration(*target_granularity)),
+        format!(
+            "$query$ USING $1 - interval '{}', $1;\n",
+            humantime::format_duration(*target_granularity)
+        ),
         "END;\n".to_string(),
-    ].join("");
+    ]
+    .join("");
 
     Ok(TrendMaterializationFunction {
         return_type: return_type_sql,
@@ -488,22 +585,32 @@ struct TimeAggregation {
     pub parts: Vec<AggregationPart>,
 }
 
-fn generate_time_aggregation(trend_store: &TrendStore, source_granularity: &Duration, target_granularity: &Duration) -> Result<TimeAggregation, String> {
+fn generate_time_aggregation(
+    trend_store: &TrendStore,
+    source_granularity: &Duration,
+    target_granularity: &Duration,
+) -> Result<TimeAggregation, String> {
     let target_granularity_suffix = granularity_to_suffix(target_granularity)?;
     let source_granularity_suffix = granularity_to_suffix(source_granularity)?;
 
     let source_name = translate_time_aggregation_part_name(
-        &trend_store_name(trend_store)?, &source_granularity_suffix
+        &trend_store_name(trend_store)?,
+        &source_granularity_suffix,
     )?;
 
-    let mapping_function = format!("trend.mapping_{}->{}", source_granularity_suffix, target_granularity_suffix);
+    let mapping_function = format!(
+        "trend.mapping_{}->{}",
+        source_granularity_suffix, target_granularity_suffix
+    );
 
     let parts: Vec<AggregationPart> = trend_store
         .parts
         .iter()
         .map(|part| AggregationPart {
-            name: translate_time_aggregation_part_name(&part.name, &target_granularity_suffix).unwrap(),
-            source: translate_time_aggregation_part_name(&part.name, &source_granularity_suffix).unwrap()
+            name: translate_time_aggregation_part_name(&part.name, &target_granularity_suffix)
+                .unwrap(),
+            source: translate_time_aggregation_part_name(&part.name, &source_granularity_suffix)
+                .unwrap(),
         })
         .collect();
 
@@ -515,18 +622,21 @@ fn generate_time_aggregation(trend_store: &TrendStore, source_granularity: &Dura
     })
 }
 
-fn translate_time_aggregation_part_name(name: &str, target_granularity_suffix: &str) -> Result<String, String> {
+fn translate_time_aggregation_part_name(
+    name: &str,
+    target_granularity_suffix: &str,
+) -> Result<String, String> {
     let re = regex::Regex::new("^(.*)_[^_]+$").unwrap();
 
     match re.captures(name) {
         Some(captures) => {
             let entity_type_and_data_source = &captures[1];
 
-            Ok(format!("{entity_type_and_data_source}_{target_granularity_suffix}"))
-        },
-        None => {
-            Err(format!("Could not translate part name '{}'", name))
+            Ok(format!(
+                "{entity_type_and_data_source}_{target_granularity_suffix}"
+            ))
         }
+        None => Err(format!("Could not translate part name '{}'", name)),
     }
 }
 
@@ -556,12 +666,9 @@ fn build_entity_aggregation(
     )?;
 
     let file_name = format!("{}.yaml", entity_aggregation.name);
-    let aggregation_file_path: PathBuf = [
-        PathBuf::from("aggregation"),
-        PathBuf::from(&file_name),
-    ]
-    .iter()
-    .collect();
+    let aggregation_file_path: PathBuf = [PathBuf::from("aggregation"), PathBuf::from(&file_name)]
+        .iter()
+        .collect();
 
     let aggregation_context = AggregationContext {
         definition: entity_aggregation,
@@ -674,31 +781,68 @@ fn write_function_entity_aggregations(
             .find(|p| p.source == part.name)
             .unwrap_or(&default_dest_part);
 
-        let aggregation = define_function_part_entity_aggregation(part, aggregation_context.definition.relation.clone(), dest_part.name.clone());
+        let aggregation = define_function_part_entity_aggregation(
+            part,
+            aggregation_context.definition.relation.clone(),
+            dest_part.name.clone(),
+        );
 
         let file_path: PathBuf = [
             minerva_instance.instance_root.clone().unwrap(),
             PathBuf::from("materialization"),
             PathBuf::from(format!("{}.yaml", aggregation.target_trend_store_part)),
-        ].iter().collect();
+        ]
+        .iter()
+        .collect();
 
-        println!("Writing entity materialization to '{}'", file_path.to_string_lossy());
+        println!(
+            "Writing entity materialization to '{}'",
+            file_path.to_string_lossy()
+        );
 
         let file = File::create(file_path).unwrap();
 
         let mut writer = BufWriter::new(file);
 
-        let relative_aggregation_file_path = aggregation_context.aggregation_file_path.to_string_lossy();
-        let relative_source_definition_path = format!("{}_{}_{}", aggregation_context.source_definition.data_source, aggregation_context.source_definition.entity_type, granularity_to_suffix(&aggregation_context.source_definition.granularity)?);
+        let relative_aggregation_file_path =
+            aggregation_context.aggregation_file_path.to_string_lossy();
+        let relative_source_definition_path = format!(
+            "{}_{}_{}",
+            aggregation_context.source_definition.data_source,
+            aggregation_context.source_definition.entity_type,
+            granularity_to_suffix(&aggregation_context.source_definition.granularity)?
+        );
 
-        writeln!(writer, "###########################################################################").unwrap();
+        writeln!(
+            writer,
+            "###########################################################################"
+        )
+        .unwrap();
         writeln!(writer, "#").unwrap();
-        writeln!(writer, "# This file is automatically generated by the `minerva aggregation` command").unwrap();
+        writeln!(
+            writer,
+            "# This file is automatically generated by the `minerva aggregation` command"
+        )
+        .unwrap();
         writeln!(writer, "#").unwrap();
-        writeln!(writer, "# definition:         {}", relative_aggregation_file_path).unwrap();
-        writeln!(writer, "# source trend store: {}", relative_source_definition_path).unwrap();
+        writeln!(
+            writer,
+            "# definition:         {}",
+            relative_aggregation_file_path
+        )
+        .unwrap();
+        writeln!(
+            writer,
+            "# source trend store: {}",
+            relative_source_definition_path
+        )
+        .unwrap();
         writeln!(writer, "#").unwrap();
-        writeln!(writer, "###########################################################################").unwrap();
+        writeln!(
+            writer,
+            "###########################################################################"
+        )
+        .unwrap();
 
         serde_yaml::to_writer(writer, &aggregation).unwrap();
     }
@@ -706,29 +850,44 @@ fn write_function_entity_aggregations(
     Ok(())
 }
 
-fn define_function_part_entity_aggregation(source_part: &TrendStorePart, relation: String, name: String) -> TrendFunctionMaterialization {
+fn define_function_part_entity_aggregation(
+    source_part: &TrendStorePart,
+    relation: String,
+    name: String,
+) -> TrendFunctionMaterialization {
     TrendFunctionMaterialization {
         target_trend_store_part: name,
         enabled: true,
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
-        reprocessing_period: Duration::from_secs(86400*3),
-        sources: vec![
-            TrendMaterializationSource {
-                trend_store_part: source_part.name.clone(),
-                mapping_function: "trend.mapping_id".to_string(),
-            }
-        ],
+        reprocessing_period: Duration::from_secs(86400 * 3),
+        sources: vec![TrendMaterializationSource {
+            trend_store_part: source_part.name.clone(),
+            mapping_function: "trend.mapping_id".to_string(),
+        }],
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
-        description: None
+        description: None,
     }
 }
 
-fn entity_aggregation_function(source_part: &TrendStorePart, relation_name: String) -> TrendMaterializationFunction {
-    let trend_columns: Vec<String> = source_part.trends.iter().map(|trend| {
-        format!("  {}(\"{}\")::{} AS \"{}\"", trend.entity_aggregation, trend.name, aggregate_data_type(trend.data_type, &trend.time_aggregation), trend.name)
-    }).collect();
+fn entity_aggregation_function(
+    source_part: &TrendStorePart,
+    relation_name: String,
+) -> TrendMaterializationFunction {
+    let trend_columns: Vec<String> = source_part
+        .trends
+        .iter()
+        .map(|trend| {
+            format!(
+                "  {}(\"{}\")::{} AS \"{}\"",
+                trend.entity_aggregation,
+                trend.name,
+                aggregate_data_type(trend.data_type, &trend.time_aggregation),
+                trend.name
+            )
+        })
+        .collect();
 
     let mut result_columns = vec![
         "\"entity_id\" integer".to_string(),
@@ -740,16 +899,22 @@ fn entity_aggregation_function(source_part: &TrendStorePart, relation_name: Stri
         "  $1 AS timestamp".to_string(),
     ];
 
-    if !source_part.trends.iter().any(|trend| trend.name.eq("samples")) {
+    if !source_part
+        .trends
+        .iter()
+        .any(|trend| trend.name.eq("samples"))
+    {
         columns.push("  count(*)::integer AS samples".to_string());
         result_columns.push("samples integer".to_string());
     }
 
-    result_columns.extend(source_part
-        .trends
-        .iter()
-        .map(|trend| format!("\"{}\" {}", trend.name, aggregate_data_type(trend.data_type, &trend.time_aggregation)))
-    );
+    result_columns.extend(source_part.trends.iter().map(|trend| {
+        format!(
+            "\"{}\" {}",
+            trend.name,
+            aggregate_data_type(trend.data_type, &trend.time_aggregation)
+        )
+    }));
 
     columns.extend(trend_columns);
 
@@ -768,7 +933,8 @@ fn entity_aggregation_function(source_part: &TrendStorePart, relation_name: Stri
         "    GROUP BY r.target_id".to_string(),
         "$query$ USING $1;\n".to_string(),
         "END;".to_string(),
-    ].join("");
+    ]
+    .join("");
 
     TrendMaterializationFunction {
         return_type: return_type_sql,
@@ -789,7 +955,9 @@ fn aggregate_data_type(data_type: DataType, aggregation: &str) -> DataType {
             (DataType::Double, DataType::Double),
             (DataType::Real, DataType::Real),
             (DataType::Numeric, DataType::Numeric),
-        ].into_iter().collect()
+        ]
+        .into_iter()
+        .collect()
     });
 
     let avg_mapping = AGGREGATE_DATA_TYPE_MAPPING_AVG.get_or_init(|| {
@@ -800,27 +968,33 @@ fn aggregate_data_type(data_type: DataType, aggregation: &str) -> DataType {
             (DataType::Double, DataType::Double),
             (DataType::Real, DataType::Double),
             (DataType::Numeric, DataType::Numeric),
-        ].into_iter().collect()
+        ]
+        .into_iter()
+        .collect()
     });
 
     match aggregation.to_uppercase().as_str() {
-        "SUM" => {
-            *sum_mapping.get(&data_type).unwrap_or(&data_type)
-        },
-        "AVG" => {
-            *avg_mapping.get(&data_type).unwrap_or(&data_type)
-        },
-        _ => data_type
+        "SUM" => *sum_mapping.get(&data_type).unwrap_or(&data_type),
+        "AVG" => *avg_mapping.get(&data_type).unwrap_or(&data_type),
+        _ => data_type,
     }
 }
 
 fn define_fingerprint_sql(source_part: &TrendStorePart) -> String {
     [
-        format!("SELECT modified.last, format('{{\"{}\": \"%s\"}}', modified.last)::jsonb\n", source_part.name),
+        format!(
+            "SELECT modified.last, format('{{\"{}\": \"%s\"}}', modified.last)::jsonb\n",
+            source_part.name
+        ),
         "FROM trend_directory.modified\n".to_string(),
-        "JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id\n".to_string(),
-        format!("WHERE ttsp::name = '{}' AND modified.timestamp = $1;\n", source_part.name),
-    ].join("")
+        "JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id\n"
+            .to_string(),
+        format!(
+            "WHERE ttsp::name = '{}' AND modified.timestamp = $1;\n",
+            source_part.name
+        ),
+    ]
+    .join("")
 }
 
 fn translate_source_part_name(
@@ -901,11 +1075,19 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
             (Duration::from_secs(3600), "1d".to_string()),
             (humantime::parse_duration("1d").unwrap(), "1d".to_string()),
             (humantime::parse_duration("1w").unwrap(), "1w".to_string()),
-            (humantime::parse_duration("1month").unwrap(), "1month".to_string()),
-        ].into_iter().collect()
+            (
+                humantime::parse_duration("1month").unwrap(),
+                "1month".to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect()
     });
 
-    standard_aggregations.get(granularity).ok_or(format!("No predefined granularity '{:?}'", granularity)).cloned()
+    standard_aggregations
+        .get(granularity)
+        .ok_or(format!("No predefined granularity '{:?}'", granularity))
+        .cloned()
 }
 
 #[derive(Debug, Parser, PartialEq)]
