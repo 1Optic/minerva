@@ -29,7 +29,7 @@ lint-openapi:
   stage: test
   image:
     name: redocly/cli
-    entryoint: [""]
+    entrypoint: [""]
   script:
     - redocly lint api-spec/api.yaml
   allow_failure: true
