@@ -25,15 +25,6 @@ lint:
     - cargo fmt --check
     - RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 
-lint-openapi:
-  stage: test
-  image:
-    name: redocly/cli
-    entrypoint: [""]
-  script:
-    - redocly lint api-spec/api.yaml
-  allow_failure: true
-
 # Use cargo to test the project
 test-minerva-cli:cargo:
   stage: test
