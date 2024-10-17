@@ -143,7 +143,7 @@ fn load_aggregation_hints(
     for (key, value) in &raw_hints {
         aggregation_hints.push(
             AggregationHint::parse(key.to_string(), value)
-                .map_err(|e| AggregationGenerationError::HintLoading(e))?,
+                .map_err(AggregationGenerationError::HintLoading)?,
         );
     }
 
