@@ -1,5 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS citus;
 
+
 DO
 $do$
 BEGIN
@@ -612,6 +613,7 @@ CREATE OR REPLACE FUNCTION create_reference_table(text) RETURNS VOID AS $$ SELEC
 CREATE OR REPLACE FUNCTION create_distributed_function(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION run_command_on_workers(text) RETURNS VOID AS $$ SELECT 42; $$ LANGUAGE sql STABLE;
 $function$ LANGUAGE sql VOLATILE;
+
 
 CREATE AGGREGATE first (anyelement) (
     sfunc = fst,
@@ -1282,6 +1284,13 @@ GRANT INSERT,UPDATE,DELETE ON TABLE "trend_directory"."trend_store" TO minerva_w
 
 
 
+CREATE FUNCTION "trend_directory"."default_columnar_period"()
+    RETURNS interval
+AS $$
+SELECT '2w'::interval;
+$$ LANGUAGE sql IMMUTABLE;
+
+
 CREATE TABLE "trend_directory"."trend_store_part"
 (
   "id" serial NOT NULL,
@@ -1306,6 +1315,7 @@ CREATE TABLE "trend_directory"."partition"
   "index" integer NOT NULL,
   "from" timestamp with time zone NOT NULL,
   "to" timestamp with time zone NOT NULL,
+  "is_columnar" boolean NOT NULL DEFAULT false,
   PRIMARY KEY (id)
 );
 
@@ -2192,6 +2202,25 @@ BEGIN
   RETURN trend_directory.create_partition(tsp, $2);
 END;
 $$ LANGUAGE plpgsql VOLATILE;
+
+
+CREATE FUNCTION "trend_directory"."needs_columnar_store"(trend_directory.partition)
+    RETURNS boolean
+AS $$
+SELECT not p.is_columnar and p.to + COALESCE(m.reprocessing_period, trend_directory.default_columnar_period()) < now()
+FROM trend_directory.partition p
+  JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id
+  LEFT JOIN trend_directory.materialization m ON m.dst_trend_store_part_id = p.id
+WHERE p.id = $1.id;
+$$ LANGUAGE sql STABLE;
+
+
+CREATE FUNCTION "trend_directory"."convert_to_columnar"(trend_directory.partition)
+    RETURNS void
+AS $$
+SELECT alter_table_set_access_method(format('%I.%I', trend_directory.partition_schema(), $1.name)::regclass, 'columnar');
+UPDATE trend_directory.partition SET is_columnar = 'true' WHERE id = $1.id;
+$$ LANGUAGE sql VOLATILE;
 
 
 CREATE FUNCTION "trend_directory"."column_spec"(trend_directory.table_trend)
