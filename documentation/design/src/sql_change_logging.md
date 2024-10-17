@@ -12,8 +12,55 @@ see precisely what happened and when.
 ## Design
 
 The change logging will be done for every change performed on a Minerva
-database by the Minerva CLI interface. The exact SQL commands issued and a
-timestamp of when they are applied need to be logged.
+database by the Minerva CLI interface.
+
+### What
+
+The following shall be logged:
+
+1. The original Minerva administrative command (with arguments) as issued from
+   the command line (or a script).
+2. The exact SQL commands issued to the database after they succeed (commit).
+3. The timestamp of when they are applied (commit).
+4. The username of the current user.
+
+### How
+
+The logging shall be done in files in a configurable directory. Each
+administrative command shall create 1 file with the timestamp of the start of
+the command in the file name. The timestamp uses the following [ISO
+8601](https://en.wikipedia.org/wiki/ISO_8601) format:
+
+```
+20241017T193114Z
+```
+
+The resulting file name will be:
+
+```
+minerva_change_20241017T193114Z.json
+```
+
+The format of the records in the log will be:
+
+```
+{
+    "command": ["minerva", "update", "/usr/share/minerva_4g"],
+    "user": "Steven Ops",
+    "actions": [
+        {
+            "timestamp": "2024-10-17T19:31:14Z",
+            "sql": "INSERT INTO directory.entity_type(name, description) VALUES ('v-cell', 'Vendor agnostic cell representation')"
+        },
+        {
+            "timestamp": "2024-10-17T19:31:14Z",
+            "sql": "INSERT INTO directory.entity_type(name, description) VALUES ('v-site', 'Vendor agnostic site representation')"
+        },
+    ]
+}
+```
+
+## Follow-up Changes
 
 Currently, a lot of change actions on Minerva databases are implemented as SQL
 functions, which makes it much harder to implement comprehensive logging of the
