@@ -22,8 +22,9 @@ use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_store::{
-    analyze_trend_store_part, create_partitions, create_partitions_for_timestamp,
-    delete_trend_store, list_trend_stores, load_trend_store, load_trend_store_from_file,
+    analyze_trend_store_part, columnarize_partitions, create_partitions,
+    create_partitions_for_timestamp, delete_trend_store, list_trend_stores, load_trend_store,
+    load_trend_store_from_file,
 };
 
 use super::common::{connect_db, Cmd, CmdResult};
@@ -197,6 +198,9 @@ pub struct TrendStorePartitionRemove {
     pretend: bool,
 }
 
+#[derive(Debug, Parser, PartialEq)]
+pub struct ColumnarizePartitions {}
+
 #[async_trait]
 impl Cmd for TrendStorePartitionRemove {
     async fn run(&self) -> CmdResult {
@@ -254,6 +258,15 @@ impl Cmd for TrendStorePartitionRemove {
     }
 }
 
+#[async_trait]
+impl Cmd for ColumnarizePartitions {
+    async fn run(&self) -> CmdResult {
+        let mut client = connect_db().await?;
+        columnarize_partitions(&mut client).await?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStorePartition {
     #[command(subcommand)]
@@ -266,6 +279,8 @@ pub enum TrendStorePartitionCommands {
     Create(TrendStorePartitionCreate),
     #[command(about = "remove partitions")]
     Remove(TrendStorePartitionRemove),
+    #[command(about = "change partitions to columnar storage")]
+    Columnar(ColumnarizePartitions),
 }
 
 #[derive(Debug, Parser, PartialEq)]
@@ -527,6 +542,7 @@ impl TrendStoreOpt {
                     run_trend_store_partition_create_cmd(create).await
                 }
                 TrendStorePartitionCommands::Remove(remove) => remove.run().await,
+                TrendStorePartitionCommands::Columnar(columnarize) => columnarize.run().await,
             },
             TrendStoreOptCommands::Check(check) => run_trend_store_check_cmd(check),
             TrendStoreOptCommands::Part(part) => match &part.command {
