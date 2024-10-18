@@ -15,10 +15,38 @@ use async_trait::async_trait;
 use crate::interval::parse_interval;
 
 use super::change::{Change, ChangeResult};
-use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
+use super::error::{ConfigurationError, DatabaseError, DatabaseErrorKind, Error, RuntimeError};
 use super::notification_store::notification_store_exists;
 
 type PostgresName = String;
+
+pub enum TriggerError {
+    DatabaseError(DatabaseError),
+    NotFound(DatabaseError),
+    GranularityError(String),
+    FunctionError(String),
+}
+
+impl From<DatabaseError> for TriggerError {
+    fn from(e: DatabaseError) -> TriggerError {
+        TriggerError::DatabaseError(e)
+    }
+}
+
+impl TriggerError {
+    pub fn to_database_error(self) -> DatabaseError {
+        match self {
+            TriggerError::DatabaseError(e) => e,
+            TriggerError::NotFound(e) => e,
+            TriggerError::GranularityError(granularity) => {
+                DatabaseError::from_msg(format!("Unable to parse granularity {granularity}"))
+            }
+            TriggerError::FunctionError(function) => {
+                DatabaseError::from_msg(format!("Unable to load function {function}"))
+            }
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KPIDataColumn {
@@ -737,27 +765,32 @@ async fn run_checks<T: GenericClient + Sync + Send>(
     trigger_name: &str,
     client: &mut T,
 ) -> ChangeResult {
-    let trigger = load_trigger(client, trigger_name).await?;
+    let result = load_trigger(client, trigger_name).await;
 
-    let query = format!(
-        "SELECT * FROM trigger_rule.{}($1::timestamptz)",
-        escape_identifier(trigger_name)
-    );
+    match result {
+        Err(e) => Err(Error::Database(e.to_database_error())),
+        Ok(trigger) => {
+            let query = format!(
+                "SELECT * FROM trigger_rule.{}($1::timestamptz)",
+                escape_identifier(trigger_name)
+            );
 
-    let reference_timestamp = chrono::offset::Local::now();
+            let reference_timestamp = chrono::offset::Local::now();
 
-    let check_timestamp =
-        truncate_timestamp_for_granularity(trigger.granularity, &reference_timestamp)?;
+            let check_timestamp =
+                truncate_timestamp_for_granularity(trigger.granularity, &reference_timestamp)?;
 
-    client
-        .execute(&query, &[&check_timestamp])
-        .await
-        .map_err(|e| DatabaseError::from_msg(format!("Error running check: {e}")))?;
+            client
+                .execute(&query, &[&check_timestamp])
+                .await
+                .map_err(|e| DatabaseError::from_msg(format!("Error running check: {e}")))?;
 
-    Ok(format!(
-        "Checks run successfully for '{}': '{}'",
-        trigger_name, &check_timestamp
-    ))
+            Ok(format!(
+                "Checks run successfully for '{}': '{}'",
+                trigger_name, &check_timestamp
+            ))
+        }
+    }
 }
 async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
@@ -1080,7 +1113,7 @@ impl Change for DisableTrigger {
     }
 }
 
-fn extract_rule_from_src(src: &str) -> Result<String, Error> {
+fn extract_rule_from_src(src: &str) -> Result<String, TriggerError> {
     let condition_regex = regex::Regex::from_str(r".*\(\$1\) WHERE ((?s).*);[ ]*$").unwrap();
 
     let captures = condition_regex.captures(src);
@@ -1088,8 +1121,9 @@ fn extract_rule_from_src(src: &str) -> Result<String, Error> {
     let condition = match captures {
         Some(c) => c.get(1).unwrap().as_str(),
         None => {
-            return Err(Error::Runtime(RuntimeError {
+            return Err(TriggerError::DatabaseError(DatabaseError {
                 msg: format!("Could not extract condition from SQL: '{src}'"),
+                kind: DatabaseErrorKind::Default,
             }))
         }
     };
@@ -1100,7 +1134,7 @@ fn extract_rule_from_src(src: &str) -> Result<String, Error> {
 pub async fn load_trigger<T: GenericClient + Send + Sync>(
     conn: &mut T,
     name: &str,
-) -> Result<Trigger, Error> {
+) -> Result<Trigger, TriggerError> {
     let query = concat!(
         "SELECT name, granularity::text, ns::text, rule.description, enabled ",
         "FROM trigger.rule ",
@@ -1111,23 +1145,28 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
     let row = conn
         .query_one(query, &[&String::from(name)])
         .await
-        .map_err(|e| DatabaseError::from_msg(format!("Could not load trigger: {e}")))?;
+        .map_err(|e| TriggerError::NotFound(DatabaseError::from_msg(e.to_string())))?;
 
-    let granularity_str: String = row.try_get(1)?;
+    let granularity_str: String = row
+        .try_get(1)
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-    let granularity = parse_interval(&granularity_str).map_err(|e| {
-        Error::Runtime(RuntimeError::from_msg(format!(
-            "Could not parse granularity '{granularity_str}': {e}"
-        )))
-    })?;
+    let granularity = parse_interval(&granularity_str)
+        .map_err(|_| TriggerError::GranularityError(granularity_str))?;
 
-    let notification_store: Option<String> = row.try_get(2)?;
+    let notification_store: Option<String> = row
+        .try_get(2)
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-    let description: Option<String> = row.try_get(3)?;
+    let description: Option<String> = row
+        .try_get(3)
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     let enabled: bool = row.get(4);
 
-    let kpi_data_columns = load_kpi_data_columns(conn, name).await?;
+    let kpi_data_columns = load_kpi_data_columns(conn, name)
+        .await
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     let kpi_function_source =
         load_function_src(conn, "trigger_rule", &format!("{}_kpi", &name)).await?;
@@ -1153,14 +1192,20 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
     let weight_function_source =
         load_function_src(conn, "trigger_rule", &format!("{}_weight", &name)).await?;
 
-    let thresholds = load_thresholds(conn, name).await?;
+    let thresholds = load_thresholds(conn, name)
+        .await
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-    let tags = load_tags(conn, name).await?;
+    let tags = load_tags(conn, name)
+        .await
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     let fingerprint_function_source =
         load_function_src(conn, "trigger_rule", &format!("{}_fingerprint", &name)).await?;
 
-    let trend_store_links = load_trend_store_links(conn, name).await?;
+    let trend_store_links = load_trend_store_links(conn, name)
+        .await
+        .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     Ok(Trigger {
         name: String::from(name),
@@ -1184,13 +1229,15 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
 
 pub async fn load_triggers<T: GenericClient + Send + Sync>(
     conn: &mut T,
-) -> Result<Vec<Trigger>, Error> {
+) -> Result<Vec<Trigger>, TriggerError> {
     let mut triggers: Vec<Trigger> = Vec::new();
 
     let query = "SELECT name FROM trigger.rule";
 
     let rows = conn.query(query, &[]).await.map_err(|e| {
-        DatabaseError::from_msg(format!("Error loading trend materializations: {e}"))
+        TriggerError::DatabaseError(DatabaseError::from_msg(format!(
+            "Error loading trend materializations: {e}"
+        )))
     })?;
 
     for row in rows {
@@ -1396,7 +1443,7 @@ async fn load_function_src<T: GenericClient + Send + Sync>(
     conn: &mut T,
     namespace: &str,
     function_name: &str,
-) -> Result<String, Error> {
+) -> Result<String, TriggerError> {
     let query = concat!(
         "select prosrc from pg_proc ",
         "join pg_namespace ns on ns.oid = pronamespace ",
@@ -1406,11 +1453,7 @@ async fn load_function_src<T: GenericClient + Send + Sync>(
     let row = conn
         .query_one(query, &[&namespace, &function_name])
         .await
-        .map_err(|e| {
-            DatabaseError::from_msg(format!(
-                "Could not load function source of function '{function_name}': {e}"
-            ))
-        })?;
+        .map_err(|_| TriggerError::FunctionError(function_name.to_string()))?;
 
     let function_source = row.get(0);
 
