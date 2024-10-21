@@ -20,6 +20,7 @@ use super::notification_store::notification_store_exists;
 
 type PostgresName = String;
 
+#[derive(Debug)]
 pub enum TriggerError {
     DatabaseError(DatabaseError),
     NotFound(DatabaseError),
