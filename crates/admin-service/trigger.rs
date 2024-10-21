@@ -154,11 +154,6 @@ async fn change_thresholds_fn(
             );
             Ok(HttpResponse::InternalServerError().json(messages))
         }
-        Err(_) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), "Unexpected Error".into());
-            Ok(HttpResponse::InternalServerError().json(messages))
-        }
         Ok(mut trigger) => {
             let mut reports = Map::new();
 
