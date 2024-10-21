@@ -3,7 +3,7 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   TESTCONTAINERS_HOST_OVERRIDE: "host.docker.internal"
 
-image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.81.0"
+image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.82.0"
 
 stages:
   - lint
