@@ -157,7 +157,7 @@ impl EntitySet {
             )
             .await
             .map_err(|e| EntitySetError::NotFound(DatabaseError::from_msg(e.to_string())))?;
-        
+
         println!(
             "SELECT source_entity_type FROM attribute.minerva_entity_set WHERE entity_id = {}",
             &self.id,
@@ -186,7 +186,6 @@ impl EntitySet {
 
                     let missing_entities: Vec<String> = row.get(0);
                     if missing_entities.is_empty() {
-
                         let query = "SELECT attribute_directory.transfer_staged(at) FROM attribute_directory.attribute_store at WHERE at::text = 'minerva_entity_set'";
                         println!("{}", query);
                         conn.execute(query, &[]).await.map_err(|e| {
@@ -207,7 +206,7 @@ impl EntitySet {
                             &format!("{}__{}", &self.name, &self.owner),
                             &self.group,
                             &self.owner,
-                            &self.description,                        
+                            &self.description,
                         );
 
                         conn.execute(
