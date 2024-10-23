@@ -84,3 +84,15 @@ but that function:
 
 This logic can better be placed in the administrative tooling so that each step
 can be logged in a similar manner.
+
+## Rationale
+
+Here are descriptions of choices that are made with alternatives and reasoning.
+
+### Standard PostgreSQL Statement Logging
+
+The use of standard PostgreSQL statement logging was considered as an
+alternative to logging of statements in the Minerva administrative tool. This
+is an option and can be configured per user. We choose to still log using the
+Minerva administrative tool because it allows us to provide more context and
+have the statements grouped together more logically.
