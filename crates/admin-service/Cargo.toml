@@ -12,7 +12,7 @@ path = "main.rs"
 [dependencies]
 actix-web = "4.7"
 actix-cors = "0.7"
-utoipa = "4.2"
+utoipa = "5.0"
 lazy_static = "1.4.0"
 clap = "4.5"
 minerva = { path = "../minerva" }
