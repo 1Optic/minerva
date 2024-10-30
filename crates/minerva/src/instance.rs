@@ -55,7 +55,9 @@ impl MinervaInstance {
 
         let trend_materializations = load_materializations(client).await?;
 
-        let triggers = load_triggers(client).await?;
+        let triggers = load_triggers(client)
+            .await
+            .map_err(|e| e.to_database_error())?;
 
         let entity_sets = load_entity_sets(client).await?;
 
