@@ -9039,7 +9039,7 @@ AS $$
 DECLARE
   set attribute.minerva_entity_set;
 BEGIN
-  SELECT * FROM attribute.minerva_entity_set WHERE id = $1 INTO set;
+  SELECT * FROM attribute.minerva_entity_set WHERE entity_id = $1 INTO set;
   PERFORM relation_directory.update_entity_set_attributes($1);
   PERFORM action(FORMAT(
     'INSERT INTO relation."%s->entity_set" (source_id, target_id) '
@@ -9063,7 +9063,7 @@ AS $$
 DECLARE
   set attribute.minerva_entity_set;
 BEGIN
-  SELECT * FROM attribute.minerva_entity_set WHERE id = $1 INTO set;
+  SELECT * FROM attribute.minerva_entity_set WHERE entity_id = $1 INTO set;
   PERFORM relation_directory.update_entity_set_attributes($1);
   PERFORM action(FORMAT(
     'DELETE es FROM relation."%s->entity_set" es '
@@ -9091,7 +9091,7 @@ AS $$
 DECLARE
   set attribute.minerva_entity_set;
 BEGIN
-  SELECT * FROM attribute.minerva_entity_set WHERE id = $1 INTO set;
+  SELECT * FROM attribute.minerva_entity_set WHERE entity_id = $1 INTO set;
   PERFORM action(FORMAT(
     'DELETE FROM relation."%s->entity_set" '
     'WHERE target_id = %s;',
@@ -9115,7 +9115,7 @@ DECLARE
   result text[];
   newresult text[];
 BEGIN
-  SELECT * FROM attribute.minerva_entity_set WHERE id = $1 INTO set;
+  SELECT * FROM attribute.minerva_entity_set WHERE entity_id = $1 INTO set;
   SELECT $2 INTO result;
   FOREACH entity IN ARRAY $2 LOOP
     EXECUTE FORMAT(
@@ -9143,7 +9143,7 @@ DECLARE
   set attribute.minerva_entity_set;
   result text[];
 BEGIN
-  SELECT * FROM attribute.minerva_entity_set WHERE id = $1 INTO set;
+  SELECT * FROM attribute.minerva_entity_set WHERE entity_id = $1 INTO set;
   EXECUTE FORMAT(
     'SELECT array_agg(e.name) '
     'FROM relation."%s->entity_set" es JOIN entity.%I e ON es.source_id = e.id '
@@ -9177,7 +9177,7 @@ BEGIN
     SELECT array_remove(result, real_entity) INTO result;
   END LOOP;
   IF ARRAY_LENGTH(result, 1) IS NULL THEN
-    SELECT id FROM relation_directory.create_entity_set($1, $2, $3, $4, $5) INTO entityset;
+    SELECT entity_id FROM relation_directory.create_entity_set($1, $2, $3, $4, $5) INTO entityset;
     PERFORM relation_directory.change_set_entities(entityset, $6);
   END IF;
   RETURN result;
@@ -9188,7 +9188,7 @@ $$ LANGUAGE plpgsql VOLATILE;
 CREATE FUNCTION "relation_directory"."get_entity_set_members"("name" text, "owner" text)
     RETURNS text[]
 AS $$
-SELECT relation_directory.get_entity_set_members(es.id)
+SELECT relation_directory.get_entity_set_members(es.entity_id)
   FROM attribute.minerva_entity_set es
   WHERE owner = $2 AND name = $1;
 $$ LANGUAGE sql STABLE;

@@ -362,7 +362,9 @@ impl Cmd for TriggerDump {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let trigger = load_trigger(&mut client, &self.name).await?;
+        let trigger = load_trigger(&mut client, &self.name)
+            .await
+            .map_err(|e| e.to_database_error())?;
 
         let trigger_definition = dump_trigger(&trigger);
 
