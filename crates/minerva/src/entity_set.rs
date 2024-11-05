@@ -43,6 +43,7 @@ pub enum EntitySetError {
     EmptyEntitySet,
     MissingEntities(Vec<String>),
     UnchangeableFields(Vec<String>),
+    IncorrectEntityType(String),
 }
 
 impl From<DatabaseError> for EntitySetError {
@@ -116,33 +117,36 @@ pub async fn load_entity_sets(conn: &mut Client) -> Result<Vec<EntitySet>, Strin
     Ok(entity_sets)
 }
 
-pub async fn load_entity_set(
-    conn: &mut Client,
-    owner: &str,
-    name: &str,
-) -> Result<EntitySet, String> {
+pub async fn load_entity_set(conn: &mut Client, id: &i32) -> Result<EntitySet, String> {
     let query = concat!(
         "SELECT name, \"group\", source_entity_type, owner, description, ",
-        "entity_set.get_entity_set_members(es.entity_id), first_appearance, modified, entity_id ",
+        "first_appearance, modified, entity_id ",
         "FROM attribute.minerva_entity_set es ",
-        "WHERE es.owner = $1 AND es.name = $2"
+        "WHERE es.entity_id = $1"
     );
 
     let row = conn
-        .query_one(query, &[&owner, &name])
+        .query_one(query, &[&id])
         .await
-        .map_err(|e| format!("Could not load entity set {owner}:{name}: {e}"))?;
+        .map_err(|e| format!("Could not load entity set {id}: {e}"))?;
+
+    let query = "SELECT relation_directory.get_entity_set_members($1)";
+
+    let entitydata = conn
+        .query_one(query, &[&id])
+        .await
+        .map_err(|e| format!("Could not load entity set members for entity set {id}: {e}"))?;
 
     let entity_set = EntitySet {
-        id: row.get(8),
+        id: row.get(7),
         name: row.get(0),
         group: row.get(1),
         entity_type: row.get(2),
         owner: row.get(3),
         description: row.try_get(4).unwrap_or("".into()),
-        entities: row.get(5),
-        created: row.get(6),
-        modified: row.get(7),
+        entities: entitydata.get(0),
+        created: row.get(5),
+        modified: row.get(6),
     };
 
     Ok(entity_set)
@@ -152,19 +156,16 @@ impl EntitySet {
     pub async fn update(&self, conn: &mut Transaction<'_>) -> Result<EntitySet, EntitySetError> {
         let row = conn
             .query_one(
-                "SELECT source_entity_type FROM attribute.minerva_entity_set WHERE entity_id = $1",
+                "SELECT source_entity_type, owner, description FROM attribute.minerva_entity_set WHERE entity_id = $1",
                 &[&self.id],
             )
             .await
             .map_err(|e| EntitySetError::NotFound(DatabaseError::from_msg(e.to_string())))?;
 
-        println!(
-            "SELECT source_entity_type FROM attribute.minerva_entity_set WHERE entity_id = {}",
-            &self.id,
-        );
-
         let mut incorrect_fields: Vec<String> = vec![];
         let foundentitytype: String = row.get(0);
+        let mut owner: String = row.get(1);
+        let mut description: String = row.get(2);
         if self.entity_type != foundentitytype {
             incorrect_fields.push("entity_type".to_string());
             Err(EntitySetError::UnchangeableFields(incorrect_fields))
@@ -199,15 +200,12 @@ impl EntitySet {
                             "FROM data WHERE id = lastid",
                         );
 
-                        println!(
-                            "WITH data AS (SELECT max(id) AS lastid FROM attribute_history.minerva_entity_set WHERE entity_id = {}) UPDATE attribute_history.minerva_entity_set SET name = {}, fullname = {}, \"group\" = {}, owner = {}, description = {} FROM data WHERE id = lastid",
-                            &self.id,
-                            &self.name,
-                            &format!("{}__{}", &self.name, &self.owner),
-                            &self.group,
-                            &self.owner,
-                            &self.description,
-                        );
+                        if !self.owner.is_empty() {
+                            owner = self.owner.to_string()
+                        };
+                        if !self.description.is_empty() {
+                            description = self.description.to_string()
+                        }
 
                         conn.execute(
                             query,
@@ -216,8 +214,8 @@ impl EntitySet {
                                 &self.name,
                                 &format!("{}__{}", &self.name, &self.owner),
                                 &self.group,
-                                &self.owner,
-                                &self.description,
+                                &owner,
+                                &description,
                             ],
                         )
                         .await
@@ -319,6 +317,13 @@ impl NewEntitySet {
             )
             .await
             .map_err(|e| EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+
+        conn.query_one(
+            "SELECT name FROM directory.entity_type WHERE NAME = $1",
+            &[&self.entity_type],
+        )
+        .await
+        .map_err(|_| EntitySetError::IncorrectEntityType(self.entity_type.to_string()))?;
 
         match row.get(0) {
             true => Err(EntitySetError::ExistingEntitySet(
@@ -429,6 +434,9 @@ impl Change for CreateEntitySet {
                     missing_entities.join(", ")
                 ))))
             }
+            Err(EntitySetError::IncorrectEntityType(_)) => Err(Error::Runtime(
+                RuntimeError::from_msg("Entity set type does not exist".to_string()),
+            )),
             Err(_) => Err(Error::Runtime(RuntimeError::from_msg(
                 "Unexpected Error".to_string(),
             ))),
