@@ -61,7 +61,10 @@ impl Change for AddVirtualEntity {
             .batch_execute(&self.virtual_entity.sql)
             .await
             .map_err(|e| {
-                DatabaseError::from_msg(format!("Error creating relation materialized view: {e}"))
+                DatabaseError::from_msg(format!(
+                    "Error creating relation '{}': {e}",
+                    &self.virtual_entity.name
+                ))
             })?;
 
         Ok(format!("Added virtual entity {}", &self.virtual_entity))

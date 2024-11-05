@@ -19,6 +19,7 @@ use crate::commands::trendmaterialization::TrendMaterializationOpt;
 use crate::commands::trendstore::TrendStoreOpt;
 use crate::commands::trigger::TriggerOpt;
 use crate::commands::update::UpdateOpt;
+use crate::commands::virtualentity::VirtualEntityOpt;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, name = "minerva", arg_required_else_help = true)]
@@ -58,6 +59,8 @@ enum Commands {
     Start(StartOpt),
     #[command(about = "Generate standard aggregations")]
     Aggregation(AggregationOpt),
+    #[command(about = "Manage virtual entities")]
+    VirtualEntity(VirtualEntityOpt),
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -94,6 +97,7 @@ async fn main() {
         #[cfg(feature = "test-containers")]
         Some(Commands::Start(start)) => start.run().await,
         Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
+        Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
         None => return,
     };
 
