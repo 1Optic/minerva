@@ -158,6 +158,10 @@ impl TestDatabase {
             ),
         ]
     }
+
+    pub fn config(&self) -> Config {
+        self.connect_config.clone()
+    }
 }
 
 pub struct MinervaCluster {

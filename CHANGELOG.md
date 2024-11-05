@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.9.0] - 2024-11-05
+
+### Added
+
+- Added command for materializing virtual entities
+
 ## [9.8.0] - 2024-10-30
 
 ### Added
@@ -116,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.8.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.9.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -133,3 +139,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.6.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.1...9.6.2
 [9.7.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.6.2...9.7.0
 [9.8.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.7.0...9.8.0
+[9.9.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.8.0...9.9.0
