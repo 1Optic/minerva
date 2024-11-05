@@ -4,10 +4,12 @@ use serde_json::{Map, Value};
 use std::ops::DerefMut;
 use utoipa::ToSchema;
 
-use actix_web::{get, post, put, web::Data, web::Json, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web::Data, web::Json, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 
-use minerva::entity_set::{load_entity_sets, EntitySet, EntitySetError, NewEntitySet};
+use minerva::entity_set::{
+    load_entity_set, load_entity_sets, EntitySet, EntitySetError, NewEntitySet,
+};
 use minerva::error::DatabaseError;
 
 use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};
@@ -36,6 +38,11 @@ pub struct EntitySetDataFull {
     pub entities: Vec<String>,
     pub created: Option<DateTime<Utc>>,
     pub modified: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct Id {
+    pub id: i32,
 }
 
 impl EntitySetDataFull {
@@ -168,7 +175,7 @@ async fn change_entity_set_fn(
         }
         Err(EntitySetError::EmptyEntitySet) => {
             let mut messages = Map::new();
-            messages.insert("general".to_string(), "Entity set cannot be empty".into());
+            messages.insert("entities".to_string(), "Entity set cannot be empty".into());
             Ok(HttpResponse::BadRequest().json(messages))
         }
         Err(_) => {
@@ -257,7 +264,7 @@ async fn create_entity_set_fn(
         }
         Err(EntitySetError::EmptyEntitySet) => {
             let mut messages = Map::new();
-            messages.insert("general".to_string(), "Entity set cannot be empty".into());
+            messages.insert("entities".to_string(), "Entity set cannot be empty".into());
             Ok(HttpResponse::BadRequest().json(messages))
         }
         Err(EntitySetError::MissingEntities(missing_entities)) => {
@@ -266,6 +273,14 @@ async fn create_entity_set_fn(
                 messages.insert(entity, "Entity does not exist".into());
             }
             Ok(HttpResponse::Conflict().json(messages))
+        }
+        Err(EntitySetError::IncorrectEntityType(_entity_type)) => {
+            let mut messages = Map::new();
+            messages.insert(
+                "entity_type".to_string(),
+                "Entity type with that name does not exist".into(),
+            );
+            Ok(HttpResponse::BadRequest().json(messages))
         }
         Err(_) => {
             let mut messages = Map::new();
@@ -300,6 +315,55 @@ pub(super) async fn create_entity_set(
             let mut messages = Map::new();
             messages.insert("general".to_string(), e.to_string().into());
             HttpResponse::InternalServerError().json(messages)
+        }
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path="/entitysets",
+    responses(
+        (status = 200, description = "Deleting entity set succeeded", body=Success),
+        (status = 400, description = "Request could not be parsed", body=Error),
+        (status = 409, description = "Entity set does not exist", body=Error),
+        (status = 500, description = "Database unreachable", body=Error),
+    )
+)]
+#[delete("/entitysets")]
+pub(super) async fn delete_entity_set(pool: Data<Pool>, data: Json<Id>) -> impl Responder {
+    let result = pool.get().await;
+    match result {
+        Err(e) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), Value::String(e.to_string()));
+            HttpResponse::InternalServerError().json(messages)
+        }
+        Ok(mut manager) => {
+            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+            let preresult = load_entity_set(client, &data.id).await;
+            match preresult {
+                Ok(entityset) => {
+                    let query =
+                        "DELETE FROM attribute_history.minerva_entity_set WHERE entity_id = $1";
+                    let result = client.execute(query, &[&entityset.id]).await;
+                    match result {
+                        Ok(_) => HttpResponse::Ok().json(Success {
+                            code: 200,
+                            message: format!("Entity set number {} deleted", &entityset.id),
+                        }),
+                        Err(e) => {
+                            let mut messages = Map::new();
+                            messages.insert("general".to_string(), Value::String(e.to_string()));
+                            HttpResponse::InternalServerError().json(messages)
+                        }
+                    }
+                }
+                Err(e) => {
+                    let mut messages = Map::new();
+                    messages.insert("id".to_string(), Value::String(e.to_string()));
+                    HttpResponse::Conflict().json(messages)
+                }
+            }
         }
     }
 }
