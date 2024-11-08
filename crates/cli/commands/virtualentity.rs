@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use tokio_postgres::GenericClient;
@@ -72,6 +74,8 @@ where
 
     print!("Loading into temporary table '{temp_table_name}' ... ");
 
+    std::io::stdout().flush().unwrap();
+
     let insert_temp_count = client
         .execute(&insert_temp_query, &[])
         .await
@@ -87,12 +91,14 @@ where
 
     print!("Loading into target table 'entity.{name}' ... ");
 
+    std::io::stdout().flush().unwrap();
+
     let insert_count = client
         .execute(&insert_query, &[])
         .await
         .map_err(|e| VirtualEntityUpdateError::AddEntities(format!("{e}")))?;
 
-    println!("Done.");
+    println!("Done ({insert_count} records)");
 
     let drop_temp_table_query = format!("DROP TABLE {}", escape_identifier(temp_table_name));
 
