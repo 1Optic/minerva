@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [9.9.0] - 2024-11-08
+## [9.9.0] - 2024-11-11
 
 ### Added
 
-- Added command for materializing virtual entities
+- CLI: Added command for materializing virtual entities
+- Service: Add endpoint to delete entity sets
 
 ## [9.8.0] - 2024-10-30
 
@@ -118,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [8.0.0] - 2024-07-24
 
-### Changed 
+### Changed
 
 - AttributeDataRow now includes timestamp field
 
