@@ -32,7 +32,7 @@ impl VirtualEntityOpt {
 #[derive(Debug, Parser, PartialEq)]
 pub struct VirtualEntityMaterialize {
     #[arg(help = "virtual entity type name")]
-    name: String,
+    name: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -110,25 +110,84 @@ where
     Ok(insert_count)
 }
 
+async fn get_virtual_entity_type_names<C>(client: &mut C) -> Result<Vec<String>, String>
+where
+    C: GenericClient,
+{
+    let query = "SELECT et.name FROM directory.entity_type et JOIN pg_class c ON et.name = c.relname JOIN pg_namespace ns ON ns.oid = relnamespace WHERE c.relkind = 'v' AND ns.nspname = 'virtual_entity'";
+    let rows = client.query(query, &[]).await.map_err(|e| format!("{e}"))?;
+
+    let names = rows.iter().map(|row| row.get(0)).collect();
+
+    Ok(names)
+}
+
+async fn materialize_virtual_entity_type<C>(client: &mut C, name: &str) -> Result<u64, String>
+where
+    C: GenericClient,
+{
+    let mut tx = client
+        .transaction()
+        .await
+        .map_err(|e| format!("Could not start transaction: {e}"))?;
+
+    match materialize_virtual_entity(&mut tx, name).await {
+        Ok(record_count) => {
+            tx.commit()
+                .await
+                .map_err(|e| format!("Could not commit change: {e}"))?;
+            Ok(record_count)
+        }
+        Err(e) => {
+            tx.rollback()
+                .await
+                .map_err(|e| format!("Could not rollback change: {e}"))?;
+            Err(format!("{e}"))
+        }
+    }
+}
+
+async fn materialize_select_virtual_entities<C, T>(client: &mut C, names: &[T])
+where
+    C: GenericClient,
+    T: AsRef<str>,
+{
+    for name in names {
+        match materialize_virtual_entity_type(client, name.as_ref()).await {
+            Ok(record_count) => {
+                println!(
+                    "Materialized virtual entity '{}' ({} records)",
+                    name.as_ref(),
+                    record_count
+                );
+            }
+            Err(e) => {
+                println!("Error materializing relation '{}': {e}", name.as_ref());
+            }
+        }
+    }
+}
+
+async fn materialize_all_virtual_entities<C>(client: &mut C) -> Result<(), String>
+where
+    C: GenericClient,
+{
+    let entity_type_names = get_virtual_entity_type_names(client).await?;
+
+    materialize_select_virtual_entities(client, entity_type_names.as_slice()).await;
+
+    Ok(())
+}
+
 #[async_trait]
 impl Cmd for VirtualEntityMaterialize {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let mut tx = client.transaction().await?;
-
-        match materialize_virtual_entity(&mut tx, &self.name).await {
-            Ok(record_count) => {
-                tx.commit().await?;
-                println!(
-                    "Materialized virtual entity '{}' ({} records)",
-                    self.name, record_count
-                );
-            }
-            Err(e) => {
-                tx.rollback().await?;
-                println!("Error materializing relation '{}': {e}", self.name);
-            }
+        if self.name.is_empty() {
+            let _ = materialize_all_virtual_entities(&mut client).await;
+        } else {
+            let _ = materialize_select_virtual_entities(&mut client, &self.name).await;
         }
 
         Ok(())
