@@ -4,7 +4,7 @@ use serde_json::{Map, Value};
 use std::ops::DerefMut;
 use utoipa::ToSchema;
 
-use actix_web::{delete, get, post, put, web::Data, web::Json, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web::Data, web::Json, web::Path, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 
 use minerva::entity_set::{
@@ -330,7 +330,7 @@ pub(super) async fn create_entity_set(
     )
 )]
 #[delete("/entitysets")]
-pub(super) async fn delete_entity_set(pool: Data<Pool>, data: Json<Id>) -> impl Responder {
+pub(super) async fn delete_entity_set_temp(pool: Data<Pool>, data: Json<Id>) -> impl Responder {
     let result = pool.get().await;
     match result {
         Err(e) => {
@@ -350,6 +350,56 @@ pub(super) async fn delete_entity_set(pool: Data<Pool>, data: Json<Id>) -> impl 
                         Ok(_) => HttpResponse::Ok().json(Success {
                             code: 200,
                             message: format!("Entity set number {} deleted", &entityset.id),
+                        }),
+                        Err(e) => {
+                            let mut messages = Map::new();
+                            messages.insert("general".to_string(), Value::String(e.to_string()));
+                            HttpResponse::InternalServerError().json(messages)
+                        }
+                    }
+                }
+                Err(e) => {
+                    let mut messages = Map::new();
+                    messages.insert("id".to_string(), Value::String(e.to_string()));
+                    HttpResponse::Conflict().json(messages)
+                }
+            }
+        }
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path="/entitysets/{id}",
+    responses(
+        (status = 200, description = "Deleting entity set succeeded", body=Success),
+        (status = 400, description = "Request could not be parsed", body=Error),
+        (status = 409, description = "Entity set does not exist", body=Error),
+        (status = 500, description = "Database unreachable", body=Error),
+    )
+)]
+#[delete("/entitysets/{id}")]
+pub(super) async fn delete_entity_set(pool: Data<Pool>, id: Path<i32>) -> impl Responder {
+    let result = pool.get().await;
+    let es_id = id.into_inner();
+    match result {
+        Err(e) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), Value::String(e.to_string()));
+            HttpResponse::InternalServerError().json(messages)
+        }
+        Ok(mut manager) => {
+            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+            let preresult = load_entity_set(client, &es_id).await;
+            match preresult {
+                Ok(_) => {
+                    let query =
+                        "DELETE FROM attribute_history.minerva_entity_set WHERE entity_id = $1";
+                    let result = client.execute(query, &[&es_id]).await;
+                    match result {
+                        Ok(_) => HttpResponse::Ok().json(Success {
+                            code: 200,
+                            message: format!("Entity set number {} deleted", &es_id),
                         }),
                         Err(e) => {
                             let mut messages = Map::new();

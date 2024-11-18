@@ -47,7 +47,8 @@ use trigger::{change_thresholds, get_triggers, TriggerData};
 
 mod entityset;
 use entityset::{
-    change_entity_set, create_entity_set, delete_entity_set, get_entity_sets, EntitySetData,
+    change_entity_set, create_entity_set, delete_entity_set, delete_entity_set_temp,
+    get_entity_sets, EntitySetData,
 };
 
 mod header;
@@ -107,6 +108,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             entityset::change_entity_set,
             entityset::create_entity_set,
             entityset::delete_entity_set,
+            entityset::delete_entity_set_temp,
             header::get_header
         ),
         components(
@@ -191,6 +193,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             .service(change_entity_set)
             .service(create_entity_set)
             .service(delete_entity_set)
+            .service(delete_entity_set_temp)
             .service(get_header)
     })
     .bind((service_address, service_port))
