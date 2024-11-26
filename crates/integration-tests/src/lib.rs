@@ -1,6 +1,7 @@
 use std::sync::Once;
 
 pub mod common;
+pub mod compact_attribute;
 pub mod create_kpi;
 pub mod entity_set;
 pub mod get_entity_types;
