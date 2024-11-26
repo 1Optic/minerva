@@ -95,16 +95,7 @@ INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance,
 
         tx.commit().await?;
 
-        let exit_code = run_compact_cmd(&cluster, &test_database.name, 3).await?;
-        assert_eq!(exit_code.code(), Some(0));
-
-        let exit_code = run_compact_cmd(&cluster, &test_database.name, 3).await?;
-        assert_eq!(exit_code.code(), Some(0));
-
-        let exit_code = run_compact_cmd(&cluster, &test_database.name, 3).await?;
-        assert_eq!(exit_code.code(), Some(0));
-
-        let exit_code = run_compact_cmd(&cluster, &test_database.name, 3).await?;
+        let exit_code = run_compact_cmd(&cluster, &test_database.name).await?;
         assert_eq!(exit_code.code(), Some(0));
 
         let row = client
@@ -242,7 +233,6 @@ INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance,
     async fn run_compact_cmd(
         cluster: &MinervaCluster,
         database_name: &str,
-        max_compact_count: u32,
     ) -> io::Result<ExitStatus> {
         let log_level = std::env::var("RUST_LOG").unwrap_or("error".to_string());
 
@@ -258,8 +248,6 @@ INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance,
             .env("PGDATABASE", database_name)
             .arg("attribute-store")
             .arg("compact")
-            .arg("--max-compact-count")
-            .arg(max_compact_count.to_string())
             .arg("--name")
             .arg("hub_node")
             .kill_on_drop(true)

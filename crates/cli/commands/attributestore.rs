@@ -17,12 +17,6 @@ use super::common::{connect_db, Cmd, CmdResult};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreCompact {
-    #[arg(
-        long,
-        default_value = "100",
-        help = "maximum number of records to compact"
-    )]
-    max_compact_count: i32,
     #[arg(short, long, help = "Id of attribute store")]
     id: Option<i32>,
     #[arg(short, long, help = "name of attribute store")]
@@ -39,8 +33,7 @@ impl Cmd for AttributeStoreCompact {
         if let Some(id) = self.id {
             let transaction = client.transaction().await?;
 
-            let result =
-                compact_attribute_store_by_id(&transaction, id, self.max_compact_count).await?;
+            let result = compact_attribute_store_by_id(&transaction, id).await?;
 
             transaction.commit().await?;
 
@@ -51,8 +44,7 @@ impl Cmd for AttributeStoreCompact {
         } else if let Some(name) = &self.name {
             let transaction = client.transaction().await?;
 
-            let result =
-                compact_attribute_store_by_name(&transaction, name, self.max_compact_count).await?;
+            let result = compact_attribute_store_by_name(&transaction, name).await?;
 
             transaction.commit().await?;
 
@@ -61,18 +53,15 @@ impl Cmd for AttributeStoreCompact {
                 result.attribute_store_name, result.attribute_store_id, result.record_count
             );
         } else if self.all_modified {
-            compact_all_attribute_stores(&mut client, self.max_compact_count).await?;
+            compact_all_attribute_stores(&mut client).await?;
         }
 
         Ok(())
     }
 }
 
-async fn compact_all_attribute_stores(
-    client: &mut Client,
-    max_compact_count: i32,
-) -> Result<(), CompactError> {
-    let query = "SELECT id FROM attribute_directory.attribute_store";
+async fn compact_all_attribute_stores(client: &mut Client) -> Result<(), CompactError> {
+    let query = "SELECT id, attribute_store::text FROM attribute_directory.attribute_store";
 
     let rows = client
         .query(query, &[])
@@ -81,18 +70,51 @@ async fn compact_all_attribute_stores(
 
     for row in rows {
         let id = row.get(0);
+        let attribute_store_name: String = row.get(1);
 
         let transaction = client
             .transaction()
             .await
             .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
 
-        compact_attribute_store_by_id(&transaction, id, max_compact_count).await?;
+        println!(
+            "Compacting attribute store '{}'({})",
+            attribute_store_name, id
+        );
+
+        let result = compact_attribute_store_by_id(&transaction, id).await?;
+
+        // When any attribute data is compacted, also update the curr-ptr data
+        if result.record_count > 0 {
+            println!(
+                "Materializing curr-ptr table for attribute store '{}'",
+                attribute_store_name
+            );
+
+            let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
+
+            let row = transaction
+                .query_one(query, &[&id])
+                .await
+                .map_err(|e| CompactError::CurrPtr(format!("{e}")))?;
+
+            let record_count: i32 = row.get(0);
+
+            println!(
+                "Materialized curr-ptr table for attribute store '{}': {} records",
+                attribute_store_name, record_count
+            );
+        }
 
         transaction
             .commit()
             .await
             .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+
+        println!(
+            "Compacted attribute store '{}'({}): {}",
+            result.attribute_store_name, result.attribute_store_id, result.record_count
+        );
     }
 
     Ok(())
