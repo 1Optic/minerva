@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.11.0] - 2024-11-26
+
+### Added
+
+- Design: Add default alias column design
+- Service: Add endpoint to delete entity sets by id
+
+### Changed
+
+- Upgrade dependencies
+
+### Fixed
+
+- Handle SQL inputs securely
+
 ## [9.10.0] - 2024-11-13
 
 ### Changed
@@ -130,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.10.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.11.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -149,3 +164,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.8.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.7.0...9.8.0
 [9.9.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.8.0...9.9.0
 [9.10.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.9.0...9.10.0
+[9.11.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.10.0...9.11.0
