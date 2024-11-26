@@ -407,8 +407,8 @@ pub async fn load_attribute_store<T: GenericClient + Send + Sync>(
     })
 }
 
-async fn load_attributes<T: GenericClient + Send + Sync>(
-    conn: &mut T,
+pub async fn load_attributes<T: GenericClient + Send + Sync>(
+    conn: &T,
     attribute_store_id: i32,
 ) -> Vec<Attribute> {
     let attribute_query = "SELECT name, data_type, description FROM attribute_directory.attribute WHERE attribute_store_id = $1";

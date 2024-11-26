@@ -8,9 +8,95 @@ use minerva::attribute_store::{
     load_attribute_store, load_attribute_store_from_file, AddAttributeStore, AttributeStore,
 };
 use minerva::change::Change;
+use minerva::compact::{
+    compact_attribute_store_by_id, compact_attribute_store_by_name, CompactError,
+};
 use minerva::error::{Error, RuntimeError};
 
 use super::common::{connect_db, Cmd, CmdResult};
+
+#[derive(Debug, Parser, PartialEq)]
+pub struct AttributeStoreCompact {
+    #[arg(
+        long,
+        default_value = "100",
+        help = "maximum number of records to compact"
+    )]
+    max_compact_count: i32,
+    #[arg(short, long, help = "Id of attribute store")]
+    id: Option<i32>,
+    #[arg(short, long, help = "name of attribute store")]
+    name: Option<String>,
+    #[arg(long, help = "compact all modified attribute stores")]
+    all_modified: bool,
+}
+
+#[async_trait]
+impl Cmd for AttributeStoreCompact {
+    async fn run(&self) -> CmdResult {
+        let mut client = connect_db().await?;
+
+        if let Some(id) = self.id {
+            let transaction = client.transaction().await?;
+
+            let result =
+                compact_attribute_store_by_id(&transaction, id, self.max_compact_count).await?;
+
+            transaction.commit().await?;
+
+            println!(
+                "Compacted attribute store '{}'({}): {}",
+                result.attribute_store_name, result.attribute_store_id, result.record_count
+            );
+        } else if let Some(name) = &self.name {
+            let transaction = client.transaction().await?;
+
+            let result =
+                compact_attribute_store_by_name(&transaction, name, self.max_compact_count).await?;
+
+            transaction.commit().await?;
+
+            println!(
+                "Compacted attribute store '{}'({}): {}",
+                result.attribute_store_name, result.attribute_store_id, result.record_count
+            );
+        } else if self.all_modified {
+            compact_all_attribute_stores(&mut client, self.max_compact_count).await?;
+        }
+
+        Ok(())
+    }
+}
+
+async fn compact_all_attribute_stores(
+    client: &mut Client,
+    max_compact_count: i32,
+) -> Result<(), CompactError> {
+    let query = "SELECT id FROM attribute_directory.attribute_store";
+
+    let rows = client
+        .query(query, &[])
+        .await
+        .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+
+    for row in rows {
+        let id = row.get(0);
+
+        let transaction = client
+            .transaction()
+            .await
+            .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+
+        compact_attribute_store_by_id(&transaction, id, max_compact_count).await?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+    }
+
+    Ok(())
+}
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreMaterializeCurrPtr {
@@ -159,6 +245,8 @@ pub enum AttributeStoreOptCommands {
     Update(AttributeStoreUpdate),
     #[command(about = "materialize attribute store curr-ptr table")]
     MaterializeCurrPtr(AttributeStoreMaterializeCurrPtr),
+    #[command(about = "compact attribute store history")]
+    Compact(AttributeStoreCompact),
 }
 
 impl AttributeStoreOpt {
@@ -170,6 +258,7 @@ impl AttributeStoreOpt {
             AttributeStoreOptCommands::MaterializeCurrPtr(materialize_curr_ptr) => {
                 materialize_curr_ptr.run().await
             }
+            AttributeStoreOptCommands::Compact(compact) => compact.run().await,
         }
     }
 }

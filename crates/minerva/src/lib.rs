@@ -3,6 +3,7 @@ pub mod attribute_storage;
 pub mod attribute_store;
 pub mod change;
 pub mod changes;
+pub mod compact;
 pub mod database;
 pub mod entity;
 pub mod entity_set;
