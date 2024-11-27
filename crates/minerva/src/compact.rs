@@ -39,9 +39,91 @@ impl From<CompactError> for Error {
     }
 }
 
-pub fn build_compact_query(attribute_store_name: &str) -> String {
-    format!(
-        r#"
+pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
+    client: &T,
+    attribute_store_id: i32,
+    limit: Option<usize>,
+) -> Result<CompactResult, CompactError> {
+    let rows = client
+        .query(
+            "SELECT attribute_store::text FROM attribute_directory.attribute_store WHERE id = $1",
+            &[&attribute_store_id],
+        )
+        .await
+        .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+
+    if rows.is_empty() {
+        return Err(CompactError::NoSuchAttributeStoreId(attribute_store_id));
+    }
+
+    let row = rows.first().unwrap();
+
+    let attribute_store_name = row.get(0);
+
+    let create_tmp_table_query = r#"
+CREATE TEMP TABLE compact_info (
+    id integer,
+    first_id integer,
+    last_id integer,
+    timestamp timestamptz,
+    modified timestamptz
+) ON COMMIT DROP"#;
+
+    client.execute(create_tmp_table_query, &[]).await.unwrap();
+
+    let insert_count = match limit {
+        Some(max_records) => {
+            let query = format!(
+                r#"
+INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
+SELECT
+    id, first_id, last_id, timestamp, modified
+FROM (
+    SELECT
+        id,
+        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp ASC) AS first_id,
+        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp DESC) AS last_id,
+        "timestamp",
+        modified,
+        count(*) OVER (PARTITION BY entity_id, run) AS run_length
+    FROM (
+        SELECT
+            id,
+            entity_id,
+            "timestamp",
+            first_appearance,
+            modified,
+            sum(change) OVER w2 AS run
+        FROM (
+            SELECT
+                id,
+                entity_id,
+                "timestamp",
+                first_appearance,
+                modified,
+                CASE
+                    WHEN hash <> lag(hash) OVER w THEN 1
+                    ELSE 0
+                END AS change
+            FROM attribute_history."{}"
+            WINDOW w AS (PARTITION BY entity_id ORDER BY "timestamp")
+        ) t
+        WINDOW w2 AS (PARTITION BY entity_id ORDER BY "timestamp")
+        LIMIT $1
+    ) runs
+) to_compact WHERE run_length > 1
+"#,
+                attribute_store_name
+            );
+
+            client
+                .execute(&query, &[&(max_records as i64)])
+                .await
+                .unwrap()
+        }
+        None => {
+            let query = format!(
+                r#"
 INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
 SELECT
     id, first_id, last_id, timestamp, modified
@@ -79,44 +161,12 @@ FROM (
     ) runs
 ) to_compact WHERE run_length > 1
 "#,
-        attribute_store_name
-    )
-}
+                attribute_store_name
+            );
 
-pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
-    client: &T,
-    attribute_store_id: i32,
-) -> Result<CompactResult, CompactError> {
-    let rows = client
-        .query(
-            "SELECT attribute_store::text FROM attribute_directory.attribute_store WHERE id = $1",
-            &[&attribute_store_id],
-        )
-        .await
-        .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
-
-    if rows.is_empty() {
-        return Err(CompactError::NoSuchAttributeStoreId(attribute_store_id));
-    }
-
-    let row = rows.first().unwrap();
-
-    let attribute_store_name = row.get(0);
-
-    let create_tmp_table_query = r#"
-CREATE TEMP TABLE compact_info (
-    id integer,
-    first_id integer,
-    last_id integer,
-    timestamp timestamptz,
-    modified timestamptz
-) ON COMMIT DROP"#;
-
-    client.execute(create_tmp_table_query, &[]).await.unwrap();
-
-    let load_compact_info_query = build_compact_query(attribute_store_name);
-
-    let insert_count = client.execute(&load_compact_info_query, &[]).await.unwrap();
+            client.execute(&query, &[]).await.unwrap()
+        }
+    };
 
     println!("Inserted {} records", insert_count);
 
@@ -176,6 +226,7 @@ RETURNING attribute_store_modified"#;
 pub async fn compact_attribute_store_by_name<T: GenericClient + Send + Sync>(
     client: &T,
     name: &str,
+    limit: Option<usize>,
 ) -> Result<CompactResult, CompactError> {
     let query =
         "SELECT id FROM attribute_directory.attribute_store WHERE attribute_store::text = $1";
@@ -193,5 +244,5 @@ pub async fn compact_attribute_store_by_name<T: GenericClient + Send + Sync>(
 
     let attribute_store_id: i32 = row.get(0);
 
-    compact_attribute_store_by_id(client, attribute_store_id).await
+    compact_attribute_store_by_id(client, attribute_store_id, limit).await
 }

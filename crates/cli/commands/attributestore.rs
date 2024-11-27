@@ -23,6 +23,8 @@ pub struct AttributeStoreCompact {
     name: Option<String>,
     #[arg(long, help = "compact all modified attribute stores")]
     all_modified: bool,
+    #[arg(long, help = "limit how many records to compact")]
+    limit: Option<usize>,
 }
 
 #[async_trait]
@@ -30,10 +32,14 @@ impl Cmd for AttributeStoreCompact {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
+        client
+            .execute("SET citus.max_intermediate_result_size = -1", &[])
+            .await?;
+
         if let Some(id) = self.id {
             let transaction = client.transaction().await?;
 
-            let result = compact_attribute_store_by_id(&transaction, id).await?;
+            let result = compact_attribute_store_by_id(&transaction, id, self.limit).await?;
 
             transaction.commit().await?;
 
@@ -44,7 +50,7 @@ impl Cmd for AttributeStoreCompact {
         } else if let Some(name) = &self.name {
             let transaction = client.transaction().await?;
 
-            let result = compact_attribute_store_by_name(&transaction, name).await?;
+            let result = compact_attribute_store_by_name(&transaction, name, self.limit).await?;
 
             transaction.commit().await?;
 
@@ -53,14 +59,17 @@ impl Cmd for AttributeStoreCompact {
                 result.attribute_store_name, result.attribute_store_id, result.record_count
             );
         } else if self.all_modified {
-            compact_all_attribute_stores(&mut client).await?;
+            compact_all_attribute_stores(&mut client, self.limit).await?;
         }
 
         Ok(())
     }
 }
 
-async fn compact_all_attribute_stores(client: &mut Client) -> Result<(), CompactError> {
+async fn compact_all_attribute_stores(
+    client: &mut Client,
+    limit: Option<usize>,
+) -> Result<(), CompactError> {
     let query = "SELECT id, attribute_store::text FROM attribute_directory.attribute_store";
 
     let rows = client
@@ -82,7 +91,7 @@ async fn compact_all_attribute_stores(client: &mut Client) -> Result<(), Compact
             attribute_store_name, id
         );
 
-        let result = compact_attribute_store_by_id(&transaction, id).await?;
+        let result = compact_attribute_store_by_id(&transaction, id, limit).await?;
 
         // When any attribute data is compacted, also update the curr-ptr data
         if result.record_count > 0 {
