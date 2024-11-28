@@ -70,12 +70,17 @@ async fn compact_all_attribute_stores(
     client: &mut Client,
     limit: Option<usize>,
 ) -> Result<(), CompactError> {
-    let query = "SELECT id, attribute_store::text FROM attribute_directory.attribute_store";
+    let query = "SELECT ast.id, ast::text FROM attribute_directory.attribute_store ast LEFT JOIN attribute_directory.attribute_store_compacted astc ON astc.attribute_store_id = ast.id JOIN attribute_directory.attribute_store_modified astm ON astm.attribute_store_id = ast.id WHERE astc.compacted IS NULL OR astm.modified <> astc.compacted";
 
     let rows = client
         .query(query, &[])
         .await
         .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
+
+    if rows.is_empty() {
+        println!("All attribute stores are already compacted, nothing to do");
+        return Ok(());
+    }
 
     for row in rows {
         let id = row.get(0);

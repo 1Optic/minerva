@@ -99,7 +99,12 @@ mod tests {
                 .send()
                 .await?;
 
-            assert_eq!(response.status(), 200);
+            assert_eq!(
+                response.status(),
+                200,
+                "error response: {}",
+                response.text().await.unwrap()
+            );
 
             let body: Value = response.json().await?;
 

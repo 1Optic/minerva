@@ -1,4 +1,6 @@
 use std::env;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use log::info;
@@ -46,6 +48,11 @@ impl Cmd for StartOpt {
         {
             info!("Creating Minerva schema");
             let mut client = test_database.connect().await?;
+
+            let mut env = test_database.get_env();
+
+            env.push(("PGSSLMODE".to_string(), "disable".to_string()));
+
             let query = format!("SET citus.shard_count = {};", cluster.size());
 
             client.execute(&query, &[]).await?;
@@ -68,12 +75,10 @@ impl Cmd for StartOpt {
 
                 let minerva_instance = MinervaInstance::load_from(&minerva_instance_root);
 
-                let mut env: Vec<(String, String)> = vec![(
+                env.push((
                     "MINERVA_INSTANCE_ROOT".to_string(),
                     minerva_instance_root.to_string_lossy().to_string(),
-                )];
-
-                env.append(&mut test_database.get_env());
+                ));
 
                 minerva_instance.initialize(&mut client, &env).await?;
 
@@ -83,6 +88,9 @@ impl Cmd for StartOpt {
 
                 println!("Initialized");
             }
+
+            let env_file_path = String::from("cluster.env");
+            write_env_file(&env_file_path, &env);
         }
 
         println!("Minerva cluster is running (press CTRL-C to stop)");
@@ -105,5 +113,17 @@ impl Cmd for StartOpt {
         })?;
 
         Ok(())
+    }
+}
+
+fn write_env_file(file_path: &str, env: &[(String, String)]) {
+    let env_file = File::create(file_path).expect("Could not create env file");
+
+    let mut env_buf_writer = BufWriter::new(env_file);
+
+    for (name, value) in env {
+        env_buf_writer
+            .write_fmt(format_args!("{}={}\n", name, value))
+            .unwrap();
     }
 }

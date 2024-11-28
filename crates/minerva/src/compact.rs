@@ -31,6 +31,8 @@ pub enum CompactError {
     Unexpected(String),
     #[error("Could not materialize curr_ptr data: {0}")]
     CurrPtr(String),
+    #[error("Could mark attribute store with ID {0} as compacted: {1}")]
+    MarkCompacted(i32, String),
 }
 
 impl From<CompactError> for Error {
@@ -196,9 +198,16 @@ AND compact_info.id <> compact_info.first_id"#,
 
     println!("Deleted {} records", delete_count);
 
-    mark_attribute_store_modified(client, attribute_store_id)
-        .await
-        .unwrap();
+    if updated_count > 0 || delete_count > 0 {
+        mark_attribute_store_modified(client, attribute_store_id)
+            .await
+            .unwrap();
+    }
+
+    // Only if compacting is done without limit, we can be sure that everything is compacted
+    if limit.is_none() {
+        mark_attribute_store_compacted(client, attribute_store_id).await?;
+    }
 
     Ok(CompactResult {
         record_count: updated_count,
@@ -245,4 +254,21 @@ pub async fn compact_attribute_store_by_name<T: GenericClient + Send + Sync>(
     let attribute_store_id: i32 = row.get(0);
 
     compact_attribute_store_by_id(client, attribute_store_id, limit).await
+}
+
+async fn mark_attribute_store_compacted<T: GenericClient + Send + Sync>(
+    client: &T,
+    attribute_store_id: i32,
+) -> Result<(), CompactError> {
+    let query = r#"
+INSERT INTO attribute_directory.attribute_store_compacted (attribute_store_id, compacted)
+SELECT attribute_store_id, modified FROM attribute_directory.attribute_store_modified WHERE attribute_store_id = $1
+ON CONFLICT (attribute_store_id) DO UPDATE SET compacted = EXCLUDED.compacted"#;
+
+    client
+        .execute(query, &[&attribute_store_id])
+        .await
+        .map_err(|e| CompactError::MarkCompacted(attribute_store_id, format!("{e}")))?;
+
+    Ok(())
 }
