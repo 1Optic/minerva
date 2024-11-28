@@ -34,6 +34,7 @@ url = { version = "2.5", optional = true}
 rand = { version = "0.8", optional = true}
 testcontainers = { version = "0.23", optional = true }
 quick_cache = "0.6.1"
+refinery = { version = "0.8.14", features = ["tokio-postgres"] }
 
 [dev-dependencies]
 env_logger = { version = "0.11" }

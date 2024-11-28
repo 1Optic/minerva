@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.12.0] - 2024-11-28
+
+### Added
+
+- CLI: New subcommand for database schema migrations
+- CLI: New subcommand for attribute store compacting
+
+### Changed
+
+- All logic for compacting is now implemented in the client instead of in
+  database functions and views.
+
 ## [9.11.0] - 2024-11-26
 
 ### Added
@@ -145,7 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.11.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.12.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -165,3 +177,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.9.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.8.0...9.9.0
 [9.10.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.9.0...9.10.0
 [9.11.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.10.0...9.11.0
+[9.12.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.11.0...9.12.0
