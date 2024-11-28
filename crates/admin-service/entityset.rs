@@ -321,55 +321,6 @@ pub(super) async fn create_entity_set(
 
 #[utoipa::path(
     delete,
-    path="/entitysets",
-    responses(
-        (status = 200, description = "Deleting entity set succeeded", body=Success),
-        (status = 400, description = "Request could not be parsed", body=Error),
-        (status = 409, description = "Entity set does not exist", body=Error),
-        (status = 500, description = "Database unreachable", body=Error),
-    )
-)]
-#[delete("/entitysets")]
-pub(super) async fn delete_entity_set_temp(pool: Data<Pool>, data: Json<Id>) -> impl Responder {
-    let result = pool.get().await;
-    match result {
-        Err(e) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), Value::String(e.to_string()));
-            HttpResponse::InternalServerError().json(messages)
-        }
-        Ok(mut manager) => {
-            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
-            let preresult = load_entity_set(client, &data.id).await;
-            match preresult {
-                Ok(entityset) => {
-                    let query =
-                        "DELETE FROM attribute_history.minerva_entity_set WHERE entity_id = $1";
-                    let result = client.execute(query, &[&entityset.id]).await;
-                    match result {
-                        Ok(_) => HttpResponse::Ok().json(Success {
-                            code: 200,
-                            message: format!("Entity set number {} deleted", &entityset.id),
-                        }),
-                        Err(e) => {
-                            let mut messages = Map::new();
-                            messages.insert("general".to_string(), Value::String(e.to_string()));
-                            HttpResponse::InternalServerError().json(messages)
-                        }
-                    }
-                }
-                Err(e) => {
-                    let mut messages = Map::new();
-                    messages.insert("id".to_string(), Value::String(e.to_string()));
-                    HttpResponse::Conflict().json(messages)
-                }
-            }
-        }
-    }
-}
-
-#[utoipa::path(
-    delete,
     path="/entitysets/{id}",
     responses(
         (status = 200, description = "Deleting entity set succeeded", body=Success),
