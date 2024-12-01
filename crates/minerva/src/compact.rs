@@ -170,7 +170,10 @@ FROM (
         }
     };
 
-    println!("Inserted {} records", insert_count);
+    println!(
+        "Inserted {} records to compact into temporary table",
+        insert_count
+    );
 
     let update_history_query = format!(
         r#"
@@ -183,7 +186,12 @@ WHERE compact_info.first_id = history.id AND compact_info.id = compact_info.last
 
     let updated_count = client.execute(&update_history_query, &[]).await.unwrap();
 
-    println!("Updated {} records", updated_count);
+    let history_table = format!("attribute_history.\"{}\"", attribute_store_name);
+
+    println!(
+        "Updated {} records in history table '{}'",
+        updated_count, history_table
+    );
 
     let delete_query = format!(
         r#"
@@ -196,7 +204,10 @@ AND compact_info.id <> compact_info.first_id"#,
 
     let delete_count = client.execute(&delete_query, &[]).await.unwrap();
 
-    println!("Deleted {} records", delete_count);
+    println!(
+        "Deleted {} records from history table '{}'",
+        delete_count, history_table
+    );
 
     if updated_count > 0 || delete_count > 0 {
         mark_attribute_store_modified(client, attribute_store_id)
