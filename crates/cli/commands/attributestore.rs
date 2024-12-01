@@ -25,6 +25,8 @@ pub struct AttributeStoreCompact {
     all_modified: bool,
     #[arg(long, help = "limit how many records to compact")]
     limit: Option<usize>,
+    #[arg(long, help = "limit how many records to compact and loop until done")]
+    limit_loop: Option<usize>,
 }
 
 #[async_trait]
@@ -36,10 +38,18 @@ impl Cmd for AttributeStoreCompact {
             .execute("SET citus.max_intermediate_result_size = -1", &[])
             .await?;
 
+        let (limit, loop_until_done) = if self.limit_loop.is_some() {
+            (self.limit_loop, true)
+        } else if self.limit.is_some() {
+            (self.limit, false)
+        } else {
+            (None, false)
+        };
+
         if let Some(id) = self.id {
             let transaction = client.transaction().await?;
 
-            let result = compact_attribute_store_by_id(&transaction, id, self.limit).await?;
+            let result = compact_attribute_store_by_id(&transaction, id, limit).await?;
 
             transaction.commit().await?;
 
@@ -48,18 +58,26 @@ impl Cmd for AttributeStoreCompact {
                 result.attribute_store_name, result.attribute_store_id, result.record_count
             );
         } else if let Some(name) = &self.name {
-            let transaction = client.transaction().await?;
+            let mut done: bool = false;
 
-            let result = compact_attribute_store_by_name(&transaction, name, self.limit).await?;
+            while !done {
+                let transaction = client.transaction().await?;
 
-            transaction.commit().await?;
+                let result = compact_attribute_store_by_name(&transaction, name, limit).await?;
 
-            println!(
-                "Compacted attribute store '{}'({}): {}",
-                result.attribute_store_name, result.attribute_store_id, result.record_count
-            );
+                transaction.commit().await?;
+
+                println!(
+                    "Compacted attribute store '{}'({}): {}",
+                    result.attribute_store_name, result.attribute_store_id, result.record_count
+                );
+
+                if !loop_until_done || result.record_count == 0 {
+                    done = true
+                }
+            }
         } else if self.all_modified {
-            compact_all_attribute_stores(&mut client, self.limit).await?;
+            compact_all_attribute_stores(&mut client, limit).await?;
         }
 
         Ok(())
