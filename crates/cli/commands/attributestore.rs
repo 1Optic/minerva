@@ -328,6 +328,12 @@ async fn run_attribute_store_create_cmd(args: &AttributeStoreCreate) -> CmdResul
 
     let mut tx = client.transaction().await?;
 
+    tx.execute(
+        "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
+        &[],
+    )
+    .await?;
+
     let result = change.apply(&mut tx).await;
 
     match result {
