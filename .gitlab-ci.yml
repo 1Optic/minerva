@@ -74,20 +74,7 @@ publish-minerva-cli-deb:
   rules:
     - if: $CI_COMMIT_TAG
 
-build-minerva-service:
-  stage: build
-  before_script:
-    - apt-get update && apt-get install -y wget build-essential libssl-dev pkg-config openssh-client musl-tools
-    - rustup target add x86_64-unknown-linux-musl
-  script:
-    - rustc --version && cargo --version  # Print version info for debugging
-    - cargo build --package minerva-service --release --target=x86_64-unknown-linux-musl
-  artifacts:
-    when: always
-    paths:
-      - target/x86_64-unknown-linux-musl/release/minerva-service
-
-build-service-image:
+build-image:
   stage: build-image
   image:
     name: gcr.io/kaniko-project/executor:debug
@@ -102,4 +89,3 @@ build-service-image:
       --destination "${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
   rules:
     - if: $CI_COMMIT_TAG
-
