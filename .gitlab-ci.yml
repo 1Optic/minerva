@@ -3,7 +3,7 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   TESTCONTAINERS_HOST_OVERRIDE: "host.docker.internal"
 
-image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.82.0"
+image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.82.0@sha256:7e4db198c994923452243ec75ff6fb7a943459a88d59e07ef68089520126bae2"
 
 stages:
   - lint
@@ -14,7 +14,7 @@ stages:
 lint-openapi:
   stage: lint
   image:
-    name: redocly/cli
+    name: redocly/cli@sha256:f2239c9097b09fa8ede54bb9b09d5ac6bba781bfe50606161f9adfce5fdc7b11
     entrypoint: [""]
   script:
     - redocly lint api-spec/api.yaml
@@ -77,7 +77,7 @@ publish-minerva-cli-deb:
 build-image:
   stage: build-image
   image:
-    name: gcr.io/kaniko-project/executor:debug
+    name: gcr.io/kaniko-project/executor:debug@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e
     entrypoint: [""]
   script:
     - mkdir -p /kaniko/.docker
