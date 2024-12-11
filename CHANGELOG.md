@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.14.0] - 2024-12-11
+
+### Changed
+
+- Docker: Use CLI as Docker image entrypoint
+
 ## [9.13.0] - 2024-12-10
 
 ### Added
@@ -163,7 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.13.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.14.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -185,3 +191,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.11.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.10.0...9.11.0
 [9.12.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.11.0...9.12.0
 [9.13.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.12.0...9.13.0
+[9.14.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.13.0...9.14.0
