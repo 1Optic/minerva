@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.14.1] - 2024-12-12
+
+### Fixed
+
+- CLI: Fix bug in materialize service query for materializations to run
+
 ## [9.14.0] - 2024-12-11
 
 ### Changed

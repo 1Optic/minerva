@@ -1,19 +1,41 @@
 use core::hash::{Hash, Hasher};
 use std::collections::HashSet;
 use std::env;
+use std::fmt::Display;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use deadpool_postgres::tokio_postgres;
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+use deadpool_postgres::Pool;
 use futures::StreamExt;
+use log::warn;
+use thiserror::Error;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::time::Interval;
+use tokio_postgres::NoTls;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub const CONNECTION_CHECK_INTERVAL: u64 = 60;
 pub const MAX_CONNECTION_AGE: u64 = 3600;
+
+pub static VAR_PGHOST: &str = "PGHOST";
+pub static VAR_PGPORT: &str = "PGPORT";
+pub static VAR_PGUSER: &str = "PGUSER";
+pub static VAR_PGDATABASE: &str = "PGDATABASE";
+pub static VAR_DB_MAX_CONNECTION_AGE: &str = "DB_MAX_CONNECTION_AGE";
+
+pub static DEFAULT_PGHOST: &str = "127.0.0.1";
+pub static DEFAULT_PGPORT: u16 = 5432;
+pub static DEFAULT_PGUSER: &str = "postgres";
+pub static DEFAULT_PGDATABASE: &str = "postgres";
+pub static DEFAULT_DB_MAX_CONNECTION_AGE: u64 = 3600;
+
+#[derive(Error, Debug)]
+pub enum ConfigurationError {
+    #[error("Invalid format: {0}")]
+    Format(String),
+}
 
 #[derive(Debug)]
 pub enum MaterializeError {
@@ -48,7 +70,7 @@ pub struct MaterializationChunk {
 
 impl std::fmt::Display for MaterializationChunk {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} - {}", &self.timestamp, &self.name)
+        write!(f, "{} - {}", &self.timestamp.to_rfc3339(), &self.name)
     }
 }
 
@@ -152,13 +174,14 @@ impl MaterializationChunk {
         &self,
         client: &deadpool_postgres::ClientWrapper,
     ) -> Result<i32, MaterializeError> {
-        let materialize_query = format!(
-            "SELECT (trend_directory.materialize(m, '{}'::timestamptz)).row_count FROM trend_directory.materialization m WHERE m::text = '{}'",
-            &self.timestamp,
-            &self.name
+        let materialize_query = concat!(
+            "SELECT (trend_directory.materialize(m, $1)).row_count ",
+            "FROM trend_directory.materialization m WHERE m::text = $2"
         );
 
-        let result = client.query_one(materialize_query.as_str(), &[]).await;
+        let result = client
+            .query_one(materialize_query, &[&self.timestamp, &self.name])
+            .await;
 
         match result {
             Ok(row) => {
@@ -329,7 +352,7 @@ async fn load_materialization_chunks(
     };
 
     query_parts.push(format!(
-        "ORDER BY ms.timestamp {}, ts.granularity ASC LIMIT $2",
+        "ORDER BY ms.timestamp {}, ts.granularity ASC LIMIT $1",
         order
     ));
 
@@ -346,7 +369,7 @@ async fn load_materialization_chunks(
         .filter_map(|x| match x {
             Ok(m) => Some(m),
             Err(e) => {
-                println!("Error reading materialization chunk: {}", e);
+                warn!("Error reading materialization chunk: {}", e);
 
                 None
             }
@@ -356,36 +379,53 @@ async fn load_materialization_chunks(
     Ok(materialization_chunks)
 }
 
-pub fn create_db_pool() -> Pool {
-    let mut pg_config = tokio_postgres::Config::new();
+#[derive(Clone)]
+pub struct DBConfig {
+    pub pg_host: String,
+    pub pg_port: u16,
+    pub pg_user: String,
+    pub pg_database: String,
+    pub max_connection_age: Duration,
+}
 
-    if let Ok(db_host) = env::var("DB_HOST") {
-        pg_config.host(db_host.as_str());
+impl DBConfig {
+    pub fn load_config() -> Result<DBConfig, ConfigurationError> {
+        let pg_host = std::env::var(VAR_PGHOST).unwrap_or_else(|_| DEFAULT_PGHOST.into());
+
+        let pg_port: u16 = get_typed_var(VAR_PGPORT, DEFAULT_PGPORT)?;
+
+        let pg_user = std::env::var(VAR_PGUSER).unwrap_or_else(|_| DEFAULT_PGUSER.into());
+        let pg_database =
+            std::env::var(VAR_PGDATABASE).unwrap_or_else(|_| DEFAULT_PGDATABASE.into());
+
+        let max_connection_age_seconds: u64 =
+            get_typed_var(VAR_DB_MAX_CONNECTION_AGE, DEFAULT_DB_MAX_CONNECTION_AGE)?;
+
+        let max_connection_age = std::time::Duration::from_secs(max_connection_age_seconds);
+
+        Ok(DBConfig {
+            pg_host,
+            pg_port,
+            pg_user,
+            pg_database,
+            max_connection_age,
+        })
     }
 
-    if let Ok(db_port) = env::var("DB_PORT") {
-        let port: u16 = db_port.parse::<u16>().unwrap();
-        pg_config.port(port);
+    pub fn create_pool(
+        &self,
+    ) -> Result<deadpool_postgres::Pool, deadpool_postgres::CreatePoolError> {
+        let mut cfg = deadpool_postgres::Config::new();
+        cfg.application_name = Some(env!("CARGO_CRATE_NAME").to_string());
+        cfg.host = Some(self.pg_host.clone());
+        cfg.port = Some(self.pg_port);
+        cfg.user = Some(self.pg_user.clone());
+        cfg.dbname = Some(self.pg_database.clone());
+        cfg.manager = Some(deadpool_postgres::ManagerConfig {
+            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+        });
+        cfg.create_pool(Some(deadpool_postgres::Runtime::Tokio1), NoTls)
     }
-
-    if let Ok(db_host_path) = env::var("DB_HOST_PATH") {
-        pg_config.host_path(db_host_path);
-    }
-
-    pg_config.user(env::var("DB_USER").unwrap().as_str());
-
-    if let Ok(db_password) = env::var("DB_PASSWORD") {
-        pg_config.password(db_password);
-    }
-
-    pg_config.dbname(env::var("DB_NAME").unwrap().as_str());
-
-    let mgr_config = ManagerConfig {
-        recycling_method: RecyclingMethod::Fast,
-    };
-    let mgr = Manager::from_config(pg_config, tokio_postgres::NoTls, mgr_config);
-
-    Pool::builder(mgr).max_size(16).build().unwrap()
 }
 
 pub struct MaterializationFetcher {
@@ -527,5 +567,17 @@ impl MaterializationExecutor {
                 // Todo: move result reporting here.
             })
             .await;
+    }
+}
+
+fn get_typed_var<T: std::str::FromStr<Err: Display>>(
+    name: &str,
+    default: T,
+) -> Result<T, ConfigurationError> {
+    match std::env::var(name) {
+        Ok(v) => v
+            .parse::<T>()
+            .map_err(|e| ConfigurationError::Format(format!("Could not parse {name} value: {e}"))),
+        Err(_) => Ok(default),
     }
 }
