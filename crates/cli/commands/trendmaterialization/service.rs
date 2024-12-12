@@ -11,7 +11,7 @@ use tokio::time::{interval, Duration};
 use crate::commands::common::{Cmd, CmdResult};
 
 use materialize::materialize::{
-    create_db_pool, MaterializationChunk, MaterializationExecutor, MaterializationFetcher,
+    DBConfig, MaterializationChunk, MaterializationExecutor, MaterializationFetcher,
     MaterializeConfig, CONNECTION_CHECK_INTERVAL, MAX_CONNECTION_AGE,
 };
 
@@ -48,6 +48,8 @@ pub struct TrendMaterializationService {
 #[async_trait]
 impl Cmd for TrendMaterializationService {
     async fn run(&self) -> CmdResult {
+        env_logger::init();
+
         let materialize_config = MaterializeConfig {
             oldest_first: self.oldest_first,
             max_materializations: self.max_materializations,
@@ -61,7 +63,8 @@ impl Cmd for TrendMaterializationService {
 
         let mutex = Arc::new(Mutex::new(in_progress));
 
-        let pool = create_db_pool();
+        let db_config = DBConfig::load_config().map_err(|e| format!("{e}"))?;
+        let pool = db_config.create_pool().map_err(|e| format!("{e}"))?;
 
         let connection_check_interval = Duration::from_secs(CONNECTION_CHECK_INTERVAL);
         let max_connection_age = Duration::from_secs(MAX_CONNECTION_AGE);

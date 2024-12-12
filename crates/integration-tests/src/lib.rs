@@ -7,6 +7,7 @@ pub mod entity_set;
 pub mod get_entity_types;
 pub mod initialize;
 pub mod load_data;
+pub mod trend_materialization;
 pub mod trend_storage;
 
 static INIT: Once = Once::new();
