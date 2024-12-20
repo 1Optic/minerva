@@ -1,11 +1,10 @@
-openapi: '3.1.0'
+openapi: 3.0.0
 info:
   title: Minerva API
   description: API for Minerva system management
   version: "1.0.0"
   license:
     name: GNU Affero General Public License v3.0 or later
-    identifier: AGPL-3.0-or-later
     url: https://www.gnu.org/licenses/agpl.txt
 servers:
   - url: https://demo.1optic.io/gis-api/v1
@@ -742,6 +741,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /templates:
+    get:
+      summary: Get list of all templates
+      description: Get list of all templates including name and Id.
+      operationId: getTemplates
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateRef'
+  /templates/{templateId}:
+    get:
+      summary: Get template with specified Id
+      description: Template including all properties required for the GUI to populat an interface for editing the trigger.
+      operationId: getTemplateById
+      parameters:
+       - name: templateId
+         in: path
+         schema:
+           type: string
+         required: true
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
   /triggers:
     get:
       summary: List of existing triggers
@@ -1158,6 +1189,31 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Threshold'
+    Template:
+      type: object
+      description: A template describes both the UI form and database query form of a templated trigger
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        name:
+          type: string
+        body:
+          type: string
+          example: "When {kpi1} {op1} {thr1} is true, trigger event"
+        sql_body:
+          type: string
+          example: "SELECT {kpi1} {op1} {thr1}"
+    TemplateRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        name:
+          type: string
     EntitySet:
       type: object
       properties:
@@ -1225,3 +1281,4 @@ components:
       type: array
       items:
         type: object
+          type: string
