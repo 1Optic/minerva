@@ -1177,6 +1177,11 @@ components:
           type: string
     Trigger:
       type: object
+      required:
+        - name
+        - enabled
+        - description
+        - thresholds
       properties:
         name:
           type: string
@@ -1185,10 +1190,32 @@ components:
           type: boolean
         description:
           type: string
-        thresholds:
-          type: array
-          items:
-            $ref: '#/components/schemas/Threshold'
+        template_instance:
+          type: object
+          properties:
+            template_id:
+              type: string
+            parameters:
+              type: array
+              items:
+                $ref: '#/components/schemas/TemplateInstanceParameter'
+    TemplateInstanceParameter:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+          description: Name of the parameter matching the template where it is applied
+          example: kpi1
+        value:
+          description: Value of the parameter as will be substituted in the template.
+          oneOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
     Template:
       type: object
       description: A template describes both the UI form and database query form of a templated trigger
