@@ -13,7 +13,6 @@ use crate::commands::initialize::InitializeOpt;
 use crate::commands::loaddata::LoadDataOpt;
 use crate::commands::relation::RelationOpt;
 use crate::commands::schema::SchemaOpt;
-#[cfg(feature = "test-containers")]
 use crate::commands::start::StartOpt;
 use crate::commands::trendmaterialization::TrendMaterializationOpt;
 use crate::commands::trendstore::TrendStoreOpt;
@@ -54,7 +53,6 @@ enum Commands {
     LoadData(LoadDataOpt),
     #[command(about = "Manage relations")]
     Relation(RelationOpt),
-    #[cfg(feature = "test-containers")]
     #[command(about = "Start Minerva instance")]
     Start(StartOpt),
     #[command(about = "Generate standard aggregations")]
@@ -94,7 +92,6 @@ async fn main() {
         }
         Some(Commands::LoadData(load_data)) => load_data.run().await,
         Some(Commands::Relation(relation)) => relation.run().await,
-        #[cfg(feature = "test-containers")]
         Some(Commands::Start(start)) => start.run().await,
         Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
