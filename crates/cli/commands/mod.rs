@@ -7,7 +7,6 @@ pub mod initialize;
 pub mod loaddata;
 pub mod relation;
 pub mod schema;
-#[cfg(feature = "test-containers")]
 pub mod start;
 pub mod trendmaterialization;
 pub mod trendstore;
