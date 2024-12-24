@@ -5,7 +5,7 @@ mod tests {
     use log::debug;
     use std::path::PathBuf;
 
-    use minerva::cluster::MinervaCluster;
+    use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::entity::{DbEntityMapping, EntityMapping};
     use minerva::schema::create_schema;
 
@@ -13,11 +13,14 @@ mod tests {
     async fn db_entity_mapping() -> Result<(), Box<dyn std::error::Error>> {
         crate::common::setup();
 
-        let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
-
         let entity_mapping = DbEntityMapping {};
 
-        let cluster = MinervaCluster::start(&config_file, 3).await?;
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
+
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         let test_database = cluster.create_db().await?;
 

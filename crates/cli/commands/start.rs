@@ -10,7 +10,9 @@ use clap::Parser;
 
 use tokio::signal;
 
-use minerva::cluster::MinervaCluster;
+use minerva::cluster::{
+    MinervaCluster, MinervaClusterConfig, DEFAULT_CITUS_IMAGE, DEFAULT_CITUS_TAG,
+};
 use minerva::error::Error;
 use minerva::instance::MinervaInstance;
 use minerva::schema::create_schema;
@@ -40,7 +42,14 @@ impl Cmd for StartOpt {
 
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
-        let cluster = MinervaCluster::start(&config_file, node_count).await?;
+        let cluster_config = MinervaClusterConfig {
+            image_name: DEFAULT_CITUS_IMAGE.to_string(),
+            image_tag: DEFAULT_CITUS_TAG.to_string(),
+            config_file,
+            worker_count: node_count,
+        };
+
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         let test_database = cluster.create_db().await?;
 

@@ -1,9 +1,9 @@
-const CITUS_IMAGE: &str = "citusdata/citus";
-const CITUS_TAG: &str = "12.0";
+pub const DEFAULT_CITUS_IMAGE: &str = "citusdata/citus";
+pub const DEFAULT_CITUS_TAG: &str = "12.0";
 
 use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use log::{debug, error};
 
@@ -26,13 +26,15 @@ pub fn generate_name(len: usize) -> String {
 }
 
 pub fn create_citus_container(
+    image_name: &str,
+    image_tag: &str,
     name: &str,
     exposed_port: Option<u16>,
     config_file: &Path,
 ) -> ContainerRequest<GenericImage> {
-    let image = GenericImage::new(CITUS_IMAGE, CITUS_TAG).with_wait_for(
-        WaitFor::message_on_stdout("PostgreSQL init process complete; ready for start up."),
-    );
+    let image = GenericImage::new(image_name, image_tag).with_wait_for(WaitFor::message_on_stdout(
+        "PostgreSQL init process complete; ready for start up.",
+    ));
 
     let image = match exposed_port {
         Some(port) => image.with_exposed_port(ContainerPort::Tcp(port)),
@@ -164,6 +166,24 @@ impl TestDatabase {
     }
 }
 
+pub struct MinervaClusterConfig {
+    pub image_name: String,
+    pub image_tag: String,
+    pub config_file: PathBuf,
+    pub worker_count: u8,
+}
+
+impl Default for MinervaClusterConfig {
+    fn default() -> Self {
+        MinervaClusterConfig {
+            image_name: DEFAULT_CITUS_IMAGE.to_string(),
+            image_tag: DEFAULT_CITUS_TAG.to_string(),
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            worker_count: 3,
+        }
+    }
+}
+
 pub struct MinervaCluster {
     controller_container: ContainerAsync<GenericImage>,
     worker_containers: Vec<std::pin::Pin<Box<ContainerAsync<GenericImage>>>>,
@@ -173,15 +193,16 @@ pub struct MinervaCluster {
 
 impl MinervaCluster {
     pub async fn start(
-        config_file: &Path,
-        worker_count: u8,
+        config: &MinervaClusterConfig,
     ) -> Result<MinervaCluster, crate::error::Error> {
         let network_name = generate_name(6);
 
         let controller_container = create_citus_container(
+            &config.image_name,
+            &config.image_tag,
             &format!("{}_coordinator", network_name),
             Some(5432),
-            config_file,
+            &config.config_file,
         )
         .with_network(network_name.clone())
         .start()
@@ -236,15 +257,21 @@ impl MinervaCluster {
 
         let mut node_containers = Vec::new();
 
-        for i in 1..(worker_count + 1) {
+        for i in 1..(config.worker_count + 1) {
             let name = format!("{}_node{i}", network_name);
-            let container = create_citus_container(&name, None, config_file)
-                .with_network(network_name.clone())
-                .start()
-                .await
-                .map_err(|e| {
-                    Error::Runtime(format!("Could not start worker node container: {e}").into())
-                })?;
+            let container = create_citus_container(
+                &config.image_name,
+                &config.image_tag,
+                &name,
+                None,
+                &config.config_file,
+            )
+            .with_network(network_name.clone())
+            .start()
+            .await
+            .map_err(|e| {
+                Error::Runtime(format!("Could not start worker node container: {e}").into())
+            })?;
 
             let container_address = container.get_bridge_ip_address().await.unwrap();
 

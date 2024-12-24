@@ -11,7 +11,7 @@ mod tests {
     use minerva::attribute_storage::{AttributeDataRow, RawAttributeStore};
     use minerva::attribute_store::{AddAttributeStore, AttributeStore};
     use minerva::change::Change;
-    use minerva::cluster::MinervaCluster;
+    use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
 
     const ATTRIBUTE_STORE_DEFINITION: &str = r###"
@@ -49,11 +49,14 @@ mod tests {
     async fn load_attribute_data() -> Result<(), Box<dyn std::error::Error>> {
         crate::common::setup();
 
-        let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
-
         let entity_mapping = CachingEntityMapping::new(100);
 
-        let cluster = MinervaCluster::start(&config_file, 3).await?;
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
+
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         let test_database = cluster.create_db().await?;
 
