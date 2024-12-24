@@ -7,7 +7,7 @@ mod tests {
 
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
-    use minerva::cluster::MinervaCluster;
+    use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
     use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
@@ -42,9 +42,12 @@ mod tests {
     async fn get_entity_types() -> Result<(), Box<dyn std::error::Error>> {
         crate::setup();
 
-        let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
 
-        let cluster = MinervaCluster::start(&config_file, 3).await?;
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         debug!("Containers started");
 

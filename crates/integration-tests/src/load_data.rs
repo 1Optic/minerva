@@ -13,7 +13,7 @@ mod tests {
 
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
-    use minerva::cluster::MinervaCluster;
+    use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
     use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
@@ -61,9 +61,12 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             .unwrap_or(String::from("1"))
             .eq("0");
 
-        let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
 
-        let cluster = MinervaCluster::start(&config_file, 3).await?;
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         let data_source_name = "hub";
 
@@ -139,9 +142,12 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             .eq("0");
         let data_source_name = "hub";
 
-        let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
 
-        let cluster = MinervaCluster::start(&config_file, 3).await?;
+        let cluster = MinervaCluster::start(&cluster_config).await?;
 
         let test_database = cluster.create_db().await?;
 
