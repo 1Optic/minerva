@@ -57,7 +57,7 @@ pub(super) async fn get_data_sources(pool: Data<Pool>) -> Result<HttpResponse, S
     get,
     path="/data-sources/{id}",
     responses(
-    (status = 200, description = "Get a specific data source", body = TrendStorePart),
+    (status = 200, description = "Get a specific data source", body = DataSource),
     (status = 404, description = "Data source not found", body = Error),
     (status = 500, description = "Problem interacting with database", body = Error),
     )

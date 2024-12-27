@@ -63,7 +63,7 @@ pub(super) async fn get_entity_types(pool: Data<Pool>) -> impl Responder {
     get,
     path="/entity-types/{id}",
     responses(
-    (status = 200, description = "Get a specific entity type", body = TrendStorePart),
+    (status = 200, description = "Get a specific entity type", body = EntityType),
     (status = 404, description = "Entity type not found", body = Error),
     (status = 500, description = "Problem interacting with database", body = Error),
     )

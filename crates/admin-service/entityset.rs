@@ -90,7 +90,7 @@ impl EntitySetData {
     get,
     path="/entitysets",
     responses(
-    (status = 200, description = "List of existing entity sets", body = [EntitySet]),
+    (status = 200, description = "List of existing entity sets", body = [EntitySetDataFull]),
     (status = 500, description = "Database unreachable", body = Error),
     )
 )]
