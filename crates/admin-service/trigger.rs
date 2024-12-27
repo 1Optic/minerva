@@ -21,7 +21,34 @@ pub struct TriggerData {
     name: String,
     enabled: bool,
     description: String,
-    thresholds: Vec<Threshold>,
+    thresholds: Vec<ThresholdData>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct ThresholdData {
+    pub name: String,
+    pub data_type: String,
+    pub value: String,
+}
+
+impl From<Threshold> for ThresholdData {
+    fn from(threshold: Threshold) -> Self {
+        ThresholdData {
+            name: threshold.name,
+            data_type: threshold.data_type,
+            value: threshold.value,
+        }
+    }
+}
+
+impl From<ThresholdData> for Threshold {
+    fn from(threshold_data: ThresholdData) -> Self {
+        Threshold {
+            name: threshold_data.name,
+            data_type: threshold_data.data_type,
+            value: threshold_data.value,
+        }
+    }
 }
 
 async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServiceError> {
@@ -57,11 +84,12 @@ async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServi
                     messages,
                 }
             })?;
+
         result.push(TriggerData {
             name: trigger.name.clone(),
             enabled: trigger.enabled,
             description: trigger.description.clone(),
-            thresholds,
+            thresholds: thresholds.into_iter().map(|t| t.into()).collect(),
         })
     }
 
@@ -182,7 +210,7 @@ async fn change_thresholds_fn(
             if !reports.is_empty() {
                 Ok(HttpResponse::Conflict().json(reports))
             } else {
-                trigger.thresholds = data.thresholds;
+                trigger.thresholds = data.thresholds.into_iter().map(|t| t.into()).collect();
                 trigger.enabled = data.enabled;
                 trigger.description = data.description;
 
