@@ -26,7 +26,7 @@ struct AttributeValue<'a> {
     inner_value: &'a Option<String>,
 }
 
-impl<'a> ToSql for AttributeValue<'a> {
+impl ToSql for AttributeValue<'_> {
     fn to_sql(
         &self,
         ty: &Type,
