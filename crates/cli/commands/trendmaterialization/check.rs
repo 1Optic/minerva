@@ -7,7 +7,8 @@ use tokio_postgres::GenericClient;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 use minerva::trend_materialization::{
-    get_function_result_columns, load_materializations, ResultColumn, TrendFunctionMaterialization, TrendMaterialization, MATERIALIZATION_FUNCTION_SCHEMA
+    get_function_result_columns, load_materializations, ResultColumn, TrendFunctionMaterialization,
+    TrendMaterialization, MATERIALIZATION_FUNCTION_SCHEMA,
 };
 
 #[derive(Debug, Parser, PartialEq)]
@@ -22,9 +23,7 @@ impl Cmd for TrendMaterializationCheck {
 
         for materialization in materializations {
             let issues = match materialization {
-                TrendMaterialization::View(ref _view_materialization) => {
-                    Vec::new()
-                }
+                TrendMaterialization::View(ref _view_materialization) => Vec::new(),
                 TrendMaterialization::Function(ref function_materialization) => {
                     check_function_materialization(&mut client, function_materialization)
                         .await
@@ -86,12 +85,15 @@ pub async fn check_function_materialization<T: GenericClient + Send + Sync>(
                     "Column '{}'({}) is returned from function but has no matching trend",
                     function_result_column.name, function_result_column.data_type
                 ));
-            },
+            }
             Some(data_type) => {
                 if !data_type.eq(&function_result_column.data_type) {
                     report.push(format!(
                         "Column '{}'({}) returned from function differs in type: '{}' != '{}' ",
-                        function_result_column.name, function_result_column.data_type, function_result_column.data_type, data_type
+                        function_result_column.name,
+                        function_result_column.data_type,
+                        function_result_column.data_type,
+                        data_type
                     ));
                 }
             }
@@ -99,7 +101,8 @@ pub async fn check_function_materialization<T: GenericClient + Send + Sync>(
     }
 
     for trend_store_part_column in trend_store_part_columns {
-        let function_result_column_data_type = function_result_columns_map.get(&trend_store_part_column.name);
+        let function_result_column_data_type =
+            function_result_columns_map.get(&trend_store_part_column.name);
 
         if function_result_column_data_type.is_none() {
             report.push(format!(
