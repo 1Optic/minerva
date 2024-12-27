@@ -20,6 +20,8 @@ use super::change::{Change, ChangeResult};
 use super::error::{DatabaseError, Error, RuntimeError};
 use super::interval::parse_interval;
 
+pub const MATERIALIZATION_FUNCTION_SCHEMA: &str = "trend";
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendMaterializationSource {
     pub trend_store_part: String,
@@ -922,9 +924,13 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
                         "failed getting sources".into(),
                     )),
             )?;
-            let return_type = get_function_return_type(conn, &target_trend_store_part)
-                .await
-                .unwrap_or("failed getting return type".into());
+            let return_type = get_function_return_type(
+                conn,
+                MATERIALIZATION_FUNCTION_SCHEMA,
+                &target_trend_store_part,
+            )
+            .await
+            .unwrap_or("failed getting return type".into());
 
             let sources = load_sources(conn, materialization_id).await?;
 
@@ -1016,21 +1022,52 @@ pub async fn get_function_def<T: GenericClient + Send + Sync>(
     }
 }
 
+pub struct ResultColumn {
+    pub name: String,
+    pub data_type: String,
+}
+
+pub async fn get_function_result_columns<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    function_schema: &str,
+    function_name: &str,
+) -> Result<Vec<ResultColumn>, String> {
+    let query = concat!(
+        "SELECT unnest(proargnames[2:]), format_type(unnest(proallargtypes[2:]), null) ",
+        "FROM pg_proc ",
+        "JOIN pg_namespace ON pg_proc.pronamespace = pg_namespace.oid ",
+        "WHERE nspname = $1 AND proname = $2"
+    );
+
+    let columns: Vec<ResultColumn> = client
+        .query(query, &[&function_schema, &function_name])
+        .await
+        .map(|rows| {
+            rows.iter()
+                .map(|row| ResultColumn {
+                    name: row.get(0),
+                    data_type: row.get(1),
+                })
+                .collect()
+        })
+        .map_err(|e| format!("could not retrieve result columns for function: {e}"))?;
+
+    Ok(columns)
+}
+
 pub async fn get_function_return_type<T: GenericClient + Send + Sync>(
     client: &mut T,
+    function_schema: &str,
     function_name: &str,
 ) -> Option<String> {
-    let query = "SELECT unnest(proargnames[2:]), format_type(unnest(proallargtypes[2:]), null) FROM pg_proc WHERE proname = $1";
-
-    let columns: Vec<(String, String)> = client
-        .query(query, &[&function_name])
-        .await
-        .map(|rows| rows.iter().map(|row| (row.get(0), row.get(1))).collect())
-        .unwrap();
+    let columns: Vec<ResultColumn> =
+        get_function_result_columns(client, function_schema, function_name)
+            .await
+            .unwrap();
 
     let columns_part = columns
         .iter()
-        .map(|(name, data_type)| format!("    \"{name}\" {data_type}"))
+        .map(|column| format!("    \"{}\" {}", column.name, column.data_type))
         .collect::<Vec<String>>()
         .join(",\n");
 

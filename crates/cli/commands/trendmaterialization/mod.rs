@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 use service::TrendMaterializationService;
 
+mod check;
 mod create;
 mod dump;
 mod list;
@@ -11,6 +12,7 @@ mod service;
 mod update;
 
 use super::common::{Cmd, CmdResult};
+use crate::commands::trendmaterialization::check::TrendMaterializationCheck;
 use crate::commands::trendmaterialization::create::TrendMaterializationCreate;
 use crate::commands::trendmaterialization::dump::TrendMaterializationDump;
 use crate::commands::trendmaterialization::list::TrendMaterializationList;
@@ -40,6 +42,8 @@ pub enum TrendMaterializationOptCommand {
     List(TrendMaterializationList),
     #[command(about = "start materialization service")]
     Service(TrendMaterializationService),
+    #[command(about = "check materializations for inconsistencies")]
+    Check(TrendMaterializationCheck),
 }
 
 impl TrendMaterializationOpt {
@@ -60,6 +64,7 @@ impl TrendMaterializationOpt {
             Some(TrendMaterializationOptCommand::Dump(dump)) => dump.run().await,
             Some(TrendMaterializationOptCommand::List(list)) => list.run().await,
             Some(TrendMaterializationOptCommand::Service(service)) => service.run().await,
+            Some(TrendMaterializationOptCommand::Check(check)) => check.run().await,
             None => Ok(()),
         }
     }
