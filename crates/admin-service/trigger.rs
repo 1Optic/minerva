@@ -36,14 +36,18 @@ impl From<Threshold> for ThresholdData {
         ThresholdData {
             name: threshold.name,
             data_type: threshold.data_type,
-            value: threshold.value
+            value: threshold.value,
         }
     }
 }
 
 impl From<ThresholdData> for Threshold {
     fn from(threshold_data: ThresholdData) -> Self {
-        Threshold { name: threshold_data.name, data_type: threshold_data.data_type, value: threshold_data.value }
+        Threshold {
+            name: threshold_data.name,
+            data_type: threshold_data.data_type,
+            value: threshold_data.value,
+        }
     }
 }
 
