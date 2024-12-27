@@ -322,7 +322,7 @@ struct ValueExtractor<'a> {
     pub value_index: usize,
 }
 
-impl<'a> ValueExtractor<'a> {
+impl ValueExtractor<'_> {
     fn extract(&self, values: &[String], null_value: &str) -> Result<MeasValue, Error> {
         values
             .get(self.value_index)
