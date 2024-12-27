@@ -1,6 +1,7 @@
 use actix_web::{get, web::Path, HttpRequest, HttpResponse};
 
 use super::serviceerror::{ServiceError, ServiceErrorKind};
+use crate::error::Error;
 
 #[utoipa::path(
     get,
