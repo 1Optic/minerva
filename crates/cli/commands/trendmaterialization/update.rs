@@ -6,7 +6,7 @@ use clap::Parser;
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_materialization::{
-    trend_materialization_from_config, UpdateTrendMaterialization,
+    trend_materialization_from_config, UpdateTrendMaterialization, check_trend_materialization
 };
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -15,6 +15,12 @@ use crate::commands::common::{connect_db, Cmd, CmdResult};
 pub struct TrendMaterializationUpdate {
     #[arg(help = "trend materialization definition file")]
     definition: PathBuf,
+    #[arg(
+        short = 'v',
+        long = "verify",
+        help = "run basic verification commands after creation"
+    )]
+    verify: bool,
 }
 
 #[async_trait]
@@ -28,15 +34,27 @@ impl Cmd for TrendMaterializationUpdate {
         let mut transaction = client.transaction().await?;
 
         let change = UpdateTrendMaterialization {
-            trend_materialization,
+            trend_materialization: trend_materialization.clone(),
         };
 
-        let result = change.apply(&mut transaction).await;
+        change.apply(&mut transaction).await?;
 
-        transaction.commit().await?;
+        let result = if self.verify {
+            let report = check_trend_materialization(&mut transaction, &trend_materialization).await?;
+
+            if report.is_empty() {
+                Ok(())
+            } else {
+                Err(report.join("\n"))
+            }
+        } else {
+            Ok(())
+        };
 
         match result {
             Ok(_) => {
+                transaction.commit().await?;
+
                 println!("Updated trend materialization");
 
                 Ok(())

@@ -10,6 +10,7 @@ mod populatesourcefingerprint;
 mod resetsourcefingerprint;
 mod service;
 mod update;
+mod remove;
 
 use super::common::{Cmd, CmdResult};
 use crate::commands::trendmaterialization::check::TrendMaterializationCheck;
@@ -19,6 +20,7 @@ use crate::commands::trendmaterialization::list::TrendMaterializationList;
 use crate::commands::trendmaterialization::populatesourcefingerprint::TrendMaterializationPopulateSourceFingerprint;
 use crate::commands::trendmaterialization::resetsourcefingerprint::TrendMaterializationResetSourceFingerprint;
 use crate::commands::trendmaterialization::update::TrendMaterializationUpdate;
+use crate::commands::trendmaterialization::remove::TrendMaterializationRemove;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationOpt {
@@ -32,6 +34,8 @@ pub enum TrendMaterializationOptCommand {
     Create(TrendMaterializationCreate),
     #[command(about = "update a trend materialization")]
     Update(TrendMaterializationUpdate),
+    #[command(about = "remove a trend materialization")]
+    Remove(TrendMaterializationRemove),
     #[command(about = "reset the source fingerprint of the materialization state")]
     ResetSourceFingerprint(TrendMaterializationResetSourceFingerprint),
     #[command(about = "populate the source fingerprint of the materialization state")]
@@ -54,6 +58,9 @@ impl TrendMaterializationOpt {
             }
             Some(TrendMaterializationOptCommand::Update(trend_materialization_update)) => {
                 trend_materialization_update.run().await
+            }
+            Some(TrendMaterializationOptCommand::Remove(trend_materialization_remove)) => {
+                trend_materialization_remove.run().await
             }
             Some(TrendMaterializationOptCommand::PopulateSourceFingerprint(
                 populate_source_fingerprint,

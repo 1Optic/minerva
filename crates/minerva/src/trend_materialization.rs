@@ -1,4 +1,5 @@
 use glob::glob;
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_yaml;
@@ -15,6 +16,8 @@ use tokio_postgres::{types::ToSql, types::Type, GenericClient};
 use humantime::format_duration;
 
 use async_trait::async_trait;
+
+use crate::error::ConfigurationError;
 
 use super::change::{Change, ChangeResult};
 use super::error::{DatabaseError, Error, RuntimeError};
@@ -848,6 +851,115 @@ fn coorce_to_plpgsql((lang, src): (String, String)) -> Result<(String, String), 
     }
 }
 
+pub async fn load_materialization<T: GenericClient + Send + Sync>(
+    conn: &mut T,
+    name: &str,
+) -> Result<TrendMaterialization, Error> {
+    let query = concat!(
+        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
+        "FROM trend_directory.materialization AS m ",
+        "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
+        "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
+        "LEFT JOIN trend_directory.function_materialization AS fm ON fm.materialization_id = m.id ",
+        "WHERE m::text = $1",
+    );
+
+    let result = conn.query(query, &[&name]).await.map_err(|e| {
+        DatabaseError::from_msg(format!("Error loading trend materialization: {e}"))
+    })?;
+
+    if result.len() == 0 {
+        return Err(Error::Configuration(ConfigurationError::from_msg(format!("No materialization that matches name '{}'", name))));
+    }
+
+    let row = result.first().unwrap();
+
+    let materialization_id: i32 = row.get(0);
+    let processing_delay_str: String = row.get(1);
+    let stability_delay_str: String = row.get(2);
+    let reprocessing_period_str: String = row.get(3);
+    let enabled: bool = row.get(4);
+    let description: Option<Value> = row.get(5);
+    let target_trend_store_part: String = row.get(6);
+    let src_view: Option<String> = row.get(7);
+    let src_function: Option<String> = row.get(8);
+
+    let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
+    let (_fingerprint_function_lang, fingerprint_function_def) =
+        get_function_def(conn, &fingerprint_function_name)
+            .await
+            .unwrap_or((
+                "failed getting language".into(),
+                "failed getting sources".into(),
+            ));
+
+    let processing_delay = parse_interval(&processing_delay_str)
+        .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of processing_delay: {e}"))))?;
+
+    let reprocessing_period = parse_interval(&reprocessing_period_str)
+        .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of reprocessing_period: {e}"))))?;
+
+    let stability_delay = parse_interval(&stability_delay_str)
+        .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}"))))?;
+
+    if let Some(view) = src_view {
+        let view_def = get_view_def(conn, &view).await.unwrap();
+        let sources = load_sources(conn, materialization_id).await?;
+
+        let view_materialization = TrendViewMaterialization {
+            target_trend_store_part: target_trend_store_part.clone(),
+            enabled,
+            fingerprint_function: fingerprint_function_def.clone(),
+            processing_delay,
+            reprocessing_period,
+            sources,
+            stability_delay,
+            view: view_def,
+            description: description.clone(),
+        };
+
+        Ok(TrendMaterialization::View(view_materialization))
+    } else if src_function.is_some() {
+        let (function_lang, function_def) = coorce_to_plpgsql(
+            get_function_def(conn, &target_trend_store_part)
+                .await
+                .unwrap_or((
+                    "failed getting language".into(),
+                    "failed getting sources".into(),
+                )),
+        )?;
+        let return_type = get_function_return_type(
+            conn,
+            MATERIALIZATION_FUNCTION_SCHEMA,
+            &target_trend_store_part,
+        )
+        .await
+        .unwrap_or("failed getting return type".into());
+
+        let sources = load_sources(conn, materialization_id).await?;
+
+        let function_materialization = TrendFunctionMaterialization {
+            target_trend_store_part: target_trend_store_part.clone(),
+            enabled,
+            fingerprint_function: fingerprint_function_def.clone(),
+            processing_delay,
+            reprocessing_period,
+            sources,
+            stability_delay,
+            function: TrendMaterializationFunction {
+                return_type,
+                src: function_def,
+                language: function_lang,
+            },
+            description: description.clone(),
+        };
+
+        Ok(TrendMaterialization::Function(function_materialization))
+    } else {
+        Err(Error::Runtime(RuntimeError::from_msg("Unexpected configuration where materialization is not a view and not a function materialization".to_string())))
+    }
+}
+
 pub async fn load_materializations<T: GenericClient + Send + Sync>(
     conn: &mut T,
 ) -> Result<Vec<TrendMaterialization>, Error> {
@@ -1027,6 +1139,35 @@ pub struct ResultColumn {
     pub data_type: String,
 }
 
+pub async fn get_view_result_columns<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    view_schema: &str,
+    view_name: &str,
+) -> Result<Vec<ResultColumn>, String> {
+    let query = concat!(
+        "SELECT attname, format_type(atttypid, null) ",
+        "FROM pg_class ",
+        "JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid ",
+        "JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid ",
+        "WHERE relkind = 'v' AND nspname = $1 AND relname = $2 AND attnum >= 0"
+    );
+
+    let columns: Vec<ResultColumn> = client
+        .query(query, &[&view_schema, &view_name])
+        .await
+        .map(|rows| {
+            rows.iter()
+                .map(|row| ResultColumn {
+                    name: row.get(0),
+                    data_type: row.get(1),
+                })
+                .collect()
+        })
+        .map_err(|e| format!("could not retrieve result columns for view: {e}"))?;
+
+    Ok(columns)
+}
+
 pub async fn get_function_result_columns<T: GenericClient + Send + Sync>(
     client: &mut T,
     function_schema: &str,
@@ -1110,6 +1251,38 @@ impl From<TrendMaterialization> for AddTrendMaterialization {
     fn from(trend_materialization: TrendMaterialization) -> Self {
         AddTrendMaterialization {
             trend_materialization,
+        }
+    }
+}
+
+pub struct RemoveTrendMaterialization {
+    pub name: String,
+}
+
+impl fmt::Display for RemoveTrendMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RemoveTrendMaterialization({})",
+            &self.name
+        )
+    }
+}
+
+#[async_trait]
+impl Change for RemoveTrendMaterialization {
+    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+        match remove_trend_materialization(client, &self.name).await {
+            Ok(_) => Ok(format!(
+                "Removed trend materialization '{}'",
+                &self.name
+            )),
+            Err(e) => Err(Error::Runtime(RuntimeError {
+                msg: format!(
+                    "Error removing trend materialization '{}': {}",
+                    &self.name, e
+                ),
+            })),
         }
     }
 }
@@ -1302,4 +1475,214 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
     }
 
     Ok(())
+}
+
+pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    name: &str,
+) -> Result<(), String> {
+    let query = concat!(
+        "DELETE FROM trend_directory.materialization WHERE materialization::text = $1"
+    );
+
+    let deleted = client.execute(query, &[&name]).await.unwrap();
+
+    if deleted == 1 {
+        Ok(())
+    } else if deleted == 0 {
+        Err("No materializations deleted".to_string())
+    } else {
+        Err(format!("More than 1 materialization deleted ({})", deleted))
+    }
+}
+
+pub async fn check_trend_materialization<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    trend_materialization: &TrendMaterialization,
+) -> Result<Vec<String>, String> {
+    match trend_materialization {
+        TrendMaterialization::View(ref view_materialization) => {
+            check_view_materialization(client, view_materialization)
+                .await
+        },
+        TrendMaterialization::Function(ref function_materialization) => {
+            check_function_materialization(client, function_materialization)
+                .await
+        }
+    }
+}
+
+pub async fn check_view_materialization<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    view_materialization: &TrendViewMaterialization,
+) -> Result<Vec<String>, String> {
+    let mut report = Vec::new();
+
+    let view_name = format!("_{}", view_materialization.target_trend_store_part);
+
+    let view_result_columns: Vec<ResultColumn> = get_view_result_columns(
+        client,
+        MATERIALIZATION_FUNCTION_SCHEMA,
+        &view_name,
+    )
+    .await
+    .unwrap()
+    .into_iter()
+    .filter(|c| c.name != "entity_id" && c.name != "timestamp")
+    .collect();
+
+    let view_result_columns_map: HashMap<String, String> = view_result_columns
+        .iter()
+        .map(|c| (c.name.clone(), c.data_type.clone()))
+        .collect();
+
+    let trend_store_part_columns =
+        get_trend_store_part_columns(client, &view_materialization.target_trend_store_part)
+            .await
+            .unwrap();
+
+    let trend_store_part_columns_map: HashMap<String, String> = trend_store_part_columns
+        .iter()
+        .map(|c| (c.name.clone(), c.data_type.clone()))
+        .collect();
+
+    for view_result_column in view_result_columns {
+        let trend_data_type = trend_store_part_columns_map.get(&view_result_column.name);
+
+        match trend_data_type {
+            None => {
+                report.push(format!(
+                    "Column '{}'({}) is returned from view but has no matching trend",
+                    view_result_column.name, view_result_column.data_type
+                ));
+            }
+            Some(data_type) => {
+                if !data_type.eq(&view_result_column.data_type) {
+                    report.push(format!(
+                        "Column '{}'({}) returned from view differs in type: '{}' != '{}' ",
+                        view_result_column.name,
+                        view_result_column.data_type,
+                        view_result_column.data_type,
+                        data_type
+                    ));
+                }
+            }
+        }
+    }
+
+    for trend_store_part_column in trend_store_part_columns {
+        let view_result_column_data_type =
+            view_result_columns_map.get(&trend_store_part_column.name);
+
+        if view_result_column_data_type.is_none() {
+            report.push(format!(
+                "Column '{}'({}) is defined as trend in trend store part '{}' but is not returned from view",
+                trend_store_part_column.name, trend_store_part_column.data_type, view_materialization.target_trend_store_part
+            ));
+        }
+    }
+
+    Ok(report)
+}
+
+pub async fn check_function_materialization<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    function_materialization: &TrendFunctionMaterialization,
+) -> Result<Vec<String>, String> {
+    let mut report: Vec<String> = Vec::new();
+    let function_result_columns: Vec<ResultColumn> = get_function_result_columns(
+        client,
+        MATERIALIZATION_FUNCTION_SCHEMA,
+        &function_materialization.target_trend_store_part,
+    )
+    .await
+    .unwrap()
+    .into_iter()
+    .filter(|c| c.name != "entity_id" && c.name != "timestamp")
+    .collect();
+
+    let function_result_columns_map: HashMap<String, String> = function_result_columns
+        .iter()
+        .map(|c| (c.name.clone(), c.data_type.clone()))
+        .collect();
+
+    let trend_store_part_columns =
+        get_trend_store_part_columns(client, &function_materialization.target_trend_store_part)
+            .await
+            .unwrap();
+
+    let trend_store_part_columns_map: HashMap<String, String> = trend_store_part_columns
+        .iter()
+        .map(|c| (c.name.clone(), c.data_type.clone()))
+        .collect();
+
+    for function_result_column in function_result_columns {
+        let trend_data_type = trend_store_part_columns_map.get(&function_result_column.name);
+
+        match trend_data_type {
+            None => {
+                report.push(format!(
+                    "Column '{}'({}) is returned from function but has no matching trend",
+                    function_result_column.name, function_result_column.data_type
+                ));
+            }
+            Some(data_type) => {
+                if !data_type.eq(&function_result_column.data_type) {
+                    report.push(format!(
+                        "Column '{}'({}) returned from function differs in type: '{}' != '{}' ",
+                        function_result_column.name,
+                        function_result_column.data_type,
+                        function_result_column.data_type,
+                        data_type
+                    ));
+                }
+            }
+        }
+    }
+
+    for trend_store_part_column in trend_store_part_columns {
+        let function_result_column_data_type =
+            function_result_columns_map.get(&trend_store_part_column.name);
+
+        if function_result_column_data_type.is_none() {
+            report.push(format!(
+                "Column '{}'({}) is defined as trend in trend store part '{}' but is not returned from function",
+                trend_store_part_column.name, trend_store_part_column.data_type, function_materialization.target_trend_store_part
+            ));
+        }
+    }
+
+    Ok(report)
+}
+
+pub struct TrendStorePartColumn {
+    pub name: String,
+    pub data_type: String,
+}
+
+pub async fn get_trend_store_part_columns<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    trend_store_part_name: &str,
+) -> Result<Vec<TrendStorePartColumn>, String> {
+    let query = concat!(
+        "SELECT tt.name, tt.data_type ",
+        "FROM trend_directory.trend_store_part tsp ",
+        "JOIN trend_directory.table_trend tt ON tt.trend_store_part_id = tsp.id ",
+        "WHERE tsp.name = $1"
+    );
+
+    let columns: Vec<TrendStorePartColumn> = client
+        .query(query, &[&trend_store_part_name])
+        .await
+        .map(|rows| {
+            rows.iter()
+                .map(|row| TrendStorePartColumn {
+                    name: row.get(0),
+                    data_type: row.get(1),
+                })
+                .collect()
+        })
+        .map_err(|e| format!("could not retrieve columns for trend store part: {e}"))?;
+
+    Ok(columns)
 }
