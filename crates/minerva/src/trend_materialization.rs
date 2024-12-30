@@ -850,7 +850,7 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
         DatabaseError::from_msg(format!("Error loading trend materialization: {e}"))
     })?;
 
-    if result.len() == 0 {
+    if result.is_empty() {
         return Err(Error::Configuration(ConfigurationError::from_msg(format!(
             "No materialization that matches name '{}'",
             name
