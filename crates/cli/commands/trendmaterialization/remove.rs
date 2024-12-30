@@ -19,7 +19,9 @@ impl Cmd for TrendMaterializationRemove {
 
         let mut transaction = client.transaction().await?;
 
-        let change = RemoveTrendMaterialization { name: self.name.clone() };
+        let change = RemoveTrendMaterialization {
+            name: self.name.clone(),
+        };
 
         change.apply(&mut transaction).await?;
 

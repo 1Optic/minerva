@@ -65,7 +65,10 @@ impl TrendViewMaterialization {
             &format_duration(self.processing_delay).to_string(),
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
-            &format!("trend.{}", escape_identifier(&materialization_view_name(&self.target_trend_store_part))),
+            &format!(
+                "trend.{}",
+                escape_identifier(&materialization_view_name(&self.target_trend_store_part))
+            ),
             &self.description.as_ref().unwrap_or(&description_default),
             &self.target_trend_store_part,
         ];
@@ -100,7 +103,10 @@ impl TrendViewMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let view_ident = format!("trend.{}", &escape_identifier(&materialization_view_name(&self.target_trend_store_part)));
+        let view_ident = format!(
+            "trend.{}",
+            &escape_identifier(&materialization_view_name(&self.target_trend_store_part))
+        );
 
         let query = concat!(
             "INSERT INTO trend_directory.view_materialization(materialization_id, src_view) ",
@@ -319,9 +325,12 @@ pub struct UpdateView {
 #[async_trait]
 impl Change for UpdateView {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        drop_materialization_view(client, &self.trend_view_materialization.target_trend_store_part)
-            .await
-            .unwrap();
+        drop_materialization_view(
+            client,
+            &self.trend_view_materialization.target_trend_store_part,
+        )
+        .await
+        .unwrap();
         self.trend_view_materialization
             .create_view(client)
             .await
@@ -1403,11 +1412,7 @@ pub struct RemoveTrendMaterialization {
 
 impl fmt::Display for RemoveTrendMaterialization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "RemoveTrendMaterialization({})",
-            &self.name
-        )
+        write!(f, "RemoveTrendMaterialization({})", &self.name)
     }
 }
 
@@ -1416,18 +1421,12 @@ impl Change for RemoveTrendMaterialization {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
         remove_trend_materialization(client, &self.name)
             .await
-            .map(|_| {
-                format!(
-                    "Removed trend materialization '{}'",
-                    &self.name,
-                )
-            })
+            .map(|_| format!("Removed trend materialization '{}'", &self.name,))
             .map_err(|e| {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error removing trend materialization '{}': {}",
-                        &self.name,
-                        e
+                        &self.name, e
                     ),
                 })
             })
@@ -1643,13 +1642,17 @@ pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
 
     if deleted == 1 {
     } else if deleted == 0 {
-        return Err("No materializations deleted".to_string())
+        return Err("No materializations deleted".to_string());
     } else {
-        return Err(format!("More than 1 materialization deleted ({})", deleted))
+        return Err(format!("More than 1 materialization deleted ({})", deleted));
     };
 
-    drop_materialization_view(client, name).await.map_err(|e| format!("error while trying to remove materialization view: {e}"))?;
-    drop_fingerprint_function(client, name).await.map_err(|e| format!("error while trying to remove fingerprint function: {e}"))?;
+    drop_materialization_view(client, name)
+        .await
+        .map_err(|e| format!("error while trying to remove materialization view: {e}"))?;
+    drop_fingerprint_function(client, name)
+        .await
+        .map_err(|e| format!("error while trying to remove fingerprint function: {e}"))?;
 
     Ok(())
 }
