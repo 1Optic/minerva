@@ -65,7 +65,7 @@ impl TrendViewMaterialization {
             &format_duration(self.processing_delay).to_string(),
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
-            &format!("trend.{}", escape_identifier(&self.view_name())),
+            &format!("trend.{}", escape_identifier(&materialization_view_name(&self.target_trend_store_part))),
             &self.description.as_ref().unwrap_or(&description_default),
             &self.target_trend_store_part,
         ];
@@ -78,34 +78,13 @@ impl TrendViewMaterialization {
         }
     }
 
-    fn view_name(&self) -> String {
-        format!("_{}", &self.target_trend_store_part)
-    }
-
-    pub async fn drop_view<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(
-            "DROP VIEW IF EXISTS trend.{}",
-            &escape_identifier(&self.view_name()),
-        );
-
-        match client.execute(query.as_str(), &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error dropping view: {e}"
-            )))),
-        }
-    }
-
     pub async fn create_view<T: GenericClient + Send + Sync>(
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
         let query = format!(
             "CREATE VIEW trend.{} AS {}",
-            &escape_identifier(&self.view_name()),
+            &escape_identifier(&materialization_view_name(&self.target_trend_store_part)),
             self.view,
         );
 
@@ -121,7 +100,7 @@ impl TrendViewMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let view_ident = format!("trend.{}", &escape_identifier(&self.view_name()));
+        let view_ident = format!("trend.{}", &escape_identifier(&materialization_view_name(&self.target_trend_store_part)));
 
         let query = concat!(
             "INSERT INTO trend_directory.view_materialization(materialization_id, src_view) ",
@@ -204,7 +183,7 @@ impl TrendViewMaterialization {
     }
 
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
-        self.drop_view(client).await?;
+        drop_materialization_view(client, &self.target_trend_store_part).await?;
         drop_fingerprint_function(client, &self.target_trend_store_part).await?;
         Ok(())
     }
@@ -245,6 +224,27 @@ impl TrendViewMaterialization {
             )))),
         }
     }
+}
+
+pub async fn drop_materialization_view<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    materialization_name: &str,
+) -> Result<(), Error> {
+    let query = format!(
+        "DROP VIEW IF EXISTS trend.{}",
+        &escape_identifier(&materialization_view_name(materialization_name)),
+    );
+
+    match client.execute(query.as_str(), &[]).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
+            "Error dropping view: {e}"
+        )))),
+    }
+}
+
+fn materialization_view_name(materialization_name: &str) -> String {
+    format!("_{}", materialization_name)
 }
 
 fn fingerprint_function_name(materialization_name: &str) -> String {
@@ -319,8 +319,7 @@ pub struct UpdateView {
 #[async_trait]
 impl Change for UpdateView {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        self.trend_view_materialization
-            .drop_view(client)
+        drop_materialization_view(client, &self.trend_view_materialization.target_trend_store_part)
             .await
             .unwrap();
         self.trend_view_materialization
@@ -330,7 +329,7 @@ impl Change for UpdateView {
 
         Ok(format!(
             "Updated view {}",
-            self.trend_view_materialization.view_name()
+            materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         ))
     }
 }
@@ -341,7 +340,7 @@ impl fmt::Display for UpdateView {
             f,
             "UpdateView({}, {})",
             &self.trend_view_materialization.target_trend_store_part,
-            &self.trend_view_materialization.view_name()
+            materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         )
     }
 }
@@ -1399,7 +1398,7 @@ impl From<TrendMaterialization> for AddTrendMaterialization {
 }
 
 pub struct RemoveTrendMaterialization {
-    pub materialization: TrendMaterialization,
+    pub name: String,
 }
 
 impl fmt::Display for RemoveTrendMaterialization {
@@ -1407,7 +1406,7 @@ impl fmt::Display for RemoveTrendMaterialization {
         write!(
             f,
             "RemoveTrendMaterialization({})",
-            &self.materialization.name()
+            &self.name
         )
     }
 }
@@ -1415,20 +1414,19 @@ impl fmt::Display for RemoveTrendMaterialization {
 #[async_trait]
 impl Change for RemoveTrendMaterialization {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        self.materialization
-            .delete(client)
+        remove_trend_materialization(client, &self.name)
             .await
             .map(|_| {
                 format!(
                     "Removed trend materialization '{}'",
-                    &self.materialization.name(),
+                    &self.name,
                 )
             })
             .map_err(|e| {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error removing trend materialization '{}': {}",
-                        &self.materialization.name(),
+                        &self.name,
                         e
                     ),
                 })
@@ -1644,12 +1642,16 @@ pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
     let deleted = client.execute(query, &[&name]).await.unwrap();
 
     if deleted == 1 {
-        Ok(())
     } else if deleted == 0 {
-        Err("No materializations deleted".to_string())
+        return Err("No materializations deleted".to_string())
     } else {
-        Err(format!("More than 1 materialization deleted ({})", deleted))
-    }
+        return Err(format!("More than 1 materialization deleted ({})", deleted))
+    };
+
+    drop_materialization_view(client, name).await.map_err(|e| format!("error while trying to remove materialization view: {e}"))?;
+    drop_fingerprint_function(client, name).await.map_err(|e| format!("error while trying to remove fingerprint function: {e}"))?;
+
+    Ok(())
 }
 
 pub async fn check_trend_materialization<T: GenericClient + Send + Sync>(
