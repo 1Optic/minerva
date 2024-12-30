@@ -1,11 +1,10 @@
-openapi: '3.1.0'
+openapi: 3.0.0
 info:
   title: Minerva API
   description: API for Minerva system management
   version: "1.0.0"
   license:
     name: GNU Affero General Public License v3.0 or later
-    identifier: AGPL-3.0-or-later
     url: https://www.gnu.org/licenses/agpl.txt
 servers:
   - url: https://demo.1optic.io/gis-api/v1
@@ -742,6 +741,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /templates:
+    get:
+      summary: Get list of all templates
+      description: Get list of all templates including name and Id.
+      operationId: getTemplates
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateRef'
+  /templates/{templateId}:
+    get:
+      summary: Get template with specified Id
+      description: Template including all properties required for the GUI to populat an interface for editing the trigger.
+      operationId: getTemplateById
+      parameters:
+       - name: templateId
+         in: path
+         schema:
+           type: string
+         required: true
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
   /triggers:
     get:
       summary: List of existing triggers
@@ -755,6 +786,39 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Trigger'
+        401:
+          description: User is not allowed to perform this operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: Database unreachable or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new (template based) trigger
+      operationId: createTrigger
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              $ref: '#/components/schemas/Trigger'
+      responses:
+        200:
+          description: Trigger successfully changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        400:
+          description: The input is incorrectly formatted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         401:
           description: User is not allowed to perform this operation
           content:
@@ -1146,6 +1210,11 @@ components:
           type: string
     Trigger:
       type: object
+      required:
+        - name
+        - enabled
+        - description
+        - thresholds
       properties:
         name:
           type: string
@@ -1154,10 +1223,57 @@ components:
           type: boolean
         description:
           type: string
-        thresholds:
-          type: array
-          items:
-            $ref: '#/components/schemas/Threshold'
+        template_instance:
+          type: object
+          properties:
+            template_id:
+              type: string
+            parameters:
+              type: array
+              items:
+                $ref: '#/components/schemas/TemplateInstanceParameter'
+    TemplateInstanceParameter:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+          description: Name of the parameter matching the template where it is applied
+          example: kpi1
+        value:
+          description: Value of the parameter as will be substituted in the template.
+          oneOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+    Template:
+      type: object
+      description: A template describes both the UI form and database query form of a templated trigger
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        name:
+          type: string
+        body:
+          type: string
+          example: "When {kpi1} {op1} {thr1} is true, trigger event"
+        sql_body:
+          type: string
+          example: "SELECT {kpi1} {op1} {thr1}"
+    TemplateRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        name:
+          type: string
     EntitySet:
       type: object
       properties:
