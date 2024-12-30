@@ -798,6 +798,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new (template based) trigger
+      operationId: createTrigger
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              $ref: '#/components/schemas/Trigger'
+      responses:
+        200:
+          description: Trigger successfully changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        400:
+          description: The input is incorrectly formatted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: User is not allowed to perform this operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: Database unreachable or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     put:
       summary: Change the thresholds for a trigger
       operationId: updateTrigger
