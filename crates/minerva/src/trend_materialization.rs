@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::{Send, Sync};
 use std::path::Path;
 use std::time::Duration;
-use tokio_postgres::Transaction;
+use tokio_postgres::{Row, Transaction};
 
 use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
@@ -148,48 +148,9 @@ impl TrendViewMaterialization {
         self.create_view(client).await?;
         self.define_materialization(client).await?;
         self.connect_sources(client).await?;
-        self.create_fingerprint_function(client).await?;
+        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
 
         Ok(())
-    }
-
-    fn fingerprint_function_name(&self) -> String {
-        format!("{}_fingerprint", self.target_trend_store_part)
-    }
-
-    async fn create_fingerprint_function<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(concat!(
-            "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS trend_directory.fingerprint AS $$\n",
-            "{}\n",
-            "$$ LANGUAGE sql STABLE\n"
-        ), escape_identifier(&self.fingerprint_function_name()), self.fingerprint_function);
-
-        match client.query(query.as_str(), &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error creating fingerprint function: {e}"
-            )))),
-        }
-    }
-
-    async fn drop_fingerprint_function<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(
-            "DROP FUNCTION IF EXISTS trend.{}(timestamp with time zone)",
-            escape_identifier(&self.fingerprint_function_name())
-        );
-
-        match client.query(query.as_str(), &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error dropping fingerprint function: {e}"
-            )))),
-        }
     }
 
     pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
@@ -218,7 +179,7 @@ impl TrendViewMaterialization {
     async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_view(client).await?;
         self.init_view_materialization(client).await?;
-        self.create_fingerprint_function(client).await?;
+        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
         self.connect_sources(client).await?;
         self.update_attributes(client).await?;
 
@@ -234,7 +195,7 @@ impl TrendViewMaterialization {
 
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.drop_view(client).await?;
-        self.drop_fingerprint_function(client).await?;
+        drop_fingerprint_function(client, &self.target_trend_store_part).await?;
         Ok(())
     }
 
@@ -273,6 +234,46 @@ impl TrendViewMaterialization {
                 "Error updating view materialization attributes: {e}"
             )))),
         }
+    }
+}
+
+fn fingerprint_function_name(materialization_name: &str) -> String {
+    format!("{}_fingerprint", materialization_name)
+}
+
+async fn create_fingerprint_function<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    materialization_name: &str,
+    function_body: &str,
+) -> Result<(), Error> {
+    let query = format!(concat!(
+        "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS trend_directory.fingerprint AS $$\n",
+        "{}\n",
+        "$$ LANGUAGE sql STABLE\n"
+    ), escape_identifier(&fingerprint_function_name(materialization_name)), function_body);
+
+    match client.query(query.as_str(), &[]).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
+            "Error creating fingerprint function: {e}"
+        )))),
+    }
+}
+
+async fn drop_fingerprint_function<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    materialization_name: &str,
+) -> Result<(), Error> {
+    let query = format!(
+        "DROP FUNCTION IF EXISTS trend.{}(timestamp with time zone)",
+        escape_identifier(&fingerprint_function_name(materialization_name))
+    );
+
+    match client.query(query.as_str(), &[]).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
+            "Error dropping fingerprint function: {e}"
+        )))),
     }
 }
 
@@ -445,7 +446,7 @@ impl TrendFunctionMaterialization {
 
     async fn create<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_function(client).await?;
-        self.create_fingerprint_function(client).await?;
+        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
         self.define_materialization(client).await?;
         if self.enabled {
             self.do_enable(client).await?
@@ -453,45 +454,6 @@ impl TrendFunctionMaterialization {
         self.connect_sources(client).await?;
 
         Ok(())
-    }
-
-    fn fingerprint_function_name(&self) -> String {
-        format!("{}_fingerprint", self.target_trend_store_part)
-    }
-
-    async fn create_fingerprint_function<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(concat!(
-            "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS trend_directory.fingerprint AS $$\n",
-            "{}\n",
-            "$$ LANGUAGE sql STABLE\n"
-        ), escape_identifier(&self.fingerprint_function_name()), self.fingerprint_function);
-
-        match client.query(query.as_str(), &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error creating fingerprint function: {e}"
-            )))),
-        }
-    }
-
-    async fn drop_fingerprint_function<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(
-            "DROP FUNCTION IF EXISTS trend.{}(timestamp with time zone)",
-            escape_identifier(&self.fingerprint_function_name())
-        );
-
-        match client.query(query.as_str(), &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error dropping fingerprint function: {e}"
-            )))),
-        }
     }
 
     async fn do_enable<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
@@ -598,7 +560,7 @@ impl TrendFunctionMaterialization {
     async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_function(client).await?;
         self.init_function_materialization(client).await?;
-        self.create_fingerprint_function(client).await?;
+        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
         self.connect_sources(client).await?;
         self.update_attributes(client).await?;
 
@@ -608,7 +570,7 @@ impl TrendFunctionMaterialization {
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.drop_sources(client).await?;
         self.drop_materialization(client).await?;
-        self.drop_fingerprint_function(client).await?;
+        drop_fingerprint_function(client, &self.target_trend_store_part).await?;
         Ok(())
     }
 }
@@ -960,6 +922,143 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     }
 }
 
+#[derive(Error, Debug)]
+pub enum LoadTrendMaterializationError {
+    #[error("no such view '{0}' could be loaded")]
+    NoSuchView(String),
+    #[error("could not parse value from database: {0}")]
+    ParseError(String),
+    #[error("could not load materialization sources: {0}")]
+    Sources(String),
+    #[error("could not load materialization function: {0}")]
+    MaterializationFunction(String),
+    #[error("invalid configuration: {0}")]
+    Configuration(String),
+    #[error("unexpected issue loading materialization: {0}")]
+    Unexpected(String),
+    #[error("could not find matching materialization: {0}")]
+    NotFound(String),
+}
+
+async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: &mut T, row: &Row) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
+    let materialization_id: i32 = row.get(0);
+    let processing_delay_str: String = row.get(1);
+    let stability_delay_str: String = row.get(2);
+    let reprocessing_period_str: String = row.get(3);
+    let enabled: bool = row.get(4);
+    let description: Option<Value> = row.get(5);
+    let target_trend_store_part: String = row.get(6);
+    let src_view: Option<String> = row.get(7);
+    let src_function: Option<String> = row.get(8);
+
+    let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
+    let (_fingerprint_function_lang, fingerprint_function_def) =
+        get_function_def(client, &fingerprint_function_name)
+            .await
+            .unwrap_or((
+                "failed getting language".into(),
+                "failed getting sources".into(),
+            ));
+
+    let processing_delay = parse_interval(&processing_delay_str)
+        .map_err(|e| LoadTrendMaterializationError::ParseError(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of processing_delay: {e}")))?;
+
+    let reprocessing_period = parse_interval(&reprocessing_period_str)
+        .map_err(|e| LoadTrendMaterializationError::ParseError(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of reprocessing_period: {e}")))?;
+
+    let stability_delay = parse_interval(&stability_delay_str)
+        .map_err(|e| LoadTrendMaterializationError::ParseError(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}")))?;
+
+    if let Some(view) = src_view {
+        let view_def = get_view_def(client, &view).await.ok_or(LoadTrendMaterializationError::NoSuchView(view))?;
+        let sources = load_sources(client, materialization_id).await.map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
+
+        let view_materialization = TrendViewMaterialization {
+            target_trend_store_part: target_trend_store_part.clone(),
+            enabled,
+            fingerprint_function: fingerprint_function_def.clone(),
+            processing_delay,
+            reprocessing_period,
+            sources,
+            stability_delay,
+            view: view_def,
+            description: description.clone(),
+        };
+
+        let trend_materialization = TrendMaterialization::View(view_materialization);
+
+        return Ok(trend_materialization);
+    }
+
+    if src_function.is_some() {
+        let (function_lang, function_def) = coorce_to_plpgsql(
+            get_function_def(client, &target_trend_store_part)
+                .await
+                .unwrap_or((
+                    "failed getting language".into(),
+                    "failed getting sources".into(),
+                )),
+        ).map_err(|e| LoadTrendMaterializationError::MaterializationFunction(format!("could not load function definition: {e}")))?;
+
+        let return_type = get_function_return_type(
+            client,
+            MATERIALIZATION_FUNCTION_SCHEMA,
+            &target_trend_store_part,
+        )
+        .await
+        .unwrap_or("failed getting return type".into());
+
+        let sources = load_sources(client, materialization_id).await.map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
+
+        let function_materialization = TrendFunctionMaterialization {
+            target_trend_store_part: target_trend_store_part.clone(),
+            enabled,
+            fingerprint_function: fingerprint_function_def.clone(),
+            processing_delay,
+            reprocessing_period,
+            sources,
+            stability_delay,
+            function: TrendMaterializationFunction {
+                return_type,
+                src: function_def,
+                language: function_lang,
+            },
+            description: description.clone(),
+        };
+
+        let trend_materialization = TrendMaterialization::Function(function_materialization);
+
+        return Ok(trend_materialization);
+    }
+
+    Err(LoadTrendMaterializationError::Configuration("No function or view materialization could be loaded".to_string()))
+}
+
+pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
+    client: &mut T, name: &str
+) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
+    let query = concat!(
+        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
+        "FROM trend_directory.materialization AS m ",
+        "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
+        "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
+        "LEFT JOIN trend_directory.function_materialization AS fm ON fm.materialization_id = m.id ",
+        "WHERE m::text = $1",
+    );
+
+    let rows = client.query(query, &[&name]).await.map_err(|e| {
+        LoadTrendMaterializationError::Unexpected(format!("Error loading trend materialization: {e}"))
+    })?;
+
+    if rows.is_empty() {
+        return Err(LoadTrendMaterializationError::NotFound(format!("No trend materialization found matching name '{name}'")));
+    }
+
+    let row = rows.first().unwrap();
+
+    trend_materialization_from_row(client, row).await
+}
+
 pub async fn load_materializations<T: GenericClient + Send + Sync>(
     conn: &mut T,
 ) -> Result<Vec<TrendMaterialization>, Error> {
@@ -1256,7 +1355,7 @@ impl From<TrendMaterialization> for AddTrendMaterialization {
 }
 
 pub struct RemoveTrendMaterialization {
-    pub name: String,
+    pub materialization: TrendMaterialization,
 }
 
 impl fmt::Display for RemoveTrendMaterialization {
@@ -1264,7 +1363,7 @@ impl fmt::Display for RemoveTrendMaterialization {
         write!(
             f,
             "RemoveTrendMaterialization({})",
-            &self.name
+            &self.materialization.name()
         )
     }
 }
@@ -1272,18 +1371,19 @@ impl fmt::Display for RemoveTrendMaterialization {
 #[async_trait]
 impl Change for RemoveTrendMaterialization {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match remove_trend_materialization(client, &self.name).await {
-            Ok(_) => Ok(format!(
+        self.materialization
+            .delete(client)
+            .await
+            .map(|_| format!(
                 "Removed trend materialization '{}'",
-                &self.name
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
+                &self.materialization.name(),
+            ))
+            .map_err(|e| Error::Runtime(RuntimeError {
                 msg: format!(
                     "Error removing trend materialization '{}': {}",
-                    &self.name, e
+                    &self.materialization.name(), e
                 ),
-            })),
-        }
+            }))
     }
 }
 
@@ -1415,6 +1515,25 @@ pub async fn reset_source_fingerprint<T: GenericClient + Send + Sync>(
     Ok(())
 }
 
+async fn get_trend_store_part_id<T: GenericClient + Send + Sync>(client: &mut T, name: &str) -> Result<i32, Error> {
+    let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
+
+    let rows = client
+        .query(source_query, &[&name])
+        .await?;
+
+    if rows.is_empty() {
+        return Err(Error::Database(DatabaseError::from_msg(format!(
+            "Materialization source '{}' does not exist",
+            name 
+        ))));
+    }
+
+    let trend_store_part_id: i32 = rows[0].get(0);
+
+    Ok(trend_store_part_id)
+}
+
 async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
     client: &mut T,
     target_trend_store_part_name: &str,
@@ -1433,20 +1552,7 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
         .await?;
 
     for source in sources {
-        let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
-
-        let rows = client
-            .query(source_query, &[&source.trend_store_part])
-            .await?;
-
-        if rows.is_empty() {
-            return Err(Error::Database(DatabaseError::from_msg(format!(
-                "Materialization source '{}' does not exist",
-                source.trend_store_part
-            ))));
-        }
-
-        let source_trend_store_part_id: i32 = rows[0].get(0);
+        let source_trend_store_part_id: i32 = get_trend_store_part_id(client, &source.trend_store_part).await?;
 
         let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
 
