@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.16.1] - 2024-12-30
+
+### Fixed
+
+- DB Schema: Restore V1 migration to original state
+
 ## [9.16.0] - 2024-12-30
 
 ### Added
@@ -189,7 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.1...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -215,3 +221,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.14.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.14.0...9.14.1
 [9.15.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.14.1...9.15.0
 [9.16.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.15.0...9.16.0
+[9.16.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.0...9.16.1
