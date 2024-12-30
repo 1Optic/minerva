@@ -6,7 +6,7 @@ use clap::Parser;
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_materialization::{
-    trend_materialization_from_config, UpdateTrendMaterialization, check_trend_materialization
+    check_trend_materialization, trend_materialization_from_config, UpdateTrendMaterialization,
 };
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -40,7 +40,8 @@ impl Cmd for TrendMaterializationUpdate {
         change.apply(&mut transaction).await?;
 
         let result = if self.verify {
-            let report = check_trend_materialization(&mut transaction, &trend_materialization).await?;
+            let report =
+                check_trend_materialization(&mut transaction, &trend_materialization).await?;
 
             if report.is_empty() {
                 Ok(())

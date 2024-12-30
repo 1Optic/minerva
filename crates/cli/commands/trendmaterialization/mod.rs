@@ -7,10 +7,10 @@ mod create;
 mod dump;
 mod list;
 mod populatesourcefingerprint;
+mod remove;
 mod resetsourcefingerprint;
 mod service;
 mod update;
-mod remove;
 
 use super::common::{Cmd, CmdResult};
 use crate::commands::trendmaterialization::check::TrendMaterializationCheck;
@@ -18,9 +18,9 @@ use crate::commands::trendmaterialization::create::TrendMaterializationCreate;
 use crate::commands::trendmaterialization::dump::TrendMaterializationDump;
 use crate::commands::trendmaterialization::list::TrendMaterializationList;
 use crate::commands::trendmaterialization::populatesourcefingerprint::TrendMaterializationPopulateSourceFingerprint;
+use crate::commands::trendmaterialization::remove::TrendMaterializationRemove;
 use crate::commands::trendmaterialization::resetsourcefingerprint::TrendMaterializationResetSourceFingerprint;
 use crate::commands::trendmaterialization::update::TrendMaterializationUpdate;
-use crate::commands::trendmaterialization::remove::TrendMaterializationRemove;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationOpt {

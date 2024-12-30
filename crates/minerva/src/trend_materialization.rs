@@ -1,8 +1,8 @@
 use glob::glob;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_yaml;
+use std::collections::HashMap;
 use std::fmt;
 use std::marker::{Send, Sync};
 use std::path::Path;
@@ -148,7 +148,12 @@ impl TrendViewMaterialization {
         self.create_view(client).await?;
         self.define_materialization(client).await?;
         self.connect_sources(client).await?;
-        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await?;
 
         Ok(())
     }
@@ -179,7 +184,12 @@ impl TrendViewMaterialization {
     async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_view(client).await?;
         self.init_view_materialization(client).await?;
-        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await?;
         self.connect_sources(client).await?;
         self.update_attributes(client).await?;
 
@@ -446,7 +456,12 @@ impl TrendFunctionMaterialization {
 
     async fn create<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_function(client).await?;
-        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await?;
         self.define_materialization(client).await?;
         if self.enabled {
             self.do_enable(client).await?
@@ -560,7 +575,12 @@ impl TrendFunctionMaterialization {
     async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_function(client).await?;
         self.init_function_materialization(client).await?;
-        create_fingerprint_function(client, &self.target_trend_store_part, &self.fingerprint_function).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await?;
         self.connect_sources(client).await?;
         self.update_attributes(client).await?;
 
@@ -831,7 +851,10 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     })?;
 
     if result.len() == 0 {
-        return Err(Error::Configuration(ConfigurationError::from_msg(format!("No materialization that matches name '{}'", name))));
+        return Err(Error::Configuration(ConfigurationError::from_msg(format!(
+            "No materialization that matches name '{}'",
+            name
+        ))));
     }
 
     let row = result.first().unwrap();
@@ -940,7 +963,10 @@ pub enum LoadTrendMaterializationError {
     NotFound(String),
 }
 
-async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: &mut T, row: &Row) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
+async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    row: &Row,
+) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
     let materialization_id: i32 = row.get(0);
     let processing_delay_str: String = row.get(1);
     let stability_delay_str: String = row.get(2);
@@ -970,8 +996,12 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: 
         .map_err(|e| LoadTrendMaterializationError::ParseError(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}")))?;
 
     if let Some(view) = src_view {
-        let view_def = get_view_def(client, &view).await.ok_or(LoadTrendMaterializationError::NoSuchView(view))?;
-        let sources = load_sources(client, materialization_id).await.map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
+        let view_def = get_view_def(client, &view)
+            .await
+            .ok_or(LoadTrendMaterializationError::NoSuchView(view))?;
+        let sources = load_sources(client, materialization_id)
+            .await
+            .map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
 
         let view_materialization = TrendViewMaterialization {
             target_trend_store_part: target_trend_store_part.clone(),
@@ -998,7 +1028,12 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: 
                     "failed getting language".into(),
                     "failed getting sources".into(),
                 )),
-        ).map_err(|e| LoadTrendMaterializationError::MaterializationFunction(format!("could not load function definition: {e}")))?;
+        )
+        .map_err(|e| {
+            LoadTrendMaterializationError::MaterializationFunction(format!(
+                "could not load function definition: {e}"
+            ))
+        })?;
 
         let return_type = get_function_return_type(
             client,
@@ -1008,7 +1043,9 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: 
         .await
         .unwrap_or("failed getting return type".into());
 
-        let sources = load_sources(client, materialization_id).await.map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
+        let sources = load_sources(client, materialization_id)
+            .await
+            .map_err(|e| LoadTrendMaterializationError::Sources(format!("{e}")))?;
 
         let function_materialization = TrendFunctionMaterialization {
             target_trend_store_part: target_trend_store_part.clone(),
@@ -1031,11 +1068,14 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(client: 
         return Ok(trend_materialization);
     }
 
-    Err(LoadTrendMaterializationError::Configuration("No function or view materialization could be loaded".to_string()))
+    Err(LoadTrendMaterializationError::Configuration(
+        "No function or view materialization could be loaded".to_string(),
+    ))
 }
 
 pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
-    client: &mut T, name: &str
+    client: &mut T,
+    name: &str,
 ) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
     let query = concat!(
         "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
@@ -1047,11 +1087,15 @@ pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
     );
 
     let rows = client.query(query, &[&name]).await.map_err(|e| {
-        LoadTrendMaterializationError::Unexpected(format!("Error loading trend materialization: {e}"))
+        LoadTrendMaterializationError::Unexpected(format!(
+            "Error loading trend materialization: {e}"
+        ))
     })?;
 
     if rows.is_empty() {
-        return Err(LoadTrendMaterializationError::NotFound(format!("No trend materialization found matching name '{name}'")));
+        return Err(LoadTrendMaterializationError::NotFound(format!(
+            "No trend materialization found matching name '{name}'"
+        )));
     }
 
     let row = rows.first().unwrap();
@@ -1374,16 +1418,21 @@ impl Change for RemoveTrendMaterialization {
         self.materialization
             .delete(client)
             .await
-            .map(|_| format!(
-                "Removed trend materialization '{}'",
-                &self.materialization.name(),
-            ))
-            .map_err(|e| Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error removing trend materialization '{}': {}",
-                    &self.materialization.name(), e
-                ),
-            }))
+            .map(|_| {
+                format!(
+                    "Removed trend materialization '{}'",
+                    &self.materialization.name(),
+                )
+            })
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error removing trend materialization '{}': {}",
+                        &self.materialization.name(),
+                        e
+                    ),
+                })
+            })
     }
 }
 
@@ -1515,17 +1564,18 @@ pub async fn reset_source_fingerprint<T: GenericClient + Send + Sync>(
     Ok(())
 }
 
-async fn get_trend_store_part_id<T: GenericClient + Send + Sync>(client: &mut T, name: &str) -> Result<i32, Error> {
+async fn get_trend_store_part_id<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    name: &str,
+) -> Result<i32, Error> {
     let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
 
-    let rows = client
-        .query(source_query, &[&name])
-        .await?;
+    let rows = client.query(source_query, &[&name]).await?;
 
     if rows.is_empty() {
         return Err(Error::Database(DatabaseError::from_msg(format!(
             "Materialization source '{}' does not exist",
-            name 
+            name
         ))));
     }
 
@@ -1552,7 +1602,8 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
         .await?;
 
     for source in sources {
-        let source_trend_store_part_id: i32 = get_trend_store_part_id(client, &source.trend_store_part).await?;
+        let source_trend_store_part_id: i32 =
+            get_trend_store_part_id(client, &source.trend_store_part).await?;
 
         let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
 
@@ -1587,9 +1638,8 @@ pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
     client: &mut T,
     name: &str,
 ) -> Result<(), String> {
-    let query = concat!(
-        "DELETE FROM trend_directory.materialization WHERE materialization::text = $1"
-    );
+    let query =
+        concat!("DELETE FROM trend_directory.materialization WHERE materialization::text = $1");
 
     let deleted = client.execute(query, &[&name]).await.unwrap();
 
@@ -1608,12 +1658,10 @@ pub async fn check_trend_materialization<T: GenericClient + Send + Sync>(
 ) -> Result<Vec<String>, String> {
     match trend_materialization {
         TrendMaterialization::View(ref view_materialization) => {
-            check_view_materialization(client, view_materialization)
-                .await
-        },
+            check_view_materialization(client, view_materialization).await
+        }
         TrendMaterialization::Function(ref function_materialization) => {
-            check_function_materialization(client, function_materialization)
-                .await
+            check_function_materialization(client, function_materialization).await
         }
     }
 }
@@ -1626,16 +1674,13 @@ pub async fn check_view_materialization<T: GenericClient + Send + Sync>(
 
     let view_name = format!("_{}", view_materialization.target_trend_store_part);
 
-    let view_result_columns: Vec<ResultColumn> = get_view_result_columns(
-        client,
-        MATERIALIZATION_FUNCTION_SCHEMA,
-        &view_name,
-    )
-    .await
-    .unwrap()
-    .into_iter()
-    .filter(|c| c.name != "entity_id" && c.name != "timestamp")
-    .collect();
+    let view_result_columns: Vec<ResultColumn> =
+        get_view_result_columns(client, MATERIALIZATION_FUNCTION_SCHEMA, &view_name)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|c| c.name != "entity_id" && c.name != "timestamp")
+            .collect();
 
     let view_result_columns_map: HashMap<String, String> = view_result_columns
         .iter()

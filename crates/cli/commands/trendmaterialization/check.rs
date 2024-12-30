@@ -2,9 +2,7 @@ use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
-use minerva::trend_materialization::{
-    check_trend_materialization, load_materializations
-};
+use minerva::trend_materialization::{check_trend_materialization, load_materializations};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationCheck {}
@@ -17,7 +15,9 @@ impl Cmd for TrendMaterializationCheck {
         let materializations = load_materializations(&mut client).await?;
 
         for materialization in materializations {
-            let issues = check_trend_materialization(&mut client, &materialization).await.unwrap();
+            let issues = check_trend_materialization(&mut client, &materialization)
+                .await
+                .unwrap();
 
             if issues.is_empty() {
                 println!("'{}': Ok", &materialization);
@@ -32,4 +32,3 @@ impl Cmd for TrendMaterializationCheck {
         Ok(())
     }
 }
-

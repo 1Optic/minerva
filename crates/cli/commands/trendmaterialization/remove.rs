@@ -3,7 +3,7 @@ use clap::Parser;
 
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
-use minerva::trend_materialization::{RemoveTrendMaterialization, load_trend_materialization};
+use minerva::trend_materialization::{load_trend_materialization, RemoveTrendMaterialization};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -20,11 +20,11 @@ impl Cmd for TrendMaterializationRemove {
 
         let mut transaction = client.transaction().await?;
 
-        let materialization = load_trend_materialization(&mut transaction, &self.name).await.map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))?;
+        let materialization = load_trend_materialization(&mut transaction, &self.name)
+            .await
+            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))?;
 
-        let change = RemoveTrendMaterialization {
-            materialization,
-        };
+        let change = RemoveTrendMaterialization { materialization };
 
         change.apply(&mut transaction).await?;
 
