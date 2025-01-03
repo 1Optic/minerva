@@ -128,9 +128,50 @@ pub async fn connect_db(host: url::Host, port: u16) -> Client {
     client
 }
 
+pub trait DbEnv {
+    fn pg_host(&self) -> String;
+    fn pg_port(&self) -> String;
+    fn pg_sslmode(&self) -> String;
+    fn to_env(&self) -> Vec<(String, String)>;
+}
+
+impl DbEnv for Config {
+    fn pg_host(&self) -> String {
+        match &self.get_hosts()[0] {
+            tokio_postgres::config::Host::Tcp(tcp_host) => tcp_host.to_string(),
+            tokio_postgres::config::Host::Unix(path) => path.to_string_lossy().to_string(),
+        }
+    }
+
+    fn pg_port(&self) -> String {
+        self.get_ports()[0].to_string()
+    }
+
+    fn pg_sslmode(&self) -> String {
+        match self.get_ssl_mode() {
+            tokio_postgres::config::SslMode::Prefer => "prefer".to_string(),
+            tokio_postgres::config::SslMode::Disable => "disable".to_string(),
+            tokio_postgres::config::SslMode::Require => "require".to_string(),
+            _ => "unknown".to_string(),
+        }
+    }
+
+    fn to_env(&self) -> Vec<(String, String)> {
+
+        vec![
+            ("PGHOST".to_string(), self.pg_host()),
+            ("PGPORT".to_string(), self.pg_port()),
+            ("PGDATABASE".to_string(), self.get_dbname().unwrap().to_string()),
+            ("PGUSER".to_string(), self.get_user().unwrap().to_string()),
+            ("PGSSLMODE".to_string(), self.pg_sslmode()),
+        ]
+    }
+}
+
+
 pub struct TestDatabase {
     pub name: String,
-    connect_config: Config,
+    pub connect_config: Config,
 }
 
 impl TestDatabase {
@@ -143,22 +184,7 @@ impl TestDatabase {
     }
 
     pub fn get_env(&self) -> Vec<(String, String)> {
-        let host = match &self.connect_config.get_hosts()[0] {
-            tokio_postgres::config::Host::Tcp(tcp_host) => tcp_host.to_string(),
-            tokio_postgres::config::Host::Unix(path) => path.to_string_lossy().to_string(),
-        };
-
-        let port = self.connect_config.get_ports()[0].to_string();
-
-        vec![
-            ("PGHOST".to_string(), host),
-            ("PGPORT".to_string(), port),
-            ("PGDATABASE".to_string(), self.name.clone()),
-            (
-                "PGUSER".to_string(),
-                self.connect_config.get_user().unwrap().to_string(),
-            ),
-        ]
+        self.connect_config.to_env()
     }
 
     pub fn config(&self) -> Config {
@@ -167,15 +193,22 @@ impl TestDatabase {
 }
 
 pub struct MinervaClusterConfig {
+    /// Prefix for container names and will also be used as the name of the Docker network
+    pub prefix: String,
+    /// Name of the container image
     pub image_name: String,
+    /// Tag of the container image
     pub image_tag: String,
+    /// Path to the PostgreSQL config file
     pub config_file: PathBuf,
+    /// Number of worker nodes to start
     pub worker_count: u8,
 }
 
 impl Default for MinervaClusterConfig {
     fn default() -> Self {
         MinervaClusterConfig {
+            prefix: generate_name(6),
             image_name: DEFAULT_CITUS_IMAGE.to_string(),
             image_tag: DEFAULT_CITUS_TAG.to_string(),
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
@@ -185,7 +218,7 @@ impl Default for MinervaClusterConfig {
 }
 
 pub struct MinervaCluster {
-    controller_container: ContainerAsync<GenericImage>,
+    pub controller_container: ContainerAsync<GenericImage>,
     worker_containers: Vec<std::pin::Pin<Box<ContainerAsync<GenericImage>>>>,
     pub controller_host: url::Host,
     pub controller_port: u16,
@@ -195,16 +228,14 @@ impl MinervaCluster {
     pub async fn start(
         config: &MinervaClusterConfig,
     ) -> Result<MinervaCluster, crate::error::Error> {
-        let network_name = generate_name(6);
-
         let controller_container = create_citus_container(
             &config.image_name,
             &config.image_tag,
-            &format!("{}_coordinator", network_name),
+            &format!("{}_coordinator", config.prefix),
             Some(5432),
             &config.config_file,
         )
-        .with_network(network_name.clone())
+        .with_network(config.prefix.clone())
         .start()
         .await
         .map_err(|e| {
@@ -258,7 +289,7 @@ impl MinervaCluster {
         let mut node_containers = Vec::new();
 
         for i in 1..(config.worker_count + 1) {
-            let name = format!("{}_node{i}", network_name);
+            let name = format!("{}_node{i}", config.prefix);
             let container = create_citus_container(
                 &config.image_name,
                 &config.image_tag,
@@ -266,7 +297,7 @@ impl MinervaCluster {
                 None,
                 &config.config_file,
             )
-            .with_network(network_name.clone())
+            .with_network(config.prefix.clone())
             .start()
             .await
             .map_err(|e| {
