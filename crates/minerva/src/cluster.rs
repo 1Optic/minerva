@@ -1,5 +1,5 @@
 pub const DEFAULT_CITUS_IMAGE: &str = "citusdata/citus";
-pub const DEFAULT_CITUS_TAG: &str = "12.0";
+pub const DEFAULT_CITUS_TAG: &str = "12.1.6-alpine";
 
 use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
