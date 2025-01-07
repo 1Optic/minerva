@@ -139,7 +139,7 @@ impl TestDatabase {
     }
 
     pub async fn connect(&self) -> Result<Client, crate::error::Error> {
-        connect_to_db(&self.connect_config).await
+        connect_to_db(&self.connect_config, 3).await
     }
 
     pub fn get_env(&self) -> Vec<(String, String)> {
@@ -250,9 +250,6 @@ impl MinervaCluster {
                 )
             })?;
 
-        //debug!("Connecting to controller");
-        //let client = connect_db(controller_host.clone(), controller_port).await;
-
         let coordinator_host = controller_container
             .get_bridge_ip_address()
             .await
@@ -268,14 +265,6 @@ impl MinervaCluster {
             "Setting Citus coordinator host address: {}:{}",
             &coordinator_host, &postgresql_port
         );
-
-        //client
-        //    .execute(
-        //        "SELECT citus_set_coordinator_host($1, $2)",
-        //        &[&coordinator_host.to_string(), &coordinator_port],
-        //    )
-        //    .await
-        //    .unwrap();
 
         let mut workers = Vec::new();
 
@@ -345,7 +334,7 @@ impl MinervaCluster {
     }
 
     pub async fn connect_to_db(&self, database_name: &str) -> Result<Client, crate::error::Error> {
-        connect_to_db(&self.connect_config(database_name)).await
+        connect_to_db(&self.connect_config(database_name), 3).await
     }
 
     pub fn connect_config(&self, database_name: &str) -> Config {
@@ -371,13 +360,13 @@ impl MinervaCluster {
                     worker.address, worker.external_port
                 );
                 let config = worker.connect_config("postgres");
-                let worker_client = connect_to_db(&config).await?;
+                let worker_client = connect_to_db(&config, 3).await?;
                 create_database(&worker_client, &database_name).await?;
 
                 info!("Created database '{database_name}' on worker node");
             }
 
-            let worker_client_db = connect_to_db(&worker.connect_config(&database_name)).await?;
+            let worker_client_db = connect_to_db(&worker.connect_config(&database_name), 3).await?;
 
             worker_client_db
                 .execute("CREATE EXTENSION citus", &[])
@@ -393,7 +382,7 @@ impl MinervaCluster {
 
         debug!("Connecting to new database '{database_name}'");
 
-        let mut db_client = connect_to_db(&connect_config).await?;
+        let mut db_client = connect_to_db(&connect_config, 3).await?;
 
         db_client.execute("CREATE EXTENSION citus", &[]).await?;
 
