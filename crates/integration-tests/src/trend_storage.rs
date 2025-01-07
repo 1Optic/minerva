@@ -186,14 +186,6 @@ mod tests {
                 .await?;
         }
 
-        {
-            let mut client = cluster.connect_to_coordinator().await;
-
-            test_database.drop_database(&mut client).await;
-
-            println!("Dropped database '{}'", test_database.name);
-        }
-
         Ok(())
     }
 }
