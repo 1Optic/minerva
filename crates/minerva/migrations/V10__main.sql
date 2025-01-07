@@ -8588,7 +8588,7 @@ $$ LANGUAGE plpgsql STABLE;
 
 
 CREATE FUNCTION "relation_directory"."create_entity_set"("name" text, "group" text, "entity_type_name" text, "owner" text, "description" text)
-    RETURNS attribute.minerva_entity_set
+    RETURNS integer
 AS $$
 DECLARE
   entity_id integer;
@@ -8617,7 +8617,7 @@ BEGIN
     );
   PERFORM attribute_directory.transfer_staged(attribute_directory.get_attribute_store('minerva', 'entity_set'));
   PERFORM attribute_directory.materialize_curr_ptr(attribute_directory.get_attribute_store('minerva', 'entity_set'));
-  RETURN es FROM attribute.minerva_entity_set es WHERE es.name = $1 AND es.owner = $4;
+  RETURN entity_id;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
 
@@ -8789,7 +8789,7 @@ BEGIN
     SELECT array_remove(result, real_entity) INTO result;
   END LOOP;
   IF ARRAY_LENGTH(result, 1) IS NULL THEN
-    SELECT entity_id FROM relation_directory.create_entity_set($1, $2, $3, $4, $5) INTO entityset;
+    SELECT relation_directory.create_entity_set($1, $2, $3, $4, $5) INTO entityset;
     PERFORM relation_directory.change_set_entities(entityset, $6);
   END IF;
   RETURN result;

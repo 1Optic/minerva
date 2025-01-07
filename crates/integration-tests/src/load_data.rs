@@ -57,10 +57,6 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
     async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
         crate::setup();
 
-        let keep_database = env::var("DROP_DATABASE")
-            .unwrap_or(String::from("1"))
-            .eq("0");
-
         let cluster_config = MinervaClusterConfig {
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
             ..Default::default()
@@ -122,14 +118,6 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             .success()
             .stdout(predicate::str::contains("Finished processing"));
 
-        if !keep_database {
-            let mut client = cluster.connect_to_coordinator().await;
-
-            test_database.drop_database(&mut client).await;
-
-            println!("Dropped database '{}'", test_database.name);
-        }
-
         Ok(())
     }
 
@@ -137,9 +125,6 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
     async fn load_data_twice() -> Result<(), Box<dyn std::error::Error>> {
         crate::setup();
 
-        let keep_database = env::var("DROP_DATABASE")
-            .unwrap_or(String::from("1"))
-            .eq("0");
         let data_source_name = "hub";
 
         let cluster_config = MinervaClusterConfig {
@@ -249,14 +234,6 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             let value: Decimal = row.get(0);
 
             assert_eq!(value, expected_value);
-        }
-
-        if !keep_database {
-            let mut client = cluster.connect_to_coordinator().await;
-
-            test_database.drop_database(&mut client).await;
-
-            info!("Dropped database '{}'", test_database.name);
         }
 
         Ok(())
