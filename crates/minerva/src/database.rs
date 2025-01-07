@@ -1,5 +1,7 @@
 use std::env;
+use std::time::Duration;
 
+use log::warn;
 use rustls::ClientConfig as RustlsClientConfig;
 
 use tokio_postgres::{config::SslMode, Config};
@@ -7,6 +9,8 @@ use tokio_postgres::{Client, NoTls};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 use serde::{Deserialize, Serialize};
+
+use crate::error::DatabaseError;
 
 use super::error::{ConfigurationError, Error};
 
@@ -66,10 +70,10 @@ pub fn get_db_config() -> Result<Config, Error> {
 }
 
 pub async fn connect_db() -> Result<Client, Error> {
-    connect_to_db(&get_db_config()?).await
+    connect_to_db(&get_db_config()?, 3).await
 }
 
-pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
+pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client, Error> {
     let client = if config.get_ssl_mode() != SslMode::Disable {
         let mut roots = rustls::RootCertStore::empty();
 
@@ -83,12 +87,29 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
             .with_no_client_auth();
         let tls = MakeRustlsConnect::new(tls_config);
 
-        let (client, connection) = config.connect(tls).await.map_err(|e| {
-            ConfigurationError::from_msg(format!(
-                "Could not setup TLS database connection to {:?}: {}",
-                &config, e
-            ))
-        })?;
+        let mut attempt_num = 1;
+
+        let (client, connection) = loop {
+            match config.connect(tls.clone()).await.map_err(|e| {
+                ConfigurationError::from_msg(format!(
+                    "Could not setup TLS database connection to {:?}: {}",
+                    &config, e
+                ))
+            }) {
+                Ok((client, connection)) => break (client, connection),
+                Err(e) => {
+                    warn!("Could not connect to database: {e:?}");
+                    if attempt_num > retry_count {
+                        return Err(Error::Database(DatabaseError::from_msg(format!(
+                            "Failed to connect after {retry_count} retries"
+                        ))));
+                    }
+
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    attempt_num += 1;
+                }
+            };
+        };
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -98,7 +119,29 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
 
         client
     } else {
-        let (client, connection) = config.connect(NoTls).await?;
+        let mut attempt_num = 1;
+
+        let (client, connection) = loop {
+            match config.connect(NoTls).await.map_err(|e| {
+                ConfigurationError::from_msg(format!(
+                    "Could not setup TLS database connection to {:?}: {}",
+                    &config, e
+                ))
+            }) {
+                Ok((client, connection)) => break (client, connection),
+                Err(e) => {
+                    warn!("Could not connect to database: {e:?}");
+                    if attempt_num > retry_count {
+                        return Err(Error::Database(DatabaseError::from_msg(format!(
+                            "Failed to connect after {retry_count} retries"
+                        ))));
+                    }
+
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    attempt_num += 1;
+                }
+            };
+        };
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -112,10 +155,7 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
     Ok(client)
 }
 
-pub async fn create_database<'a>(
-    client: &'a mut Client,
-    database_name: &str,
-) -> Result<(), String> {
+pub async fn create_database<'a>(client: &'a Client, database_name: &str) -> Result<(), String> {
     let query = format!("CREATE DATABASE \"{database_name}\"");
 
     client

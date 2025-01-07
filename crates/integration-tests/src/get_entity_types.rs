@@ -105,12 +105,6 @@ mod tests {
             assert_eq!(body, "[{\"id\":1,\"name\":\"entity_set\",\"description\":\"\"},{\"id\":2,\"name\":\"node\",\"description\":\"\"}]");
         }
 
-        let mut admin_client = cluster.connect_to_coordinator().await;
-
-        test_database.drop_database(&mut admin_client).await;
-
-        println!("Dropped database '{}'", test_database.name);
-
         Ok(())
     }
 }

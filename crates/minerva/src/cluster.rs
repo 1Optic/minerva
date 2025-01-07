@@ -1,11 +1,11 @@
 pub const DEFAULT_CITUS_IMAGE: &str = "citusdata/citus";
-pub const DEFAULT_CITUS_TAG: &str = "12.0";
+pub const DEFAULT_CITUS_TAG: &str = "12.1.6-alpine";
 
 use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 
-use log::{debug, error};
+use log::{debug, error, info};
 
 use rand::distributions::{Alphanumeric, DistString};
 
@@ -139,7 +139,7 @@ impl TestDatabase {
     }
 
     pub async fn connect(&self) -> Result<Client, crate::error::Error> {
-        connect_to_db(&self.connect_config).await
+        connect_to_db(&self.connect_config, 3).await
     }
 
     pub fn get_env(&self) -> Vec<(String, String)> {
@@ -184,9 +184,32 @@ impl Default for MinervaClusterConfig {
     }
 }
 
+pub struct WorkerNode {
+    pub container: ContainerAsync<GenericImage>,
+    pub internal_address: IpAddr,
+    pub host: url::Host,
+    pub internal_port: u16,
+    pub external_port: u16,
+}
+
+impl WorkerNode {
+    pub fn connect_config(&self, database_name: &str) -> Config {
+        let mut config = Config::new();
+
+        config
+            .host(self.host.to_string())
+            .port(self.external_port)
+            .user("postgres")
+            .dbname(database_name)
+            .ssl_mode(tokio_postgres::config::SslMode::Disable);
+
+        config
+    }
+}
+
 pub struct MinervaCluster {
     controller_container: ContainerAsync<GenericImage>,
-    worker_containers: Vec<std::pin::Pin<Box<ContainerAsync<GenericImage>>>>,
+    workers: Vec<std::pin::Pin<Box<WorkerNode>>>,
     pub controller_host: url::Host,
     pub controller_port: u16,
 }
@@ -228,9 +251,6 @@ impl MinervaCluster {
                 )
             })?;
 
-        debug!("Connecting to controller");
-        let mut client = connect_db(controller_host.clone(), controller_port).await;
-
         let coordinator_host = controller_container
             .get_bridge_ip_address()
             .await
@@ -241,28 +261,20 @@ impl MinervaCluster {
                 )
             })?;
 
-        let coordinator_port: i32 = 5432;
+        let postgresql_port: i32 = 5432;
         debug!(
             "Setting Citus coordinator host address: {}:{}",
-            &coordinator_host, &coordinator_port
+            &coordinator_host, &postgresql_port
         );
 
-        client
-            .execute(
-                "SELECT citus_set_coordinator_host($1, $2)",
-                &[&coordinator_host.to_string(), &coordinator_port],
-            )
-            .await
-            .unwrap();
-
-        let mut node_containers = Vec::new();
+        let mut workers = Vec::new();
 
         for i in 1..(config.worker_count + 1) {
-            let name = format!("{}_node{i}", network_name);
+            let container_name = format!("{}_node{i}", network_name);
             let container = create_citus_container(
                 &config.image_name,
                 &config.image_tag,
-                &name,
+                &container_name,
                 None,
                 &config.config_file,
             )
@@ -274,28 +286,39 @@ impl MinervaCluster {
             })?;
 
             let container_address = container.get_bridge_ip_address().await.unwrap();
+            let host = container.get_host().await.unwrap();
+            let postgresql_port = 5432;
 
-            debug!("Adding worker {container_address}");
-
-            sleep(Duration::from_secs(1)).await;
-
-            add_worker(&mut client, container_address, 5432)
+            let external_port = container
+                .get_host_port_ipv4(postgresql_port)
                 .await
-                .expect("Could not connect worker");
+                .map_err(|e| {
+                    crate::error::Error::Runtime(
+                        format!("Could not get coordinator container external port: {e}").into(),
+                    )
+                })?;
 
-            node_containers.push(Box::pin(container));
+            let worker = WorkerNode {
+                container,
+                internal_address: container_address,
+                host,
+                internal_port: postgresql_port,
+                external_port,
+            };
+
+            workers.push(Box::pin(worker));
         }
 
         Ok(MinervaCluster {
             controller_container,
-            worker_containers: node_containers,
+            workers,
             controller_host,
             controller_port,
         })
     }
 
     pub fn size(&self) -> usize {
-        self.worker_containers.len()
+        self.workers.len()
     }
 
     pub async fn connect_to_coordinator(&self) -> Client {
@@ -314,7 +337,7 @@ impl MinervaCluster {
     }
 
     pub async fn connect_to_db(&self, database_name: &str) -> Result<Client, crate::error::Error> {
-        connect_to_db(&self.connect_config(database_name)).await
+        connect_to_db(&self.connect_config(database_name), 3).await
     }
 
     pub fn connect_config(&self, database_name: &str) -> Config {
@@ -332,12 +355,74 @@ impl MinervaCluster {
 
     pub async fn create_db(&self) -> Result<TestDatabase, crate::error::Error> {
         let database_name = generate_name(16);
-        let mut client = self.connect_to_coordinator().await;
-        create_database(&mut client, &database_name).await?;
+
+        for worker in &self.workers {
+            {
+                info!(
+                    "Connecting to worker '{}:{}'",
+                    worker.internal_address, worker.external_port
+                );
+                let config = worker.connect_config("postgres");
+                let worker_client = connect_to_db(&config, 3).await?;
+                create_database(&worker_client, &database_name).await?;
+
+                info!("Created database '{database_name}' on worker node");
+            }
+
+            let worker_client_db = connect_to_db(&worker.connect_config(&database_name), 3).await?;
+
+            worker_client_db
+                .execute("CREATE EXTENSION citus", &[])
+                .await?;
+
+            info!("Created Citus extension on worker node in database '{database_name}'");
+        }
+
+        let client = self.connect_to_coordinator().await;
+        create_database(&client, &database_name).await?;
+
+        let connect_config = self.connect_config(&database_name);
+
+        debug!("Connecting to new database '{database_name}'");
+
+        let mut db_client = connect_to_db(&connect_config, 3).await?;
+
+        db_client.execute("CREATE EXTENSION citus", &[]).await?;
+
+        let coordinator_host = self
+            .controller_container
+            .get_bridge_ip_address()
+            .await
+            .map_err(|e| {
+                crate::error::Error::Runtime(
+                    format!("Could not get coordinator container internal host address: {e}")
+                        .into(),
+                )
+            })?;
+
+        let postgresql_port: i32 = 5432;
+
+        db_client
+            .execute(
+                "SELECT citus_set_coordinator_host($1, $2)",
+                &[&coordinator_host.to_string(), &postgresql_port],
+            )
+            .await
+            .unwrap();
+
+        for worker in &self.workers {
+            add_worker(
+                &mut db_client,
+                worker.internal_address,
+                worker.internal_port,
+            )
+            .await
+            .expect("Could not connect worker");
+        }
 
         Ok(TestDatabase {
             name: database_name.clone(),
-            connect_config: self.connect_config(&database_name),
+            connect_config,
         })
     }
 }

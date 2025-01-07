@@ -34,14 +34,12 @@ impl Cmd for InitializeOpt {
 
         if let Some(database_name) = &self.database_name {
             // A new database must be created
-            create_database(&mut client, database_name)
-                .await
-                .map_err(|e| {
-                    Error::Database(minerva::error::DatabaseError::from_msg(format!(
-                        "Could not create database '{}': {e}",
-                        &database_name
-                    )))
-                })?;
+            create_database(&client, database_name).await.map_err(|e| {
+                Error::Database(minerva::error::DatabaseError::from_msg(format!(
+                    "Could not create database '{}': {e}",
+                    &database_name
+                )))
+            })?;
 
             // Let connection use newly created database, because the current connection is to a
             // different database.

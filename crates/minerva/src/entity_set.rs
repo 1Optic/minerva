@@ -11,7 +11,6 @@ use super::change::{Change, ChangeResult};
 use super::error::{DatabaseError, DatabaseErrorKind, Error, RuntimeError};
 
 type PostgresName = String;
-use log::info;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntitySet {
@@ -325,72 +324,59 @@ impl NewEntitySet {
         .await
         .map_err(|_| EntitySetError::IncorrectEntityType(self.entity_type.to_string()))?;
 
-        match row.get(0) {
-            true => Err(EntitySetError::ExistingEntitySet(
+        if row.get(0) {
+            return Err(EntitySetError::ExistingEntitySet(
                 self.name.clone(),
                 self.owner.clone(),
-            )),
-            false => match self.entities.len() {
-                0 => Err(EntitySetError::EmptyEntitySet),
-                _ => {
-                    let entitieslist = self.entities.join("', '");
-                    let query = format!(
-                        concat!(
-                            "SELECT relation_directory.create_entity_set_guarded(",
-                            "$1, $2, $3, $4, $5, ARRAY['{}'])"
-                        ),
-                        entitieslist
-                    );
+            ));
+        }
 
-                    info!(
-                        "SELECT relation_directory.create_entity_set_guarded('{}', '{}', '{}', '{}', '{}', ARRAY['{}'])",                       
-                        &self.name,
-                        &self.group,
-                        &self.entity_type,
-                        &self.owner,
-                        &self.description,
-                        entitieslist
-                    );
+        if self.entities.is_empty() {
+            return Err(EntitySetError::EmptyEntitySet);
+        }
 
-                    let row = conn
-                        .query_one(
-                            &query,
-                            &[
-                                &self.name,
-                                &self.group,
-                                &self.entity_type,
-                                &self.owner,
-                                &self.description,
-                            ],
-                        )
-                        .await
-                        .map_err(|e| e.to_string())?;
+        let query = concat!(
+            "SELECT relation_directory.create_entity_set_guarded(",
+            "$1, $2, $3, $4, $5, $6)"
+        );
 
-                    let missing_entities: Vec<String> = row.get(0);
+        let row = conn
+            .query_one(
+                query,
+                &[
+                    &self.name,
+                    &self.group,
+                    &self.entity_type,
+                    &self.owner,
+                    &self.description,
+                    &self.entities,
+                ],
+            )
+            .await
+            .map_err(|e| e.to_string())?;
 
-                    if missing_entities.is_empty() {
-                        let iddata = conn.query_one(
-                            "SELECT entity_id, first_appearance, modified FROM attribute.minerva_entity_set es WHERE name = $1 AND owner = $2",
-                                &[&self.name, &self.owner,])
-                            .await
-                            .map_err(|e| EntitySetError::DatabaseError(DatabaseError{msg: e.to_string(), kind: DatabaseErrorKind::Default}))?;
-                        let created_entity_set = EntitySet {
-                            id: iddata.get(0),
-                            name: self.name.clone(),
-                            group: self.group.clone(),
-                            entity_type: self.entity_type.clone(),
-                            owner: self.owner.clone(),
-                            description: self.description.clone(),
-                            entities: self.entities.to_vec(),
-                            created: iddata.get(1),
-                            modified: iddata.get(2),
-                        };
-                        Ok(created_entity_set)
-                    } else {
-                        Err(EntitySetError::MissingEntities(missing_entities))
-                    }
-                }
-            },
+        let missing_entities: Vec<String> = row.get(0);
+
+        if missing_entities.is_empty() {
+            let iddata = conn.query_one(
+                "SELECT entity_id, first_appearance, modified FROM attribute.minerva_entity_set es WHERE name = $1 AND owner = $2",
+                    &[&self.name, &self.owner,])
+                .await
+                .map_err(|e| EntitySetError::DatabaseError(DatabaseError{msg: e.to_string(), kind: DatabaseErrorKind::Default}))?;
+            let created_entity_set = EntitySet {
+                id: iddata.get(0),
+                name: self.name.clone(),
+                group: self.group.clone(),
+                entity_type: self.entity_type.clone(),
+                owner: self.owner.clone(),
+                description: self.description.clone(),
+                entities: self.entities.to_vec(),
+                created: iddata.get(1),
+                modified: iddata.get(2),
+            };
+            Ok(created_entity_set)
+        } else {
+            Err(EntitySetError::MissingEntities(missing_entities))
         }
     }
 }
