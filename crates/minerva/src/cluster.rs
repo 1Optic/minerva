@@ -186,7 +186,8 @@ impl Default for MinervaClusterConfig {
 
 pub struct WorkerNode {
     pub container: ContainerAsync<GenericImage>,
-    pub address: IpAddr,
+    pub internal_address: IpAddr,
+    pub host: url::Host,
     pub internal_port: u16,
     pub external_port: u16,
 }
@@ -196,7 +197,7 @@ impl WorkerNode {
         let mut config = Config::new();
 
         config
-            .host("127.0.0.1".to_string())
+            .host(self.host.to_string())
             .port(self.external_port)
             .user("postgres")
             .dbname(database_name)
@@ -285,6 +286,7 @@ impl MinervaCluster {
             })?;
 
             let container_address = container.get_bridge_ip_address().await.unwrap();
+            let host = container.get_host().await.unwrap();
             let postgresql_port = 5432;
 
             let external_port = container
@@ -298,7 +300,8 @@ impl MinervaCluster {
 
             let worker = WorkerNode {
                 container,
-                address: container_address,
+                internal_address: container_address,
+                host,
                 internal_port: postgresql_port,
                 external_port,
             };
@@ -357,7 +360,7 @@ impl MinervaCluster {
             {
                 info!(
                     "Connecting to worker '{}:{}'",
-                    worker.address, worker.external_port
+                    worker.internal_address, worker.external_port
                 );
                 let config = worker.connect_config("postgres");
                 let worker_client = connect_to_db(&config, 3).await?;
@@ -408,7 +411,7 @@ impl MinervaCluster {
             .unwrap();
 
         for worker in &self.workers {
-            add_worker(&mut db_client, worker.address, worker.internal_port)
+            add_worker(&mut db_client, worker.internal_address, worker.internal_port)
                 .await
                 .expect("Could not connect worker");
         }
