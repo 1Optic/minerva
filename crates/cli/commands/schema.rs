@@ -23,6 +23,8 @@ impl Cmd for SchemaMigrate {
                 println!("{} - {}", version, name);
             }
         } else {
+            let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
+            client.execute(query, &[]).await?;
             migrate(&mut client).await?;
         }
 

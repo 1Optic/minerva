@@ -15,7 +15,7 @@ use minerva::cluster::{
 };
 use minerva::error::Error;
 use minerva::instance::MinervaInstance;
-use minerva::schema::{create_schema, migrate};
+use minerva::schema::migrate;
 use minerva::trend_store::create_partitions;
 
 use super::common::{Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT};
@@ -31,6 +31,8 @@ pub struct StartOpt {
         help = "Minerva instance definition root directory"
     )]
     instance_root: Option<PathBuf>,
+    #[arg(long, help = "skip Minerva schema initialization", action)]
+    no_schema_initialization: bool,
 }
 
 #[async_trait]
@@ -72,8 +74,12 @@ impl Cmd for StartOpt {
             //client.execute(query, &[]).await?;
 
             //create_schema(&mut client).await?;
-            migrate(&mut client).await?;
-            info!("Created Minerva schema");
+            if !self.no_schema_initialization {
+                let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
+                client.execute(query, &[]).await?;
+                migrate(&mut client).await?;
+                info!("Created Minerva schema");
+            }
 
             let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {
                 Some(root) => Some(root.clone()),

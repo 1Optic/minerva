@@ -61,6 +61,7 @@ pub async fn migrate(client: &mut Client) -> Result<(), String> {
     migrations.sort_by(|a, b| (*a).cmp(*b));
 
     for migration in migrations.iter() {
+        println!("Migrating '{}'", migration.name());
         if let Some(sql) = migration.sql() {
             client.batch_execute(sql).await.unwrap();
         }
