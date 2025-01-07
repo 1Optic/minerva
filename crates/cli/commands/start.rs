@@ -15,7 +15,7 @@ use minerva::cluster::{
 };
 use minerva::error::Error;
 use minerva::instance::MinervaInstance;
-use minerva::schema::create_schema;
+use minerva::schema::{create_schema, migrate};
 use minerva::trend_store::create_partitions;
 
 use super::common::{Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT};
@@ -51,6 +51,8 @@ impl Cmd for StartOpt {
 
         let cluster = MinervaCluster::start(&cluster_config).await?;
 
+        info!("Started containers");
+
         let test_database = cluster.create_db().await?;
 
         info!("Connecting to controller");
@@ -62,10 +64,15 @@ impl Cmd for StartOpt {
 
             env.push(("PGSSLMODE".to_string(), "disable".to_string()));
 
-            let query = format!("SET citus.shard_count = {};", cluster.size());
+            //let query = format!("SET citus.shard_count = {};", cluster.size());
 
-            client.execute(&query, &[]).await?;
-            create_schema(&mut client).await?;
+            //client.execute(&query, &[]).await?;
+
+            //let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
+            //client.execute(query, &[]).await?;
+
+            //create_schema(&mut client).await?;
+            migrate(&mut client).await?;
             info!("Created Minerva schema");
 
             let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {

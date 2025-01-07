@@ -1,4 +1,4 @@
-use refinery::embed_migrations;
+use refinery::{embed_migrations, Migration};
 use tokio_postgres::Client;
 
 embed_migrations!("migrations");
@@ -53,19 +53,16 @@ pub async fn get_pending_migrations(client: &mut Client) -> Result<Vec<(u32, Str
 }
 
 pub async fn migrate(client: &mut Client) -> Result<(), String> {
-    let report = migrations::runner()
-        .set_migration_table_name(SCHEMA_HISTORY_TABLE)
-        .run_async(client)
-        .await
-        .map_err(|e| format!("Could not migrate database schema: {e}"))?;
+    let mut runner = migrations::runner();
+    runner.set_migration_table_name(SCHEMA_HISTORY_TABLE);
 
-    let migrations = report.applied_migrations();
+    let mut migrations: Vec<&Migration> = runner.get_migrations().iter().collect();
 
-    if migrations.is_empty() {
-        println!("Already up-to-date");
-    } else {
-        for m in migrations {
-            println!("Applied: {}", m);
+    migrations.sort_by(|a, b| (*a).cmp(*b));
+
+    for migration in migrations.iter() {
+        if let Some(sql) = migration.sql() {
+            client.batch_execute(sql).await.unwrap();
         }
     }
 
