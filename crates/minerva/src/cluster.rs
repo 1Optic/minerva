@@ -411,9 +411,13 @@ impl MinervaCluster {
             .unwrap();
 
         for worker in &self.workers {
-            add_worker(&mut db_client, worker.internal_address, worker.internal_port)
-                .await
-                .expect("Could not connect worker");
+            add_worker(
+                &mut db_client,
+                worker.internal_address,
+                worker.internal_port,
+            )
+            .await
+            .expect("Could not connect worker");
         }
 
         Ok(TestDatabase {
