@@ -112,10 +112,7 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
     Ok(client)
 }
 
-pub async fn create_database<'a>(
-    client: &'a Client,
-    database_name: &str,
-) -> Result<(), String> {
+pub async fn create_database<'a>(client: &'a Client, database_name: &str) -> Result<(), String> {
     let query = format!("CREATE DATABASE \"{database_name}\"");
 
     client

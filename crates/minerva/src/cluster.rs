@@ -366,7 +366,10 @@ impl MinervaCluster {
 
         for worker in &self.workers {
             {
-                info!("Connecting to worker '{}:{}'", worker.address, worker.external_port);
+                info!(
+                    "Connecting to worker '{}:{}'",
+                    worker.address, worker.external_port
+                );
                 let config = worker.connect_config("postgres");
                 let worker_client = connect_to_db(&config).await?;
                 create_database(&worker_client, &database_name).await?;
@@ -376,7 +379,9 @@ impl MinervaCluster {
 
             let worker_client_db = connect_to_db(&worker.connect_config(&database_name)).await?;
 
-            worker_client_db.execute("CREATE EXTENSION citus", &[]).await?;
+            worker_client_db
+                .execute("CREATE EXTENSION citus", &[])
+                .await?;
 
             info!("Created Citus extension on worker node in database '{database_name}'");
         }
@@ -385,14 +390,15 @@ impl MinervaCluster {
         create_database(&client, &database_name).await?;
 
         let connect_config = self.connect_config(&database_name);
-        
+
         debug!("Connecting to new database '{database_name}'");
 
         let mut db_client = connect_to_db(&connect_config).await?;
 
         db_client.execute("CREATE EXTENSION citus", &[]).await?;
 
-        let coordinator_host = self.controller_container
+        let coordinator_host = self
+            .controller_container
             .get_bridge_ip_address()
             .await
             .map_err(|e| {
