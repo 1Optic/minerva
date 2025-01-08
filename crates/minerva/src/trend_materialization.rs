@@ -185,7 +185,9 @@ impl TrendViewMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources).await
+        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources)
+            .await
+            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))
     }
 
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
@@ -499,7 +501,9 @@ impl TrendFunctionMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources).await
+        connect_materialization_sources(client, &self.target_trend_store_part, &self.sources)
+            .await
+            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))
     }
 
     async fn drop_sources<T: GenericClient + Send + Sync>(
@@ -1564,43 +1568,83 @@ pub async fn reset_source_fingerprint<T: GenericClient + Send + Sync>(
 async fn get_trend_store_part_id<T: GenericClient + Send + Sync>(
     client: &mut T,
     name: &str,
-) -> Result<i32, Error> {
+) -> Result<Option<i32>, tokio_postgres::Error> {
     let source_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
 
     let rows = client.query(source_query, &[&name]).await?;
 
     if rows.is_empty() {
-        return Err(Error::Database(DatabaseError::from_msg(format!(
-            "Materialization source '{}' does not exist",
-            name
-        ))));
+        return Ok(None);
+    } else {
+        let trend_store_part_id: i32 = rows[0].get(0);
+
+        Ok(Some(trend_store_part_id))
     }
+}
 
-    let trend_store_part_id: i32 = rows[0].get(0);
+async fn get_materialization_id<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    name: &str,
+) -> Result<Option<i32>, tokio_postgres::Error> {
+    let source_query = concat!(
+        "SELECT m.id ",
+        "FROM trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
+        "ON m.dst_trend_store_part_id = dstp.id ",
+        "WHERE dstp.name = $1"
+    );
 
-    Ok(trend_store_part_id)
+    let rows = client.query(source_query, &[&name]).await?;
+
+    if rows.is_empty() {
+        Ok(None)
+    } else {
+        let trend_store_part_id: i32 = rows[0].get(0);
+
+        Ok(Some(trend_store_part_id))
+    }
+}
+
+#[derive(Error, Debug)]
+enum ConnectMaterializationSourcesError {
+    #[error("No materialization matching target trend store part '{0}'")]
+    NoSuchMaterialization(String),
+    #[error("No such source trend store part '{0}'")]
+    NoSuchSourceTrendStorePart(String),
+    #[error("Unexpected database error: {0}")]
+    Database(#[from] tokio_postgres::Error),
+    #[error("Unexpectedly, no links were inserted")]
+    NoLinkInserted,
 }
 
 async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
     client: &mut T,
     target_trend_store_part_name: &str,
     sources: &[TrendMaterializationSource],
-) -> Result<(), Error> {
+) -> Result<(), ConnectMaterializationSourcesError> {
+    let materialization_id = get_materialization_id(client, target_trend_store_part_name)
+        .await?
+        .ok_or(ConnectMaterializationSourcesError::NoSuchMaterialization(
+            target_trend_store_part_name.to_string(),
+        ))?;
+
     let query = concat!(
         "INSERT INTO trend_directory.materialization_trend_store_link(materialization_id, trend_store_part_id, timestamp_mapping_func) ",
-        "SELECT m.id, $3, $1::regprocedure ",
-        "FROM trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
-        "ON m.dst_trend_store_part_id = dstp.id ",
-        "WHERE dstp.name = $2"
+        "VALUES ($2, $3, $1::regprocedure)",
     );
 
     let statement = client
-        .prepare_typed(query, &[Type::TEXT, Type::TEXT, Type::INT4])
+        .prepare_typed(query, &[Type::TEXT, Type::INT4, Type::INT4])
         .await?;
 
     for source in sources {
         let source_trend_store_part_id: i32 =
-            get_trend_store_part_id(client, &source.trend_store_part).await?;
+            get_trend_store_part_id(client, &source.trend_store_part)
+                .await?
+                .ok_or(
+                    ConnectMaterializationSourcesError::NoSuchSourceTrendStorePart(
+                        source.trend_store_part.clone(),
+                    ),
+                )?;
 
         let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
 
@@ -1609,22 +1653,14 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
                 &statement,
                 &[
                     &mapping_function,
-                    &target_trend_store_part_name,
+                    &materialization_id,
                     &source_trend_store_part_id,
                 ],
             )
-            .await
-            .map_err(|e| {
-                Error::Database(DatabaseError::from_msg(format!(
-                    "Error connecting sources: {e}"
-                )))
-            })?;
+            .await?;
 
         if insert_count == 0 {
-            return Err(Error::Runtime(RuntimeError::from_msg(format!(
-                "Unexpectedly no link was created for source '{}'",
-                source.trend_store_part
-            ))));
+            return Err(ConnectMaterializationSourcesError::NoLinkInserted);
         }
     }
 

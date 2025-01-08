@@ -331,7 +331,7 @@ async fn initialize_attribute_stores(
             }
             Err(e) => {
                 tx.rollback().await?;
-                println!("Error creating attribute store: {e}");
+                println!("Error creating attribute store {}: {e}", attribute_store);
             }
         }
     }
