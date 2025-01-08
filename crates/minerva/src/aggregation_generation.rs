@@ -32,19 +32,18 @@ pub enum AggregationGenerationError {
 pub fn generate_all_standard_aggregations(
     instance_root: &Path,
 ) -> Result<(), AggregationGenerationError> {
-    let instance = MinervaInstance::load_from(instance_root);
+    let mut instance = MinervaInstance::load_from(instance_root);
 
     let aggregation_hints = load_aggregation_hints(instance_root)?;
 
-    for trend_store in &instance.trend_stores {
+    for trend_store in instance.trend_stores.clone() {
         if let Some(title) = &trend_store.title {
             if title.to_lowercase().contains("raw") {
                 // For now, we determine the raw data trend stores based on the title, but this
                 // should be done based on the fact that there is no materialization as source.
                 generate_standard_aggregations(
-                    &instance,
-                    trend_store.clone(),
-                    &instance.relations,
+                    &mut instance,
+                    trend_store,
                     &aggregation_hints,
                 )?;
             }
@@ -151,12 +150,11 @@ fn load_aggregation_hints(
 }
 
 fn generate_standard_aggregations(
-    minerva_instance: &MinervaInstance,
+    minerva_instance: &mut MinervaInstance,
     trend_store: TrendStore,
-    relations: &[Relation],
     aggregation_hints: &[AggregationHint],
 ) -> Result<(), AggregationGenerationError> {
-    let entity_relations: Vec<(&Relation, String)> = relations
+    let entity_relations: Vec<(&Relation, String)> = minerva_instance.relations
         .iter()
         .filter_map(|r| {
             // Currently only by convention, the relation name describes source and target entity
@@ -237,6 +235,8 @@ fn generate_standard_aggregations(
         )
         .map_err(AggregationGenerationError::TimeAggregation)?;
 
+        minerva_instance.trend_stores.push(target_trend_store.clone());
+
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
                 minerva_instance,
@@ -308,11 +308,13 @@ fn write_time_aggregations(
         .trend_stores
         .iter()
         .find(|trend_store| {
+            let name = trend_store_name(trend_store).unwrap();
+
             aggregation
                 .source
-                .eq(&trend_store_name(trend_store).unwrap())
+                .eq(&name)
         })
-        .unwrap();
+        .ok_or(format!("No trend store matching name '{}'", aggregation.source))?;
 
     for agg_part in &aggregation.parts {
         let source_part = trend_store
@@ -1049,7 +1051,7 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
     let standard_aggregations = GRANULARITY_SUFFIX_MAPPING.get_or_init(|| {
         [
             (Duration::from_secs(900), "15m".to_string()),
-            (Duration::from_secs(3600), "1d".to_string()),
+            (Duration::from_secs(3600), "1h".to_string()),
             (humantime::parse_duration("1d").unwrap(), "1d".to_string()),
             (humantime::parse_duration("1w").unwrap(), "1w".to_string()),
             (
