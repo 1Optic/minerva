@@ -61,20 +61,25 @@ impl Cmd for InitializeOpt {
         let mut cluster_config_path = self.instance_root.clone();
 
         cluster_config_path.push("cluster_config.yaml");
-        let cluster_config = match File::open(&cluster_config_path) {
-            Ok(cluster_config_file) => {
-                let reader = BufReader::new(cluster_config_file);
-                let cluster_config: ClusterConfig = serde_yaml::from_reader(reader).unwrap();
 
-                Some(cluster_config)
+        let cluster_config = if cluster_config_path.is_file() {
+            match File::open(&cluster_config_path) {
+                Ok(cluster_config_file) => {
+                    let reader = BufReader::new(cluster_config_file);
+                    let cluster_config: ClusterConfig = serde_yaml::from_reader(reader).unwrap();
+
+                    Some(cluster_config)
+                }
+                Err(e) => {
+                    println!(
+                        "Could not open cluster config file'{}': {e}",
+                        cluster_config_path.display()
+                    );
+                    None
+                }
             }
-            Err(e) => {
-                println!(
-                    "Could not open cluster config file'{}': {e}",
-                    cluster_config_path.display()
-                );
-                None
-            }
+        } else {
+            None
         };
 
         if let Some(c) = cluster_config {
