@@ -1,5 +1,6 @@
 pub const DEFAULT_CITUS_IMAGE: &str = "citusdata/citus";
 pub const DEFAULT_CITUS_TAG: &str = "12.1.6-alpine";
+pub const DEFAULT_POSTGRES_USER: &str = "postgres";
 
 use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
@@ -99,7 +100,7 @@ pub async fn connect_db(host: url::Host, port: u16) -> Client {
     let config = config
         .host(host.to_string().as_str())
         .port(port)
-        .user("postgres")
+        .user(DEFAULT_POSTGRES_USER)
         .password("password");
 
     debug!("Connecting to database host '{}' port '{}'", host, port);
@@ -199,7 +200,7 @@ impl WorkerNode {
         config
             .host(self.host.to_string())
             .port(self.external_port)
-            .user("postgres")
+            .user(DEFAULT_POSTGRES_USER)
             .dbname(database_name)
             .ssl_mode(tokio_postgres::config::SslMode::Disable);
 
@@ -346,7 +347,7 @@ impl MinervaCluster {
         config
             .host(self.controller_host.to_string())
             .port(self.controller_port)
-            .user("postgres")
+            .user(DEFAULT_POSTGRES_USER)
             .dbname(database_name)
             .ssl_mode(tokio_postgres::config::SslMode::Disable);
 
@@ -362,7 +363,7 @@ impl MinervaCluster {
                     "Connecting to worker '{}:{}'",
                     worker.internal_address, worker.external_port
                 );
-                let config = worker.connect_config("postgres");
+                let config = worker.connect_config(DEFAULT_POSTGRES_USER);
                 let worker_client = connect_to_db(&config, 3).await?;
                 create_database(&worker_client, &database_name).await?;
 
