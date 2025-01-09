@@ -62,7 +62,7 @@ impl Change for AddVirtualEntity {
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
-                    "Error creating relation '{}': {e}",
+                    "Error creating virtual entity '{}': {e}",
                     &self.virtual_entity.name
                 ))
             })?;
