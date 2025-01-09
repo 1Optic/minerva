@@ -115,9 +115,33 @@ impl MinervaInstance {
 
         initialize_trend_stores(client, &self.trend_stores).await?;
 
+        if let Some(instance_root) = &self.instance_root {
+            initialize_custom(
+                client,
+                &format!(
+                    "{}/custom/pre-notification-init/**/*",
+                    instance_root.to_string_lossy()
+                ),
+                env,
+            )
+            .await
+        }
+
         initialize_notification_stores(client, &self.notification_stores).await?;
 
         initialize_virtual_entities(client, &self.virtual_entities).await?;
+
+        if let Some(instance_root) = &self.instance_root {
+            initialize_custom(
+                client,
+                &format!(
+                    "{}/custom/pre-relation-init/**/*",
+                    instance_root.to_string_lossy()
+                ),
+                env,
+            )
+            .await
+        }
 
         initialize_relations(client, &self.relations).await?;
 
@@ -534,7 +558,7 @@ async fn initialize_virtual_entities(
             }
             Err(e) => {
                 tx.rollback().await?;
-                print!("Error creating virtual entity: {e}")
+                println!("{e}")
             }
         }
     }
@@ -555,7 +579,7 @@ async fn initialize_relations(client: &mut Client, relations: &Vec<Relation>) ->
             }
             Err(e) => {
                 tx.rollback().await?;
-                print!("{e}")
+                println!("{e}")
             }
         }
     }

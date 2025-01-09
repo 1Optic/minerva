@@ -39,7 +39,6 @@ pub fn generate_all_standard_aggregations(
     for trend_store in instance.trend_stores.clone() {
         if let Some(title) = &trend_store.title {
             if title.to_lowercase().contains("raw") {
-                println!("--> FROM '{}'", trend_store);
                 // For now, we determine the raw data trend stores based on the title, but this
                 // should be done based on the fact that there is no materialization as source.
                 generate_standard_aggregations(&mut instance, trend_store, &aggregation_hints)?;
@@ -174,7 +173,6 @@ fn generate_standard_aggregations(
         .collect();
 
     for (relation, target_type) in &entity_relations {
-        println!("REL: {} - {}", relation, target_type);
         build_entity_aggregation(
             minerva_instance,
             &trend_store,
@@ -226,7 +224,6 @@ fn generate_standard_aggregations(
     let aggregations = &standard_aggregations[&trend_store.granularity];
 
     for (source_granularity, target_granularity) in aggregations {
-        println!("AGG {:?} -> {:?}", source_granularity, target_granularity);
         let target_trend_store = build_time_aggregation(
             minerva_instance,
             &trend_store,
@@ -1138,9 +1135,11 @@ fn translate_entity_aggregation_part_name(
             let tail = &captures[3];
 
             match aggregation_prefix {
-                Some(prefix) => Ok(format!(
+                Some(prefix) => {
+                    Ok(format!(
                     "{data_source}_{target_entity_type}_{prefix}_{tail}"
-                )),
+                    ))
+                },
                 None => Ok(format!("{data_source}_{target_entity_type}_{tail}")),
             }
         }
