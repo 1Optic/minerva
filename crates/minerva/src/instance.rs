@@ -331,7 +331,7 @@ async fn initialize_attribute_stores(
             }
             Err(e) => {
                 tx.rollback().await?;
-                println!("Error creating attribute store {}: {e}", attribute_store);
+                println!("{e}");
             }
         }
     }
@@ -555,7 +555,7 @@ async fn initialize_relations(client: &mut Client, relations: &Vec<Relation>) ->
             }
             Err(e) => {
                 tx.rollback().await?;
-                print!("Error creating relation: {e}")
+                print!("{e}")
             }
         }
     }
@@ -579,7 +579,7 @@ async fn initialize_trend_materializations(
             }
             Err(e) => {
                 tx.rollback().await?;
-                println!("Error creating trend materialization: {e}")
+                println!("{e}")
             }
         }
     }
