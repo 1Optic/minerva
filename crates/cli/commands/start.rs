@@ -45,10 +45,9 @@ impl Cmd for StartOpt {
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
         let cluster_config = MinervaClusterConfig {
-            image_name: DEFAULT_CITUS_IMAGE.to_string(),
-            image_tag: DEFAULT_CITUS_TAG.to_string(),
             config_file,
             worker_count: node_count,
+            ..Default::default()
         };
 
         let cluster = MinervaCluster::start(&cluster_config).await?;
