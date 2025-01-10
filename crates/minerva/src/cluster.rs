@@ -167,9 +167,56 @@ impl TestDatabase {
     }
 }
 
-pub struct MinervaClusterConfig {
+pub struct ImageRef {
     pub image_name: String,
     pub image_tag: String,
+}
+
+#[async_trait::async_trait]
+pub trait ImageProvider {
+    async fn image(&self) -> ImageRef;
+}
+
+pub struct FixedImageProvider {
+    pub image_name: String,
+    pub image_tag: String,
+}
+
+#[async_trait::async_trait]
+impl ImageProvider for FixedImageProvider {
+    async fn image(&self) -> ImageRef {
+        ImageRef {
+            image_name: self.image_name.clone(),
+            image_tag: self.image_tag.clone(),
+        }
+    }
+}
+
+impl Default for FixedImageProvider {
+    fn default() -> Self {
+        FixedImageProvider {
+            image_name: DEFAULT_CITUS_IMAGE.to_string(),
+            image_tag: DEFAULT_CITUS_TAG.to_string(),
+        }
+    }
+}
+
+pub struct BuildImageProvider {
+    pub definition_file: PathBuf,
+}
+
+#[async_trait::async_trait]
+impl ImageProvider for BuildImageProvider {
+    async fn image(&self) -> ImageRef {
+        ImageRef {
+            image_name: DEFAULT_CITUS_IMAGE.to_string(),
+            image_tag: DEFAULT_CITUS_TAG.to_string(),
+        }
+    } 
+}
+
+pub struct MinervaClusterConfig {
+    pub image_provider: Box<dyn ImageProvider>,
     pub config_file: PathBuf,
     pub worker_count: u8,
 }
@@ -177,8 +224,7 @@ pub struct MinervaClusterConfig {
 impl Default for MinervaClusterConfig {
     fn default() -> Self {
         MinervaClusterConfig {
-            image_name: DEFAULT_CITUS_IMAGE.to_string(),
-            image_tag: DEFAULT_CITUS_TAG.to_string(),
+            image_provider: Box::new(FixedImageProvider::default()),
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
             worker_count: 3,
         }
@@ -221,9 +267,11 @@ impl MinervaCluster {
     ) -> Result<MinervaCluster, crate::error::Error> {
         let network_name = generate_name(6);
 
+        let image_ref = config.image_provider.image().await;
+
         let controller_container = create_citus_container(
-            &config.image_name,
-            &config.image_tag,
+            &image_ref.image_name,
+            &image_ref.image_name,
             &format!("{}_coordinator", network_name),
             Some(5432),
             &config.config_file,
@@ -270,11 +318,13 @@ impl MinervaCluster {
 
         let mut workers = Vec::new();
 
+        let image_ref = config.image_provider.image().await;
+
         for i in 1..(config.worker_count + 1) {
             let container_name = format!("{}_node{i}", network_name);
             let container = create_citus_container(
-                &config.image_name,
-                &config.image_tag,
+                &image_ref.image_name,
+                &image_ref.image_tag,
                 &container_name,
                 None,
                 &config.config_file,
