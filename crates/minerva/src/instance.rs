@@ -1,11 +1,12 @@
 use std::ffi::OsStr;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use glob::glob;
 
+use serde::{Deserialize, Serialize};
 use tokio_postgres::{Client, GenericClient};
 
 use super::attribute_store::{load_attribute_stores, AddAttributeStore, AttributeStore};
@@ -24,6 +25,46 @@ use super::trend_materialization::{
 use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore};
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
 use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub enum AggregationType {
+    #[serde(rename = "VIEW")]
+    View,
+    #[serde(rename = "VIEW_MATERIALIZATION")]
+    ViewMaterialization,
+    #[serde(rename = "FUNCTION_MATERIALIZATION")]
+    FunctionMaterialization,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct EntityAggregationHint {
+    pub relation: String,
+    pub materialization_type: AggregationType,
+    pub prefix: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InstanceConfig {
+    pub entity_aggregation_hints: Vec<EntityAggregationHint>,
+    pub entity_types: Vec<String>,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum InstanceConfigLoadError {
+    #[error("Could not open file: {0}")]
+    FileOpen(#[from] std::io::Error),
+}
+
+pub fn load_instance_config(
+    instance_root: &Path,
+) -> Result<InstanceConfig, InstanceConfigLoadError> {
+    let config_file_path = PathBuf::from_iter([instance_root, &PathBuf::from("config.json")]);
+    let config_file = std::fs::File::open(config_file_path)?;
+    let reader = BufReader::new(config_file);
+    let image_config: InstanceConfig = serde_json::from_reader(reader).unwrap();
+
+    Ok(image_config)
+}
 
 pub struct MinervaInstance {
     pub instance_root: Option<PathBuf>,
@@ -457,11 +498,11 @@ async fn initialize_trend_stores(
         match change.apply(&mut tx).await {
             Ok(message) => {
                 tx.commit().await?;
-                println!("{change}: {message}");
+                println!("{message}");
             }
             Err(e) => {
                 tx.rollback().await?;
-                println!("Error creating trend store: {e}");
+                println!("{e}");
             }
         }
     }

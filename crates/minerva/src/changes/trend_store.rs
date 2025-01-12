@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use crate::change::{Change, ChangeResult};
 use crate::error::DatabaseError;
 use crate::meas_value::DataType;
+use crate::trend_store::create::create_trend_store;
 use crate::trend_store::{Trend, TrendStore, TrendStorePart};
 
 pub struct RemoveTrends {
@@ -401,29 +402,7 @@ impl fmt::Display for AddTrendStore {
 #[async_trait]
 impl Change for AddTrendStore {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let query = concat!(
-            "SELECT id ",
-            "FROM trend_directory.create_trend_store(",
-            "$1, $2, $3::text::interval, $4::text::interval, ",
-            "$5::trend_directory.trend_store_part_descr[]",
-            ")"
-        );
-
-        let granularity_text = humantime::format_duration(self.trend_store.granularity).to_string();
-        let partition_size_text =
-            humantime::format_duration(self.trend_store.partition_size).to_string();
-
-        client
-            .query_one(
-                query,
-                &[
-                    &self.trend_store.data_source,
-                    &self.trend_store.entity_type,
-                    &granularity_text,
-                    &partition_size_text,
-                    &self.trend_store.parts,
-                ],
-            )
+        create_trend_store(client, &self.trend_store)
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error creating trend store: {e}")))?;
 

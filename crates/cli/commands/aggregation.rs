@@ -3,7 +3,9 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use minerva::aggregation_generation::generate_all_standard_aggregations;
+use minerva::{
+    aggregation_generation::generate_all_standard_aggregations, instance::load_instance_config,
+};
 
 use super::common::{Cmd, CmdResult};
 
@@ -44,7 +46,10 @@ impl Cmd for AggregationGenerate {
             None => std::env::current_dir().unwrap(),
         };
 
-        generate_all_standard_aggregations(&instance_root).map_err(|e| {
+        let instance_config = load_instance_config(&instance_root)
+            .map_err(|e| format!("Could not load instance config: {e}"))?;
+
+        generate_all_standard_aggregations(&instance_root, instance_config).map_err(|e| {
             minerva::error::Error::Runtime(minerva::error::RuntimeError::from_msg(e.to_string()))
         })
     }
