@@ -2,12 +2,16 @@ pub const DEFAULT_CITUS_IMAGE: &str = "citusdata/citus";
 pub const DEFAULT_CITUS_TAG: &str = "12.1.6-alpine";
 pub const DEFAULT_POSTGRES_USER: &str = "postgres";
 
+use std::fmt::Display;
 use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 
+use bollard::image::BuildImageOptions;
+use bollard::Docker;
 use log::{debug, error, info};
 
+use futures_util::StreamExt;
 use rand::distributions::{Alphanumeric, DistString};
 
 use tokio::io::AsyncBufReadExt;
@@ -27,15 +31,15 @@ pub fn generate_name(len: usize) -> String {
 }
 
 pub fn create_citus_container(
-    image_name: &str,
-    image_tag: &str,
+    image_ref: &ImageRef,
     name: &str,
     exposed_port: Option<u16>,
     config_file: &Path,
 ) -> ContainerRequest<GenericImage> {
-    let image = GenericImage::new(image_name, image_tag).with_wait_for(WaitFor::message_on_stdout(
-        "PostgreSQL init process complete; ready for start up.",
-    ));
+    let image = GenericImage::new(image_ref.image_name.clone(), image_ref.image_tag.clone())
+        .with_wait_for(WaitFor::message_on_stdout(
+            "PostgreSQL init process complete; ready for start up.",
+        ));
 
     let image = match exposed_port {
         Some(port) => image.with_exposed_port(ContainerPort::Tcp(port)),
@@ -172,6 +176,12 @@ pub struct ImageRef {
     pub image_tag: String,
 }
 
+impl Display for ImageRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.image_name, self.image_tag)
+    }
+}
+
 #[async_trait::async_trait]
 pub trait ImageProvider {
     async fn image(&self) -> ImageRef;
@@ -203,20 +213,50 @@ impl Default for FixedImageProvider {
 
 pub struct BuildImageProvider {
     pub definition_file: PathBuf,
+    pub image_name: String,
+    pub image_tag: String,
 }
 
 #[async_trait::async_trait]
 impl ImageProvider for BuildImageProvider {
     async fn image(&self) -> ImageRef {
-        ImageRef {
-            image_name: DEFAULT_CITUS_IMAGE.to_string(),
-            image_tag: DEFAULT_CITUS_TAG.to_string(),
+        let image_ref = ImageRef {
+            image_name: self.image_name.clone(),
+            image_tag: self.image_tag.clone(),
+        };
+        let t = image_ref.to_string();
+        let docker = Docker::connect_with_socket_defaults().unwrap();
+
+        let build_image_options = BuildImageOptions {
+            dockerfile: "docker-image/Dockerfile",
+            t: &t,
+            ..Default::default()
+        };
+
+        let contents: Vec<u8> = std::fs::read(&self.definition_file).unwrap();
+
+        let mut image_build_stream =
+            docker.build_image(build_image_options, None, Some(contents.into()));
+
+        while let Some(msg) = image_build_stream.next().await {
+            match msg {
+                Err(e) => {
+                    error!("{e}");
+                }
+                Ok(build_info) => {
+                    if let Some(text) = build_info.stream {
+                        info!("{text}");
+                    }
+                }
+            }
         }
-    } 
+
+        image_ref
+    }
 }
 
 pub struct MinervaClusterConfig {
-    pub image_provider: Box<dyn ImageProvider>,
+    pub image_provider: Box<dyn ImageProvider + Sync + Send>,
     pub config_file: PathBuf,
     pub worker_count: u8,
 }
@@ -270,8 +310,7 @@ impl MinervaCluster {
         let image_ref = config.image_provider.image().await;
 
         let controller_container = create_citus_container(
-            &image_ref.image_name,
-            &image_ref.image_name,
+            &image_ref,
             &format!("{}_coordinator", network_name),
             Some(5432),
             &config.config_file,
@@ -281,7 +320,11 @@ impl MinervaCluster {
         .await
         .map_err(|e| {
             crate::error::Error::Runtime(
-                format!("Could not create coordinator container: {e}").into(),
+                format!(
+                    "Could not create coordinator container of image '{}': {e}",
+                    image_ref
+                )
+                .into(),
             )
         })?;
 
@@ -322,19 +365,14 @@ impl MinervaCluster {
 
         for i in 1..(config.worker_count + 1) {
             let container_name = format!("{}_node{i}", network_name);
-            let container = create_citus_container(
-                &image_ref.image_name,
-                &image_ref.image_tag,
-                &container_name,
-                None,
-                &config.config_file,
-            )
-            .with_network(network_name.clone())
-            .start()
-            .await
-            .map_err(|e| {
-                Error::Runtime(format!("Could not start worker node container: {e}").into())
-            })?;
+            let container =
+                create_citus_container(&image_ref, &container_name, None, &config.config_file)
+                    .with_network(network_name.clone())
+                    .start()
+                    .await
+                    .map_err(|e| {
+                        Error::Runtime(format!("Could not start worker node container: {e}").into())
+                    })?;
 
             let container_address = container.get_bridge_ip_address().await.unwrap();
             let host = container.get_host().await.unwrap();
