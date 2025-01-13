@@ -75,7 +75,9 @@ impl fmt::Display for AddRelation {
 #[async_trait]
 impl Change for AddRelation {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_relation(client, &self.relation).await.map_err(|e| format!("Could not create relation '{}': {e}", self.relation.name))?;
+        create_relation(client, &self.relation)
+            .await
+            .map_err(|e| format!("Could not create relation '{}': {e}", self.relation.name))?;
 
         Ok(format!("Added relation '{}'", &self.relation))
     }
@@ -181,10 +183,9 @@ pub async fn create_relation<T: GenericClient>(
         "CREATE TABLE relation.\"{}\"(source_id integer, target_id integer)",
         relation.name
     );
-    client
-        .query(&query, &[])
-        .await
-        .map_err(|e| CreateRelationError::Database(format!("Error creating relation table: {e}")))?;
+    client.query(&query, &[]).await.map_err(|e| {
+        CreateRelationError::Database(format!("Error creating relation table: {e}"))
+    })?;
 
     let query = format!(
         "CREATE VIEW relation_def.\"{}\" AS {}",
@@ -205,10 +206,7 @@ pub async fn create_relation<T: GenericClient>(
         CreateRelationError::Database(format!("Error creating index on relation table: {e}"))
     })?;
 
-    let query = format!(
-        "CREATE INDEX ON relation.\"{}\"(target_id)",
-        relation.name
-    );
+    let query = format!("CREATE INDEX ON relation.\"{}\"(target_id)", relation.name);
 
     client.query(&query, &[]).await.map_err(|e| {
         CreateRelationError::Database(format!("Error creating index on relation table: {e}"))

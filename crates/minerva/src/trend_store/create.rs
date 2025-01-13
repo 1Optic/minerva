@@ -81,9 +81,10 @@ pub async fn create_trend_store<T: GenericClient>(
 pub async fn create_data_source<T: GenericClient>(
     client: &mut T,
     name: &str,
-    description: &str
+    description: &str,
 ) -> Result<i32, CreateTrendStoreError> {
-    let create_data_source_query = "INSERT INTO directory.data_source(name, description) VALUES ($1, $2) RETURNING id";
+    let create_data_source_query =
+        "INSERT INTO directory.data_source(name, description) VALUES ($1, $2) RETURNING id";
 
     let rows = client
         .query(create_data_source_query, &[&name, &description])
@@ -95,7 +96,7 @@ pub async fn create_data_source<T: GenericClient>(
 pub async fn create_entity_type<T: GenericClient>(
     client: &mut T,
     name: &str,
-    description: &str
+    description: &str,
 ) -> Result<i32, CreateTrendStoreError> {
     let create_entity_type_query =
         "INSERT INTO directory.entity_type(name, description) VALUES ($1, $2) RETURNING id";
@@ -106,33 +107,23 @@ pub async fn create_entity_type<T: GenericClient>(
 
     let id: i32 = rows.first().unwrap().get(0);
 
-    let create_entity_table_query = "SELECT entity.create_entity_table(entity_type) FROM directory.entity_type WHERE name = $1";
-    client
-        .execute(create_entity_table_query, &[&name])
-        .await?;
+    let create_entity_table_query =
+        "SELECT entity.create_entity_table(entity_type) FROM directory.entity_type WHERE name = $1";
+    client.execute(create_entity_table_query, &[&name]).await?;
 
     let create_get_entity_function_query = "SELECT entity.create_get_entity_function(entity_type) FROM directory.entity_type WHERE name = $1";
     client
-        .execute(
-            create_get_entity_function_query,
-            &[&name],
-        )
+        .execute(create_get_entity_function_query, &[&name])
         .await?;
 
     let create_create_entity_function_query = "SELECT entity.create_create_entity_function(entity_type) FROM directory.entity_type WHERE name = $1";
     client
-        .execute(
-            create_create_entity_function_query,
-            &[&name],
-        )
+        .execute(create_create_entity_function_query, &[&name])
         .await?;
 
     let create_create_to_entity_function_query = "SELECT entity.create_to_entity_function(entity_type) FROM directory.entity_type WHERE name = $1";
     client
-        .execute(
-            create_create_to_entity_function_query,
-            &[&name],
-        )
+        .execute(create_create_to_entity_function_query, &[&name])
         .await?;
 
     Ok(id)
@@ -238,15 +229,17 @@ pub async fn create_base_table<T: GenericClient>(
         .trends
         .iter()
         .map(|trend| format!("{} {}", escape_identifier(&trend.name), trend.data_type))
-        .chain(trend_store_part
-        .generated_trends
-        .iter()
-        .map(|generated_trend| {
-            format!(
-                "{} {} GENERATED ALWAYS AS ({}) STORED",
-                generated_trend.name, generated_trend.data_type, generated_trend.expression
-            )
-        }))
+        .chain(
+            trend_store_part
+                .generated_trends
+                .iter()
+                .map(|generated_trend| {
+                    format!(
+                        "{} {} GENERATED ALWAYS AS ({}) STORED",
+                        generated_trend.name, generated_trend.data_type, generated_trend.expression
+                    )
+                }),
+        )
         .collect();
 
     let columns_part = column_specs.join(",");
@@ -326,8 +319,7 @@ pub async fn create_staging_table<T: GenericClient>(
 
     let add_primary_key_query = format!(
         "ALTER TABLE ONLY {}.{} ADD PRIMARY KEY (entity_id, \"timestamp\")",
-        staging_table_schema,
-        staging_table_name,
+        staging_table_schema, staging_table_name,
     );
 
     client.execute(&add_primary_key_query, &[]).await?;
