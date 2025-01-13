@@ -1574,7 +1574,7 @@ async fn get_trend_store_part_id<T: GenericClient + Send + Sync>(
     let rows = client.query(source_query, &[&name]).await?;
 
     if rows.is_empty() {
-        return Ok(None);
+        Ok(None)
     } else {
         let trend_store_part_id: i32 = rows[0].get(0);
 
