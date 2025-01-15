@@ -93,9 +93,17 @@ pub struct TrendViewMaterializationFull {
     pub view: String,
     pub description: Value,
     pub fingerprint_function: String,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_threshold: Option<Duration>,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_stability_delay: Option<Duration>,
 }
 
@@ -115,9 +123,17 @@ pub struct TrendFunctionMaterializationFull {
     pub function: TrendMaterializationFunctionFull,
     pub description: Value,
     pub fingerprint_function: String,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_threshold: Option<Duration>,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_stability_delay: Option<Duration>,
 }
 
@@ -135,9 +151,17 @@ pub struct TrendViewMaterializationData {
     pub view: String,
     pub description: Value,
     pub fingerprint_function: String,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_threshold: Option<Duration>,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_stability_delay: Option<Duration>,
 }
 
@@ -155,9 +179,17 @@ pub struct TrendFunctionMaterializationData {
     pub function: TrendMaterializationFunctionData,
     pub description: Value,
     pub fingerprint_function: String,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_threshold: Option<Duration>,
-    #[serde(with = "humantime_serde", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub old_data_stability_delay: Option<Duration>,
 }
 
@@ -956,7 +988,7 @@ pub(super) async fn get_trend_materializations(pool: Data<Pool>) -> impl Respond
 // To call this with curl: -
 // first: DROP TABLE trend."u2020-4g-pm_v-site_lcs_1w_staging";
 //        DELETE FROM trend_directory.materialization;
-// curl -H "Content-Type: application/json" -X POST -d '{"target_trend_store_part":"u2020-4g-pm_v-site_lcs_1w","enabled":true,"processing_delay":"30m","stability_delay":"5m","reprocessing_period":"3days","sources":[{"trend_store_part": "u2020-4g-pm-kpi_v-cell_capacity-management_15m", "mapping_function": "trend.mapping_id(timestamp with time zone)"}, {"trend_store_part": "u2020-4g-pm-kpi_v-cell_integrity_15m", "mapping_function": "trend.mapping_id(timestamp with time zone)"}],"view":"SELECT r.target_id AS entity_id, t.\"timestamp\", sum(t.samples) AS samples, sum(t.\"L.LCS.EcidMeas.Req\") AS \"L.LCS.EcidMeas.Req\", sum(t.\"L.LCS.EcidMeas.Succ\") AS \"L.LCS.EcidMeas.Succ\", sum(t.\"L.LCS.OTDOAInterFreqRSTDMeas.Succ\") AS \"L.LCS.OTDOAInterFreqRSTDMeas.Succ\" FROM (trend.\"u2020-4g-pm_Cell_lcs_1w\" t JOIN relation.\"Cell->v-site\" r ON (t.entity_id = r.source_id)) GROUP BY t.\"timestamp\", r.target_id;", "fingerprint_function":"SELECT modified.last, '\''{}'\''::jsonb FROM trend_directory.modified JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id WHERE modified.timestamp = $1;"}' localhost:8000/trend-view-materializations
+// curl -H "Content-Type: application/json" -X POST -d '{"target_trend_store_part":"u2020-4g-pm_v-site_lcs_1w","enabled":true,"processing_delay":"30m","stability_delay":"5m","reprocessing_period":"3days","sources":[{"trend_store_part": "u2020-4g-pm-kpi_v-cell_capacity-management_15m", "mapping_function": "trend.mapping_id(timestamp with time zone)"}, {"trend_store_part": "u2020-4g-pm-kpi_v-cell_integrity_15m", "mapping_function": "trend.mapping_id(timestamp with time zone)"}],"view":"SELECT r.target_id AS entity_id, t.\"timestamp\", sum(t.samples) AS samples, sum(t.\"L.LCS.EcidMeas.Req\") AS \"L.LCS.EcidMeas.Req\", sum(t.\"L.LCS.EcidMeas.Succ\") AS \"L.LCS.EcidMeas.Succ\", sum(t.\"L.LCS.OTDOAInterFreqRSTDMeas.Succ\") AS \"L.LCS.OTDOAInterFreqRSTDMeas.Succ\" FROM (trend.\"u2020-4g-pm_Cell_lcs_1w\" t JOIN relation.\"Cell->v-site\" r ON (t.entity_id = r.source_id)) GROUP BY t.\"timestamp\", r.target_id;", "fingerprint_function":"SELECT modified.last, '\''{}'\''::jsonb FROM trend_directory.modified JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id WHERE modified.timestamp = $1;", "description": "{}"}' localhost:8000/trend-view-materializations
 
 #[utoipa::path(
     post,
