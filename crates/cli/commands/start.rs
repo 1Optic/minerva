@@ -7,14 +7,13 @@ use log::info;
 
 use async_trait::async_trait;
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 
 use tokio::signal;
 
-use minerva::cluster::{
-    MinervaCluster, MinervaClusterConfig, DEFAULT_CITUS_IMAGE, DEFAULT_CITUS_TAG,
-};
+use minerva::cluster::{BuildImageProvider, MinervaCluster, MinervaClusterConfig};
 use minerva::error::Error;
-use minerva::instance::MinervaInstance;
+use minerva::instance::{load_instance_config, MinervaInstance};
 use minerva::schema::migrate;
 use minerva::trend_store::create_partitions;
 
@@ -35,20 +34,60 @@ pub struct StartOpt {
     no_schema_initialization: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct ClusterConfig {
+    image_name: String,
+    image_tag: String,
+    path: String,
+}
+
 #[async_trait]
 impl Cmd for StartOpt {
     async fn run(&self) -> CmdResult {
         env_logger::init();
+
+        let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {
+            Some(root) => Some(root.clone()),
+            None => match env::var(ENV_MINERVA_INSTANCE_ROOT) {
+                Ok(v) => Some(PathBuf::from(v)),
+                Err(_) => None,
+            },
+        };
+
         info!("Starting containers");
         let node_count = self.node_count.unwrap_or(3);
 
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
-        let cluster_config = MinervaClusterConfig {
-            image_name: DEFAULT_CITUS_IMAGE.to_string(),
-            image_tag: DEFAULT_CITUS_TAG.to_string(),
-            config_file,
-            worker_count: node_count,
+        let cluster_config = if let Some(ref minerva_instance_root) = minerva_instance_root_option {
+            let instance_config = load_instance_config(minerva_instance_root)
+                .map_err(|e| format!("could not load instance config: {e}"))?;
+            if let Some(docker_image_config) = instance_config.docker_image {
+                let definition_file: PathBuf =
+                    PathBuf::from_iter([minerva_instance_root, &docker_image_config.path]);
+
+                MinervaClusterConfig {
+                    image_provider: Box::new(BuildImageProvider {
+                        image_name: docker_image_config.image_name.clone(),
+                        image_tag: docker_image_config.image_tag.clone(),
+                        definition_file,
+                    }),
+                    config_file,
+                    worker_count: node_count,
+                }
+            } else {
+                MinervaClusterConfig {
+                    config_file,
+                    worker_count: node_count,
+                    ..Default::default()
+                }
+            }
+        } else {
+            MinervaClusterConfig {
+                config_file,
+                worker_count: node_count,
+                ..Default::default()
+            }
         };
 
         let cluster = MinervaCluster::start(&cluster_config).await?;
@@ -66,28 +105,16 @@ impl Cmd for StartOpt {
 
             env.push(("PGSSLMODE".to_string(), "disable".to_string()));
 
-            //let query = format!("SET citus.shard_count = {};", cluster.size());
+            let query = format!("SET citus.shard_count = {};", cluster.size());
 
-            //client.execute(&query, &[]).await?;
+            client.execute(&query, &[]).await?;
 
-            //let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
-            //client.execute(query, &[]).await?;
-
-            //create_schema(&mut client).await?;
             if !self.no_schema_initialization {
                 let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
                 client.execute(query, &[]).await?;
                 migrate(&mut client).await?;
                 info!("Created Minerva schema");
             }
-
-            let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {
-                Some(root) => Some(root.clone()),
-                None => match env::var(ENV_MINERVA_INSTANCE_ROOT) {
-                    Ok(v) => Some(PathBuf::from(v)),
-                    Err(_) => None,
-                },
-            };
 
             if let Some(minerva_instance_root) = minerva_instance_root_option {
                 println!(

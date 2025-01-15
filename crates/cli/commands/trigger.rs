@@ -71,6 +71,7 @@ pub struct TriggerCreate {
 #[async_trait]
 impl Cmd for TriggerCreate {
     async fn run(&self) -> CmdResult {
+        env_logger::init();
         let trigger = load_trigger_from_file(&self.definition)?;
 
         println!("Loaded definition, creating trigger");

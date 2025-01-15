@@ -7531,14 +7531,14 @@ AS $$
 SELECT format(
   'CREATE OR REPLACE FUNCTION trigger_rule.%I(entity integer, new_start timestamp with time zone, new_expires timestamp with time zone, %s) RETURNS VOID AS $fn$%s$fn$ LANGUAGE sql VOLATILE',
   trigger.change_exception_threshold_fn_name($1),
-  string_agg(threshold.name || '_new ' || threshold.data_type, ', '),
+  string_agg(format('%I', threshold.name || '_new') || ' ' || threshold.data_type, ', '),
   format(
     'SELECT trigger_rule.%I(entity); '
     'UPDATE trigger_rule.%I SET (start, expires, %s) = (new_start, new_expires, %s) WHERE entity_id = entity;',
     trigger.get_or_create_exception_threshold_fn_name($1),
     trigger.exception_threshold_table_name($1),
-    string_agg(threshold.name, ', '),
-    string_agg(threshold.name || '_new', ', ')
+    string_agg(format('%I', threshold.name), ', '),
+    string_agg(format('%I', threshold.name || '_new'), ', ')
   )
 ) FROM unnest($2) threshold;
 $$ LANGUAGE sql VOLATILE;

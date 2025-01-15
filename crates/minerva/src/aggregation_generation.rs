@@ -4,18 +4,21 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use std::{
     collections::HashMap,
-    fmt::Display,
     path::{Path, PathBuf},
 };
 
 use thiserror::Error;
 
+use crate::instance::EntityAggregationHint;
 use crate::meas_value::DataType;
 use crate::trend_materialization::{
     TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationSource,
 };
 use crate::trend_store::{Trend, TrendStore, TrendStorePart};
-use crate::{instance::MinervaInstance, relation::Relation};
+use crate::{
+    instance::AggregationType, instance::InstanceConfig, instance::MinervaInstance,
+    relation::Relation,
+};
 
 #[derive(Error, Debug)]
 pub enum AggregationGenerationError {
@@ -31,21 +34,19 @@ pub enum AggregationGenerationError {
 
 pub fn generate_all_standard_aggregations(
     instance_root: &Path,
+    config: InstanceConfig,
 ) -> Result<(), AggregationGenerationError> {
-    let instance = MinervaInstance::load_from(instance_root);
+    let mut instance = MinervaInstance::load_from(instance_root);
 
-    let aggregation_hints = load_aggregation_hints(instance_root)?;
-
-    for trend_store in &instance.trend_stores {
+    for trend_store in instance.trend_stores.clone() {
         if let Some(title) = &trend_store.title {
             if title.to_lowercase().contains("raw") {
                 // For now, we determine the raw data trend stores based on the title, but this
                 // should be done based on the fact that there is no materialization as source.
                 generate_standard_aggregations(
-                    &instance,
-                    trend_store.clone(),
-                    &instance.relations,
-                    &aggregation_hints,
+                    &mut instance,
+                    trend_store,
+                    &config.entity_aggregation_hints,
                 )?;
             }
         }
@@ -54,109 +55,13 @@ pub fn generate_all_standard_aggregations(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
-enum AggregationType {
-    View,
-    ViewMaterialization,
-    FunctionMaterialization,
-}
-
-impl Display for AggregationType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::View => write!(f, "VIEW"),
-            Self::ViewMaterialization => write!(f, "VIEW_MATERIALIZATION"),
-            Self::FunctionMaterialization => write!(f, "FUNCTION_MATERIALIZATION"),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct AggregationHint {
-    relation: String,
-    aggregation_type: AggregationType,
-    prefix: Option<String>,
-}
-
-impl AggregationHint {
-    fn parse(relation: String, raw_hint: &str) -> Result<AggregationHint, String> {
-        let mut split = raw_hint.split('+');
-
-        let first_part = split.next().unwrap();
-
-        let aggregation_type = match first_part {
-            "VIEW" => AggregationType::View,
-            "VIEW_MATERIALIZATION" => AggregationType::ViewMaterialization,
-            "FUNCTION_MATERIALIZATION" => AggregationType::FunctionMaterialization,
-            _ => return Err(format!("Unsupported aggregation type '{first_part}'")),
-        };
-
-        let prefix = split.next();
-
-        Ok(AggregationHint {
-            relation,
-            aggregation_type,
-            prefix: prefix.map(|s| s.to_string()),
-        })
-    }
-}
-
-impl Display for AggregationHint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(prefix) = &self.prefix {
-            write!(f, "{}: {}+{}", self.relation, self.aggregation_type, prefix)
-        } else {
-            write!(f, "{}: {}", self.relation, self.aggregation_type)
-        }
-    }
-}
-
-fn load_aggregation_hints(
-    instance_root: &Path,
-) -> Result<Vec<AggregationHint>, AggregationGenerationError> {
-    let mut aggregation_hints: Vec<AggregationHint> = Vec::new();
-
-    let path: PathBuf = [
-        instance_root,
-        Path::new("aggregation"),
-        Path::new("aggregation_hints.yaml"),
-    ]
-    .iter()
-    .collect();
-
-    let f = std::fs::File::open(&path).map_err(|e| {
-        AggregationGenerationError::HintLoading(format!(
-            "Could not open aggregation hints file '{}': {}",
-            path.display(),
-            e
-        ))
-    })?;
-
-    let raw_hints: HashMap<String, String> = serde_yaml::from_reader(f).map_err(|e| {
-        AggregationGenerationError::HintLoading(format!(
-            "Could not read aggregation hints from file '{}': {}",
-            path.display(),
-            e
-        ))
-    })?;
-
-    for (key, value) in &raw_hints {
-        aggregation_hints.push(
-            AggregationHint::parse(key.to_string(), value)
-                .map_err(AggregationGenerationError::HintLoading)?,
-        );
-    }
-
-    Ok(aggregation_hints)
-}
-
 fn generate_standard_aggregations(
-    minerva_instance: &MinervaInstance,
+    minerva_instance: &mut MinervaInstance,
     trend_store: TrendStore,
-    relations: &[Relation],
-    aggregation_hints: &[AggregationHint],
+    aggregation_hints: &[EntityAggregationHint],
 ) -> Result<(), AggregationGenerationError> {
-    let entity_relations: Vec<(&Relation, String)> = relations
+    let entity_relations: Vec<(Relation, String)> = minerva_instance
+        .relations
         .iter()
         .filter_map(|r| {
             // Currently only by convention, the relation name describes source and target entity
@@ -169,7 +74,7 @@ fn generate_standard_aggregations(
                 if source_type == trend_store.entity_type {
                     // Only generate an aggregation when the source type matches the entity type of
                     // the trend store.
-                    return Some((r, target_type.to_string()));
+                    return Some((r.clone(), target_type.to_string()));
                 }
             }
 
@@ -237,6 +142,10 @@ fn generate_standard_aggregations(
         )
         .map_err(AggregationGenerationError::TimeAggregation)?;
 
+        minerva_instance
+            .trend_stores
+            .push(target_trend_store.clone());
+
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
                 minerva_instance,
@@ -270,23 +179,30 @@ fn compile_time_aggregation(
 ) -> Result<TrendStore, String> {
     let target_trend_store = write_time_aggregations(minerva_instance, aggregation)?;
 
-    let trend_store_file_name = format!("{}.yaml", trend_store_name(&target_trend_store)?);
+    save_trend_store(
+        &minerva_instance.instance_root.clone().unwrap(),
+        &target_trend_store,
+    )?;
 
-    let trend_store_file_path: PathBuf = [
-        minerva_instance.instance_root.clone().unwrap(),
-        PathBuf::from("trend"),
-        trend_store_file_name.into(),
-    ]
-    .iter()
-    .collect();
+    Ok(target_trend_store)
+}
+
+fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Result<(), String> {
+    let trend_store_file_name = format!("{}.yaml", trend_store_name(trend_store)?);
+
+    let trend_store_file_path: PathBuf = PathBuf::from_iter([
+        instance_root,
+        &PathBuf::from("trend"),
+        &PathBuf::from(trend_store_file_name),
+    ]);
 
     let file = File::create(trend_store_file_path).unwrap();
 
     let writer = BufWriter::new(file);
 
-    serde_yaml::to_writer(writer, &target_trend_store).unwrap();
+    serde_yaml::to_writer(writer, &trend_store).unwrap();
 
-    Ok(target_trend_store)
+    Ok(())
 }
 
 fn trend_store_name(trend_store: &TrendStore) -> Result<String, String> {
@@ -308,11 +224,14 @@ fn write_time_aggregations(
         .trend_stores
         .iter()
         .find(|trend_store| {
-            aggregation
-                .source
-                .eq(&trend_store_name(trend_store).unwrap())
+            let name = trend_store_name(trend_store).unwrap();
+
+            aggregation.source.eq(&name)
         })
-        .unwrap();
+        .ok_or(format!(
+            "No trend store matching name '{}'",
+            aggregation.source
+        ))?;
 
     for agg_part in &aggregation.parts {
         let source_part = trend_store
@@ -618,15 +537,15 @@ fn translate_time_aggregation_part_name(
 }
 
 fn build_entity_aggregation(
-    minerva_instance: &MinervaInstance,
+    minerva_instance: &mut MinervaInstance,
     trend_store: &TrendStore,
     relation: &Relation,
     target_entity_type: &str,
-    aggregation_hints: &[AggregationHint],
+    aggregation_hints: &[EntityAggregationHint],
 ) -> Result<(), String> {
-    let default_hint = AggregationHint {
+    let default_hint = EntityAggregationHint {
         relation: relation.name.clone(),
-        aggregation_type: AggregationType::FunctionMaterialization,
+        materialization_type: AggregationType::FunctionMaterialization,
         prefix: None,
     };
     let aggregation_hint = aggregation_hints
@@ -637,7 +556,7 @@ fn build_entity_aggregation(
     let entity_aggregation = generate_entity_aggregation(
         trend_store,
         relation,
-        aggregation_hint.aggregation_type,
+        aggregation_hint.materialization_type,
         target_entity_type,
         aggregation_hint.prefix.clone(),
     )?;
@@ -668,6 +587,7 @@ struct EntityAggregation {
     pub name: String,
     pub data_source: String,
     pub entity_type: String,
+    pub granularity: Duration,
     pub relation: String,
     pub aggregation_type: AggregationType,
     pub parts: Vec<AggregationPart>,
@@ -716,6 +636,7 @@ fn generate_entity_aggregation(
         name: name.clone(),
         data_source: trend_store.data_source.clone(),
         entity_type: target_entity_type.to_string(),
+        granularity: trend_store.granularity,
         relation: relation.name.clone(),
         aggregation_type,
         parts,
@@ -725,12 +646,17 @@ fn generate_entity_aggregation(
 }
 
 fn compile_entity_aggregation(
-    minerva_instance: &MinervaInstance,
+    minerva_instance: &mut MinervaInstance,
     aggregation_context: &AggregationContext,
 ) -> Result<(), String> {
     match aggregation_context.definition.aggregation_type {
         AggregationType::FunctionMaterialization => {
-            write_function_entity_aggregations(minerva_instance, aggregation_context)
+            println!(
+                "Generating function materialization: {}",
+                aggregation_context.aggregation_file_path.to_string_lossy()
+            );
+            write_function_entity_aggregations(minerva_instance, aggregation_context)?;
+            add_to_aggregate_trend_store(minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
         }
         AggregationType::View => {
             generate_view_entity_aggregation(minerva_instance, aggregation_context)
@@ -738,6 +664,114 @@ fn compile_entity_aggregation(
         AggregationType::ViewMaterialization => {
             write_view_entity_aggregations(minerva_instance, aggregation_context)
         }
+    }
+}
+
+fn add_to_aggregate_trend_store(
+    minerva_instance: &mut MinervaInstance,
+    aggregation_context: &AggregationContext,
+) -> Result<(), String> {
+    let aggregate_trend_store = define_aggregate_trend_store(aggregation_context)?;
+
+    let result = minerva_instance
+        .trend_stores
+        .iter_mut()
+        .find(|trend_store| {
+            trend_store
+                .data_source
+                .eq(&aggregation_context.definition.data_source)
+                && trend_store
+                    .entity_type
+                    .eq(&aggregation_context.definition.entity_type)
+                && trend_store
+                    .granularity
+                    .eq(&aggregation_context.definition.granularity)
+        });
+
+    if let Some(existing_trend_store) = result {
+        for part in aggregate_trend_store.parts.into_iter() {
+            if existing_trend_store
+                .parts
+                .iter()
+                .any(|p| part.name.eq(&p.name))
+            {
+                return Err(format!(
+                    "Trend store part with name '{}' already exists",
+                    part.name
+                ));
+            };
+
+            existing_trend_store.parts.push(part);
+        }
+
+        save_trend_store(
+            &minerva_instance.instance_root.clone().unwrap(),
+            existing_trend_store,
+        )?;
+    } else {
+        save_trend_store(
+            &minerva_instance.instance_root.clone().unwrap(),
+            &aggregate_trend_store,
+        )?;
+
+        minerva_instance.trend_stores.push(aggregate_trend_store);
+    }
+
+    Ok(())
+}
+
+fn define_aggregate_trend_store(
+    aggregation_context: &AggregationContext,
+) -> Result<TrendStore, String> {
+    let parts = aggregation_context
+        .definition
+        .parts
+        .iter()
+        .map(|aggregate_part_def| {
+            let src_part = aggregation_context
+                .source_definition
+                .parts
+                .iter()
+                .find(|p| p.name == aggregate_part_def.source)
+                .ok_or(format!(
+                    "Could not find part in source matching name '{}'",
+                    aggregate_part_def.source
+                ))?;
+            let trends = src_part
+                .trends
+                .iter()
+                .map(define_entity_aggregate_trend)
+                .collect();
+            let generated_trends = vec![];
+
+            Ok::<TrendStorePart, String>(TrendStorePart {
+                name: aggregate_part_def.name.clone(),
+                trends,
+                generated_trends,
+            })
+        })
+        .collect::<Result<Vec<TrendStorePart>, String>>()?;
+
+    let trend_store = TrendStore {
+        data_source: aggregation_context.definition.data_source.clone(),
+        entity_type: aggregation_context.definition.entity_type.clone(),
+        granularity: aggregation_context.definition.granularity,
+        title: Some("Generated by Minerva aggregation generation command".to_string()),
+        partition_size: Duration::from_secs(86400),
+        parts,
+    };
+
+    Ok(trend_store)
+}
+
+fn define_entity_aggregate_trend(trend: &Trend) -> Trend {
+    Trend {
+        name: trend.name.clone(),
+        data_type: aggregate_data_type(trend.data_type, &trend.entity_aggregation),
+        time_aggregation: trend.time_aggregation.clone(),
+        entity_aggregation: trend.entity_aggregation.clone(),
+        description: trend.description.clone(),
+        extra_data: trend.extra_data.clone(),
     }
 }
 
@@ -777,7 +811,12 @@ fn write_function_entity_aggregations(
             file_path.to_string_lossy()
         );
 
-        let file = File::create(file_path).unwrap();
+        let file = File::create_new(file_path.clone()).map_err(|e| {
+            format!(
+                "Could not write entity materialization to '{}': {e}",
+                file_path.to_string_lossy()
+            )
+        })?;
 
         let mut writer = BufWriter::new(file);
 
@@ -1049,7 +1088,7 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
     let standard_aggregations = GRANULARITY_SUFFIX_MAPPING.get_or_init(|| {
         [
             (Duration::from_secs(900), "15m".to_string()),
-            (Duration::from_secs(3600), "1d".to_string()),
+            (Duration::from_secs(3600), "1h".to_string()),
             (humantime::parse_duration("1d").unwrap(), "1d".to_string()),
             (humantime::parse_duration("1w").unwrap(), "1w".to_string()),
             (

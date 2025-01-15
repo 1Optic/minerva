@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio_postgres::Transaction;
+use tokio_postgres::{GenericClient, Transaction};
 
 use crate::change::ChangeResult;
 
@@ -75,63 +75,11 @@ impl fmt::Display for AddRelation {
 #[async_trait]
 impl Change for AddRelation {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let query = format!(
-            "CREATE TABLE relation.\"{}\"(source_id integer, target_id integer)",
-            self.relation.name
-        );
-        client
-            .query(&query, &[])
+        create_relation(client, &self.relation)
             .await
-            .map_err(|e| DatabaseError::from_msg(format!("Error creating relation table: {e}")))?;
+            .map_err(|e| format!("Could not create relation '{}': {e}", self.relation.name))?;
 
-        let query = format!(
-            "CREATE VIEW relation_def.\"{}\" AS {}",
-            self.relation.name, self.relation.query
-        );
-
-        client
-            .query(&query, &[])
-            .await
-            .map_err(|e| DatabaseError::from_msg(format!("Error creating relation view: {e}")))?;
-
-        let query = format!(
-            "CREATE UNIQUE INDEX ON relation.\"{}\"(source_id, target_id)",
-            self.relation.name
-        );
-
-        client.query(&query, &[]).await.map_err(|e| {
-            DatabaseError::from_msg(format!("Error creating index on relation table: {e}"))
-        })?;
-
-        let query = format!(
-            "CREATE INDEX ON relation.\"{}\"(target_id)",
-            self.relation.name
-        );
-
-        client.query(&query, &[]).await.map_err(|e| {
-            DatabaseError::from_msg(format!("Error creating index on relation table: {e}"))
-        })?;
-
-        // Make the table available on each of the Citus nodes.
-        let query = format!(
-            "SELECT create_reference_table('relation.\"{}\"')",
-            self.relation.name
-        );
-
-        client.query(&query, &[]).await.map_err(|e| {
-            DatabaseError::from_msg(format!(
-                "Error converting relation table to reference table: {e}"
-            ))
-        })?;
-
-        let query = "SELECT relation_directory.register_type($1)";
-
-        client
-            .query_one(query, &[&self.relation.name])
-            .await
-            .map_err(|e| DatabaseError::from_msg(format!("Error registering relation: {e}")))?;
-
-        Ok(format!("Added relation {}", &self.relation))
+        Ok(format!("Added relation '{}'", &self.relation))
     }
 }
 
@@ -219,4 +167,69 @@ pub async fn materialize_relation(
         deleted_count,
         inserted_count,
     })
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CreateRelationError {
+    #[error("{0}")]
+    Database(String),
+}
+
+pub async fn create_relation<T: GenericClient>(
+    client: &mut T,
+    relation: &Relation,
+) -> Result<(), CreateRelationError> {
+    let query = format!(
+        "CREATE TABLE relation.\"{}\"(source_id integer, target_id integer)",
+        relation.name
+    );
+    client.query(&query, &[]).await.map_err(|e| {
+        CreateRelationError::Database(format!("Error creating relation table: {e}"))
+    })?;
+
+    let query = format!(
+        "CREATE VIEW relation_def.\"{}\" AS {}",
+        relation.name, relation.query
+    );
+
+    client
+        .query(&query, &[])
+        .await
+        .map_err(|e| CreateRelationError::Database(format!("Error creating relation view: {e}")))?;
+
+    let query = format!(
+        "CREATE UNIQUE INDEX ON relation.\"{}\"(source_id, target_id)",
+        relation.name
+    );
+
+    client.query(&query, &[]).await.map_err(|e| {
+        CreateRelationError::Database(format!("Error creating index on relation table: {e}"))
+    })?;
+
+    let query = format!("CREATE INDEX ON relation.\"{}\"(target_id)", relation.name);
+
+    client.query(&query, &[]).await.map_err(|e| {
+        CreateRelationError::Database(format!("Error creating index on relation table: {e}"))
+    })?;
+
+    // Make the table available on each of the Citus nodes.
+    let query = format!(
+        "SELECT create_reference_table('relation.\"{}\"')",
+        relation.name
+    );
+
+    client.query(&query, &[]).await.map_err(|e| {
+        CreateRelationError::Database(format!(
+            "Error converting relation table to reference table: {e}"
+        ))
+    })?;
+
+    let query = "SELECT relation_directory.register_type($1)";
+
+    client
+        .query_one(query, &[&relation.name])
+        .await
+        .map_err(|e| CreateRelationError::Database(format!("Error registering relation: {e}")))?;
+
+    Ok(())
 }
