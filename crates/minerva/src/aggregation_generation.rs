@@ -656,7 +656,7 @@ fn compile_entity_aggregation(
                 aggregation_context.aggregation_file_path.to_string_lossy()
             );
             write_function_entity_aggregations(minerva_instance, aggregation_context)?;
-            add_to_aggregate_trend_store(minerva_instance, aggregation_context)
+            add_to_aggregate_trend_store(minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
         }
         AggregationType::View => {
             generate_view_entity_aggregation(minerva_instance, aggregation_context)
@@ -690,6 +690,10 @@ fn add_to_aggregate_trend_store(
 
     if let Some(existing_trend_store) = result {
         for part in aggregate_trend_store.parts.into_iter() {
+            if existing_trend_store.parts.iter().any(|p| part.name.eq(&p.name)) {
+                return Err(format!("Trend store part with name '{}' already exists", part.name));
+            };
+
             existing_trend_store.parts.push(part);
         }
 
@@ -800,7 +804,7 @@ fn write_function_entity_aggregations(
             file_path.to_string_lossy()
         );
 
-        let file = File::create(file_path).unwrap();
+        let file = File::create_new(file_path.clone()).map_err(|e| format!("Could not write entity materialization to '{}': {e}", file_path.to_string_lossy()))?;
 
         let mut writer = BufWriter::new(file);
 

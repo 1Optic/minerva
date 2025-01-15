@@ -44,13 +44,23 @@ pub struct EntityAggregationHint {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct InstanceDockerImage {
+    pub image_name: String,
+    pub image_tag: String,
+    pub path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct InstanceConfig {
+    pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum InstanceConfigLoadError {
+    #[error("No such config file '{0}'")]
+    NoSuchFile(String),
     #[error("Could not open file: {0}")]
     FileOpen(#[from] std::io::Error),
 }
@@ -59,6 +69,11 @@ pub fn load_instance_config(
     instance_root: &Path,
 ) -> Result<InstanceConfig, InstanceConfigLoadError> {
     let config_file_path = PathBuf::from_iter([instance_root, &PathBuf::from("config.json")]);
+
+    if !config_file_path.is_file() {
+        return Err(InstanceConfigLoadError::NoSuchFile(config_file_path.to_string_lossy().to_string()));
+    }
+
     let config_file = std::fs::File::open(config_file_path)?;
     let reader = BufReader::new(config_file);
     let image_config: InstanceConfig = serde_json::from_reader(reader).unwrap();

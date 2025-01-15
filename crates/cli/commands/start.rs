@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use log::info;
@@ -13,7 +13,7 @@ use tokio::signal;
 
 use minerva::cluster::{BuildImageProvider, MinervaCluster, MinervaClusterConfig};
 use minerva::error::Error;
-use minerva::instance::MinervaInstance;
+use minerva::instance::{load_instance_config, MinervaInstance};
 use minerva::schema::migrate;
 use minerva::trend_store::create_partitions;
 
@@ -59,35 +59,29 @@ impl Cmd for StartOpt {
 
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
-        let image_config_file_path = minerva_instance_root_option
-            .clone()
-            .map(|root| PathBuf::from_iter([root, "test-stack/config.json".into()]));
+        let cluster_config = if let Some(ref minerva_instance_root) = minerva_instance_root_option {
+            let instance_config = load_instance_config(minerva_instance_root).map_err(|e| format!("could not load instance config: {e}"))?;
+            if let Some(docker_image_config) = instance_config.docker_image {
+                let definition_file: PathBuf = PathBuf::from_iter([
+                    minerva_instance_root,
+                    &docker_image_config.path
+                ]);
 
-        let cluster_config = if image_config_file_path
-            .clone()
-            .map_or(false, |path| path.is_file())
-        {
-            let p = image_config_file_path.unwrap();
-            let image_config_file = File::open(p.clone()).map_err(|e| {
-                format!(
-                    "Could not open instance config file '{}': {e}",
-                    p.to_string_lossy()
-                )
-            })?;
-            let reader = BufReader::new(image_config_file);
-            let image_config: ClusterConfig = serde_json::from_reader(reader).unwrap();
-            let mut definition_file: PathBuf = p.parent().unwrap().into();
-            definition_file.push(image_config.path);
-            println!("path: {}", definition_file.to_string_lossy());
-
-            MinervaClusterConfig {
-                image_provider: Box::new(BuildImageProvider {
-                    image_name: image_config.image_name.clone(),
-                    image_tag: image_config.image_tag.clone(),
-                    definition_file,
-                }),
-                config_file,
-                worker_count: node_count,
+                MinervaClusterConfig {
+                    image_provider: Box::new(BuildImageProvider {
+                        image_name: docker_image_config.image_name.clone(),
+                        image_tag: docker_image_config.image_tag.clone(),
+                        definition_file,
+                    }),
+                    config_file,
+                    worker_count: node_count,
+                }
+            } else {
+                MinervaClusterConfig {
+                    config_file,
+                    worker_count: node_count,
+                    ..Default::default()
+                }
             }
         } else {
             MinervaClusterConfig {
