@@ -2150,6 +2150,8 @@ version = "9.16.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bollard",
+ "bollard-stubs",
  "bytes",
  "chrono",
  "csv",

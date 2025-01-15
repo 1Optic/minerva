@@ -34,6 +34,8 @@ use super::change::Change;
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use super::interval::parse_interval;
 
+pub mod create;
+
 type PostgresName = String;
 
 #[async_trait]
