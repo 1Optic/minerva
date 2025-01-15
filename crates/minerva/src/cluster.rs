@@ -328,7 +328,10 @@ impl MinervaCluster {
             )
         })?;
 
-        print_stdout("Coordinator: ".to_string(), controller_container.stdout(true));
+        print_stdout(
+            "Coordinator: ".to_string(),
+            controller_container.stdout(true),
+        );
 
         let controller_host = controller_container.get_host().await.map_err(|e| {
             crate::error::Error::Runtime(

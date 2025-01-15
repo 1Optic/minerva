@@ -71,7 +71,9 @@ pub fn load_instance_config(
     let config_file_path = PathBuf::from_iter([instance_root, &PathBuf::from("config.json")]);
 
     if !config_file_path.is_file() {
-        return Err(InstanceConfigLoadError::NoSuchFile(config_file_path.to_string_lossy().to_string()));
+        return Err(InstanceConfigLoadError::NoSuchFile(
+            config_file_path.to_string_lossy().to_string(),
+        ));
     }
 
     let config_file = std::fs::File::open(config_file_path)?;

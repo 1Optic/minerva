@@ -690,8 +690,15 @@ fn add_to_aggregate_trend_store(
 
     if let Some(existing_trend_store) = result {
         for part in aggregate_trend_store.parts.into_iter() {
-            if existing_trend_store.parts.iter().any(|p| part.name.eq(&p.name)) {
-                return Err(format!("Trend store part with name '{}' already exists", part.name));
+            if existing_trend_store
+                .parts
+                .iter()
+                .any(|p| part.name.eq(&p.name))
+            {
+                return Err(format!(
+                    "Trend store part with name '{}' already exists",
+                    part.name
+                ));
             };
 
             existing_trend_store.parts.push(part);
@@ -804,7 +811,12 @@ fn write_function_entity_aggregations(
             file_path.to_string_lossy()
         );
 
-        let file = File::create_new(file_path.clone()).map_err(|e| format!("Could not write entity materialization to '{}': {e}", file_path.to_string_lossy()))?;
+        let file = File::create_new(file_path.clone()).map_err(|e| {
+            format!(
+                "Could not write entity materialization to '{}': {e}",
+                file_path.to_string_lossy()
+            )
+        })?;
 
         let mut writer = BufWriter::new(file);
 

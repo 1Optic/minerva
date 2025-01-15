@@ -60,12 +60,11 @@ impl Cmd for StartOpt {
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
         let cluster_config = if let Some(ref minerva_instance_root) = minerva_instance_root_option {
-            let instance_config = load_instance_config(minerva_instance_root).map_err(|e| format!("could not load instance config: {e}"))?;
+            let instance_config = load_instance_config(minerva_instance_root)
+                .map_err(|e| format!("could not load instance config: {e}"))?;
             if let Some(docker_image_config) = instance_config.docker_image {
-                let definition_file: PathBuf = PathBuf::from_iter([
-                    minerva_instance_root,
-                    &docker_image_config.path
-                ]);
+                let definition_file: PathBuf =
+                    PathBuf::from_iter([minerva_instance_root, &docker_image_config.path]);
 
                 MinervaClusterConfig {
                     image_provider: Box::new(BuildImageProvider {

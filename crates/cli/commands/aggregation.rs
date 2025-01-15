@@ -43,7 +43,9 @@ impl Cmd for AggregationGenerate {
     async fn run(&self) -> CmdResult {
         let instance_root = match &self.instance_root {
             Some(path) => path.clone(),
-            None => std::env::var(ENV_MINERVA_INSTANCE_ROOT).map(PathBuf::from).unwrap_or(std::env::current_dir().unwrap()),
+            None => std::env::var(ENV_MINERVA_INSTANCE_ROOT)
+                .map(PathBuf::from)
+                .unwrap_or(std::env::current_dir().unwrap()),
         };
 
         let instance_config = load_instance_config(&instance_root)
