@@ -334,6 +334,8 @@ fn define_part_time_aggregation(
             target_granularity,
         ),
         description: None,
+        old_data_threshold: None,
+        old_data_stability_delay: None,
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
@@ -884,6 +886,8 @@ fn define_function_part_entity_aggregation(
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
         description: None,
+        old_data_threshold: None,
+        old_data_stability_delay: None,
     }
 }
 

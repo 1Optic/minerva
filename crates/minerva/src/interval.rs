@@ -12,17 +12,14 @@ pub fn parse_interval(interval_str: &str) -> Result<Duration, Error> {
     let capture_result = interval_re.captures(interval_str);
     let binding: String;
 
-    match capture_result {
-        Some(cap) => {
-            binding = interval_re
-                .replace(
-                    result_str,
-                    format!("{} hours {} minutes {} seconds", &cap[1], &cap[2], &cap[3]),
-                )
-                .to_string();
-            result_str = &binding;
-        }
-        None => {}
+    if let Some(cap) = capture_result {
+        binding = interval_re
+            .replace(
+                result_str,
+                format!("{} hours {} minutes {} seconds", &cap[1], &cap[2], &cap[3]),
+            )
+            .to_string();
+        result_str = &binding;
     };
 
     let binding = month_re.replace(result_str, "month").to_string();

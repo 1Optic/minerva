@@ -453,6 +453,8 @@ impl KpiImplementedData {
                 },
                 description: self.description.clone(),
                 fingerprint_function,
+                old_data_threshold: None,
+                old_data_stability_delay: None,
             },
         };
 
