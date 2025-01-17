@@ -39,12 +39,24 @@ pub struct TrendViewMaterialization {
     pub processing_delay: Duration,
     #[serde(with = "humantime_serde")]
     pub stability_delay: Duration,
+    #[serde(default, with = "humantime_serde")]
+    pub old_data_stability_delay: Option<Duration>,
+    #[serde(default, with = "humantime_serde")]
+    pub old_data_threshold: Option<Duration>,
     #[serde(with = "humantime_serde")]
     pub reprocessing_period: Duration,
     pub sources: Vec<TrendMaterializationSource>,
     pub view: String,
     pub fingerprint_function: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<Value>,
+}
+
+fn create_text_interval(optionduration: Option<Duration>) -> String {
+    match optionduration {
+        Some(value) => format!("'{}'::text::interval", format_duration(value)).to_string(),
+        None => "NULL".to_string(),
+    }
 }
 
 impl TrendViewMaterialization {
@@ -52,11 +64,16 @@ impl TrendViewMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let query = concat!(
-        "SELECT trend_directory.define_view_materialization(",
-        "id, $1::text::interval, $2::text::interval, $3::text::interval, $4::text::regclass, $5::jsonb",
-        ") ",
-        "FROM trend_directory.trend_store_part WHERE name = $6",
+        let query = format!(
+            concat!(
+                "SELECT trend_directory.define_view_materialization(",
+                "id, $1::text::interval, $2::text::interval, $3::text::interval, ",
+                "$4::text::regclass, $5::jsonb, {}, {}",
+                ") ",
+                "FROM trend_directory.trend_store_part WHERE name = $6",
+            ),
+            &create_text_interval(self.old_data_threshold),
+            &create_text_interval(self.old_data_stability_delay),
         );
 
         let description_default = serde_json::json!("{}");
@@ -73,7 +90,7 @@ impl TrendViewMaterialization {
             &self.target_trend_store_part,
         ];
 
-        match client.query(query, query_args).await {
+        match client.query(&query, query_args).await {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
                 "Error defining view materialization: {e}"
@@ -157,6 +174,8 @@ impl TrendViewMaterialization {
             || self.processing_delay != other.processing_delay
             || self.stability_delay != other.stability_delay
             || self.reprocessing_period != other.reprocessing_period
+            || self.old_data_threshold != other.old_data_threshold
+            || self.old_data_stability_delay != other.old_data_stability_delay
         {
             changes.push(Box::new(UpdateTrendViewMaterializationAttributes {
                 trend_view_materialization: other.clone(),
@@ -207,14 +226,18 @@ impl TrendViewMaterialization {
                 "stability_delay = $2::text::interval, ",
                 "reprocessing_period = $3::text::interval, ",
                 "enabled = $4, ",
-                "description = '{}'::jsonb ",
-                "WHERE materialization::text = $5",
+                "description = '{}'::jsonb, ",
+                "old_data_threshold = {}, ",
+                "old_data_stability_delay = {} ",
+                "WHERE materialization::text = $7",
             ),
             &self
                 .description
                 .as_ref()
                 .unwrap_or(&serde_json::json!("{}"))
-                .to_string()
+                .to_string(),
+            &create_text_interval(self.old_data_threshold),
+            &create_text_interval(self.old_data_stability_delay),
         );
 
         let query_args: &[&(dyn ToSql + Sync)] = &[
@@ -371,12 +394,24 @@ pub struct TrendFunctionMaterialization {
     pub processing_delay: Duration,
     #[serde(with = "humantime_serde")]
     pub stability_delay: Duration,
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub old_data_stability_delay: Option<Duration>,
+    #[serde(
+        default,
+        with = "humantime_serde",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub old_data_threshold: Option<Duration>,
     #[serde(with = "humantime_serde")]
     pub reprocessing_period: Duration,
     pub sources: Vec<TrendMaterializationSource>,
     pub function: TrendMaterializationFunction,
     pub fingerprint_function: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<Value>,
 }
 
@@ -385,11 +420,16 @@ impl TrendFunctionMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        let query = concat!(
-        "SELECT trend_directory.define_function_materialization(",
-        "id, $1::text::interval, $2::text::interval, $3::text::interval, $4::text::regprocedure, $5::jsonb",
-        ") ",
-        "FROM trend_directory.trend_store_part WHERE name = $6",
+        let query = format!(
+            concat!(
+                "SELECT trend_directory.define_function_materialization(",
+                "id, $1::text::interval, $2::text::interval, $3::text::interval, ",
+                "$4::text::regprocedure, $5::jsonb, {}, {}",
+                ") ",
+                "FROM trend_directory.trend_store_part WHERE name = $6",
+            ),
+            &create_text_interval(self.old_data_threshold),
+            &create_text_interval(self.old_data_stability_delay),
         );
 
         let description_default = serde_json::json!("{}");
@@ -406,7 +446,7 @@ impl TrendFunctionMaterialization {
             &self.target_trend_store_part,
         ];
 
-        match client.query(query, query_args).await {
+        match client.query(&query, query_args).await {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
                 "Error defining function materialization: {e}"
@@ -542,14 +582,18 @@ impl TrendFunctionMaterialization {
                 "stability_delay = $2::text::interval, ",
                 "reprocessing_period = $3::text::interval, ",
                 "enabled = $4, ",
-                "description = '{}'::jsonb ",
+                "description = '{}'::jsonb, ",
+                "old_data_threshold = {}, ",
+                "old_data_stability_delay = {} ",
                 "WHERE materialization::text = $5",
             ),
             &self
                 .description
                 .as_ref()
                 .unwrap_or(&serde_json::json!("{}"))
-                .to_string()
+                .to_string(),
+            &create_text_interval(self.old_data_threshold),
+            &create_text_interval(self.old_data_stability_delay),
         );
 
         let query_args: &[&(dyn ToSql + Sync)] = &[
@@ -850,7 +894,8 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     name: &str,
 ) -> Result<TrendMaterialization, Error> {
     let query = concat!(
-        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
+        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, ",
+        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_stability_delay, m.old_data_threshold ",
         "FROM trend_directory.materialization AS m ",
         "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
         "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
@@ -880,6 +925,8 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     let target_trend_store_part: String = row.get(6);
     let src_view: Option<String> = row.get(7);
     let src_function: Option<String> = row.get(8);
+    let old_data_stability_delay_str: Option<String> = row.get(9);
+    let old_data_threshold_str: Option<String> = row.get(10);
 
     let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
     let (_fingerprint_function_lang, fingerprint_function_def) =
@@ -899,6 +946,18 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     let stability_delay = parse_interval(&stability_delay_str)
         .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}"))))?;
 
+    let old_data_threshold: Option<Duration> = old_data_threshold_str.map(
+        |value| parse_interval(&value).map_err(
+            |e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of old data threshold: {e}")))
+        ).unwrap()
+    );
+
+    let old_data_stability_delay: Option<Duration> = old_data_stability_delay_str.map(
+        |value| parse_interval(&value).map_err(
+            |e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of old stability delay: {e}")))
+        ).unwrap()
+    );
+
     if let Some(view) = src_view {
         let view_def = get_view_def(conn, &view).await.unwrap();
         let sources = load_sources(conn, materialization_id).await?;
@@ -913,6 +972,8 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
             stability_delay,
             view: view_def,
             description: description.clone(),
+            old_data_threshold,
+            old_data_stability_delay,
         };
 
         Ok(TrendMaterialization::View(view_materialization))
@@ -949,6 +1010,8 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
                 language: function_lang,
             },
             description: description.clone(),
+            old_data_threshold,
+            old_data_stability_delay,
         };
 
         Ok(TrendMaterialization::Function(function_materialization))
@@ -988,6 +1051,8 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
     let target_trend_store_part: String = row.get(6);
     let src_view: Option<String> = row.get(7);
     let src_function: Option<String> = row.get(8);
+    let old_data_stability_delay_str: Option<String> = row.get(9);
+    let old_data_threshold_str: Option<String> = row.get(10);
 
     let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
     let (_fingerprint_function_lang, fingerprint_function_def) =
@@ -1007,6 +1072,12 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
     let stability_delay = parse_interval(&stability_delay_str)
         .map_err(|e| LoadTrendMaterializationError::ParseError(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}")))?;
 
+    let old_data_threshold: Option<Duration> =
+        old_data_threshold_str.map(|value| parse_interval(&value).unwrap());
+
+    let old_data_stability_delay: Option<Duration> =
+        old_data_stability_delay_str.map(|value| parse_interval(&value).unwrap());
+
     if let Some(view) = src_view {
         let view_def = get_view_def(client, &view)
             .await
@@ -1025,6 +1096,8 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
             stability_delay,
             view: view_def,
             description: description.clone(),
+            old_data_threshold,
+            old_data_stability_delay,
         };
 
         let trend_materialization = TrendMaterialization::View(view_materialization);
@@ -1073,6 +1146,8 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
                 language: function_lang,
             },
             description: description.clone(),
+            old_data_threshold,
+            old_data_stability_delay,
         };
 
         let trend_materialization = TrendMaterialization::Function(function_materialization);
@@ -1090,7 +1165,8 @@ pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
     name: &str,
 ) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
     let query = concat!(
-        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
+        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, ",
+        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold, m.old_data_stability_delay ",
         "FROM trend_directory.materialization AS m ",
         "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
         "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
@@ -1121,7 +1197,8 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
     let mut trend_materializations: Vec<TrendMaterialization> = Vec::new();
 
     let query = concat!(
-        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, m.enabled, m.description, tsp.name, vm.src_view, fm.src_function ",
+        "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, ",
+        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold, m.old_data_stability_delay ",
         "FROM trend_directory.materialization AS m ",
         "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
         "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
@@ -1142,6 +1219,8 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
         let target_trend_store_part: String = row.get(6);
         let src_view: Option<String> = row.get(7);
         let src_function: Option<String> = row.get(8);
+        let old_data_stability_delay_str: Option<String> = row.get(9);
+        let old_data_threshold_str: Option<String> = row.get(10);
 
         let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
         let (_fingerprint_function_lang, fingerprint_function_def) =
@@ -1161,6 +1240,12 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
         let stability_delay = parse_interval(&stability_delay_str)
             .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}"))))?;
 
+        let old_data_threshold: Option<Duration> =
+            old_data_threshold_str.map(|value| parse_interval(&value).unwrap());
+
+        let old_data_stability_delay: Option<Duration> =
+            old_data_stability_delay_str.map(|value| parse_interval(&value).unwrap());
+
         if let Some(view) = src_view {
             let view_def = get_view_def(conn, &view).await.unwrap();
             let sources = load_sources(conn, materialization_id).await?;
@@ -1175,6 +1260,8 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
                 stability_delay,
                 view: view_def,
                 description: description.clone(),
+                old_data_threshold,
+                old_data_stability_delay,
             };
 
             let trend_materialization = TrendMaterialization::View(view_materialization);
@@ -1215,6 +1302,8 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
                     language: function_lang,
                 },
                 description: description.clone(),
+                old_data_threshold,
+                old_data_stability_delay,
             };
 
             let trend_materialization = TrendMaterialization::Function(function_materialization);
