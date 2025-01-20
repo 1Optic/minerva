@@ -5,6 +5,8 @@ use tokio_postgres::GenericClient;
 
 use crate::error::Error;
 
+use super::materialize_curr_ptr::MaterializeCurrPtrError;
+
 pub struct CompactResult {
     pub record_count: u64,
     pub attribute_store_name: String,
@@ -30,7 +32,7 @@ pub enum CompactError {
     #[error("Unexpected error during compacting: {0}")]
     Unexpected(String),
     #[error("Could not materialize curr_ptr data: {0}")]
-    CurrPtr(String),
+    CurrPtr(#[from] MaterializeCurrPtrError),
     #[error("Could mark attribute store with ID {0} as compacted: {1}")]
     MarkCompacted(i32, String),
 }
@@ -280,48 +282,6 @@ ON CONFLICT (attribute_store_id) DO UPDATE SET compacted = EXCLUDED.compacted"#;
         .execute(query, &[&attribute_store_id])
         .await
         .map_err(|e| CompactError::MarkCompacted(attribute_store_id, format!("{e}")))?;
-
-    Ok(())
-}
-
-pub async fn has_materialized_view<T: GenericClient + Send + Sync>(
-    client: &T,
-    attribute_store_name: &str,
-) -> Result<bool, CompactError> {
-    let query = concat!(
-        "SELECT relname ",
-        "FROM pg_class c ",
-        "JOIN pg_namespace ns ON ns.oid = c.relnamespace ",
-        "WHERE ns.nspname = 'attribute' AND c.relname = $1 AND c.relkind = 'm'"
-    );
-
-    let rows = client
-        .query(query, &[&attribute_store_name])
-        .await
-        .map_err(|e| {
-            CompactError::Unexpected(format!(
-                "Could not determine existence of materialized view: {e}"
-            ))
-        })?;
-
-    if rows.is_empty() {
-        Ok(false)
-    } else {
-        Ok(true)
-    }
-}
-
-pub async fn refresh_materialized_view<T: GenericClient + Send + Sync>(
-    client: &T,
-    attribute_store_name: &str,
-) -> Result<(), CompactError> {
-    let query = format!("REFRESH MATERIALIZED VIEW attribute.\"{attribute_store_name}\"");
-
-    client.execute(&query, &[]).await.map_err(|e| {
-        CompactError::Unexpected(format!(
-            "Could not refresh materialized view attribute.\"{attribute_store_name}\": {e}"
-        ))
-    })?;
 
     Ok(())
 }

@@ -2,16 +2,18 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use minerva::attribute_store::materialize_curr_ptr::{
+    materialize_curr_ptr, materialize_curr_ptr_by_name,
+};
 use tokio_postgres::{Client, Row};
 
+use minerva::attribute_store::compact::{
+    compact_attribute_store_by_id, compact_attribute_store_by_name, CompactError,
+};
 use minerva::attribute_store::{
     load_attribute_store, load_attribute_store_from_file, AddAttributeStore, AttributeStore,
 };
 use minerva::change::Change;
-use minerva::compact::{
-    compact_attribute_store_by_id, compact_attribute_store_by_name, has_materialized_view,
-    refresh_materialized_view, CompactError,
-};
 use minerva::error::{Error, RuntimeError};
 
 use super::common::{connect_db, Cmd, CmdResult};
@@ -124,23 +126,12 @@ async fn compact_all_attribute_stores(
                 attribute_store_name
             );
 
-            let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
-
-            let row = transaction
-                .query_one(query, &[&id])
-                .await
-                .map_err(|e| CompactError::CurrPtr(format!("{e}")))?;
-
-            let record_count: i32 = row.get(0);
+            let result = materialize_curr_ptr(&transaction, id).await?;
 
             println!(
                 "Materialized curr-ptr table for attribute store '{}': {} records",
-                attribute_store_name, record_count
+                result.attribute_store_name, result.record_count
             );
-
-            if has_materialized_view(&transaction, &attribute_store_name).await? {
-                refresh_materialized_view(&transaction, &attribute_store_name).await?;
-            }
         }
 
         transaction
@@ -178,15 +169,11 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 id
             );
 
-            let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
-
-            let row = client.query_one(query, &[&id]).await?;
-
-            let record_count: i32 = row.get(0);
+            let result = materialize_curr_ptr(&client, id).await?;
 
             println!(
                 "Materialized curr-ptr table for attribute store with Id {}: {} records",
-                id, record_count
+                id, result.record_count
             );
         } else if let Some(name) = &self.name {
             println!(
@@ -194,15 +181,11 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 name
             );
 
-            let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE ast::text = $1";
-
-            let row = client.query_one(query, &[&name]).await?;
-
-            let record_count: i32 = row.get(0);
+            let result = materialize_curr_ptr_by_name(&client, name).await?;
 
             println!(
                 "Materialized curr-ptr table for attribute store '{}': {} records",
-                name, record_count
+                name, result.record_count
             );
         } else if self.all_modified {
             let query = "SELECT ast.id, ast::text FROM attribute_directory.attribute_store ast LEFT JOIN attribute_directory.attribute_store_curr_materialized ascm ON ascm.attribute_store_id = ast.id LEFT JOIN attribute_directory.attribute_store_modified asm ON asm.attribute_store_id = ascm.attribute_store_id WHERE asm.modified <> ascm.materialized or (ascm.materialized is null and asm.modified is not null)";
@@ -218,15 +201,11 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                     name
                 );
 
-                let query = "SELECT attribute_directory.materialize_curr_ptr(ast) FROM attribute_directory.attribute_store ast WHERE id = $1";
-
-                let row = client.query_one(query, &[&id]).await?;
-
-                let record_count: i32 = row.get(0);
+                let result = materialize_curr_ptr(&client, id).await?;
 
                 println!(
                     "Materialized curr-ptr table for attribute store '{}': {} records",
-                    name, record_count
+                    name, result.record_count
                 );
             }
         }
