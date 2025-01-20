@@ -13,6 +13,9 @@ use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use crate::meas_value::DataType;
 
+pub mod compact;
+pub mod materialize_curr_ptr;
+
 #[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
 #[postgres(name = "attribute_descr")]
 pub struct Attribute {
