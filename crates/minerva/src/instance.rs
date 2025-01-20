@@ -50,7 +50,7 @@ pub struct InstanceDockerImage {
     pub path: PathBuf,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
@@ -71,9 +71,7 @@ pub fn load_instance_config(
     let config_file_path = PathBuf::from_iter([instance_root, &PathBuf::from("config.json")]);
 
     if !config_file_path.is_file() {
-        return Err(InstanceConfigLoadError::NoSuchFile(
-            config_file_path.to_string_lossy().to_string(),
-        ));
+        return Ok(InstanceConfig::default());
     }
 
     let config_file = std::fs::File::open(config_file_path)?;
