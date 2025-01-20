@@ -9,7 +9,8 @@ use minerva::attribute_store::{
 };
 use minerva::change::Change;
 use minerva::compact::{
-    compact_attribute_store_by_id, compact_attribute_store_by_name, CompactError,
+    compact_attribute_store_by_id, compact_attribute_store_by_name, has_materialized_view,
+    refresh_materialized_view, CompactError,
 };
 use minerva::error::{Error, RuntimeError};
 
@@ -136,6 +137,10 @@ async fn compact_all_attribute_stores(
                 "Materialized curr-ptr table for attribute store '{}': {} records",
                 attribute_store_name, record_count
             );
+
+            if has_materialized_view(&transaction, &attribute_store_name).await? {
+                refresh_materialized_view(&transaction, &attribute_store_name).await?;
+            }
         }
 
         transaction
