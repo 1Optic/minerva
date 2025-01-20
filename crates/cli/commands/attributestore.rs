@@ -3,15 +3,15 @@ use clap::{Parser, Subcommand};
 use crate::commands::common::{Cmd, CmdResult};
 
 pub mod compact;
+pub mod create;
 pub mod list;
 pub mod materializecurrptr;
-pub mod create;
 pub mod update;
 
 use compact::AttributeStoreCompact;
+use create::AttributeStoreCreate;
 use list::AttributeStoreList;
 use materializecurrptr::AttributeStoreMaterializeCurrPtr;
-use create::AttributeStoreCreate;
 use update::AttributeStoreUpdate;
 
 #[derive(Debug, Parser, PartialEq)]
