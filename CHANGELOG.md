@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.17.0] - 2025-01-20
+
+### Fixed
+
+- Fixed Citus initialization in test databases in test clusters
+- Fixed default aggregation generation
+
+### Added
+
+- Added support for Minerva instance config file
+- Added support for specifying custom Docker image for test clusters
+- Added support for materializing attribute materialized view after curr-ptr materialization
+
+### Changed
+
+- Specifying aggregation hints is now done in Minerva instance config file
+
 ## [9.16.2] - 2024-12-30
 
 ### Fixed
@@ -201,7 +218,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.2...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.17.0...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -229,3 +246,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.16.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.15.0...9.16.0
 [9.16.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.0...9.16.1
 [9.16.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.1...9.16.2
+[9.17.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.16.2...9.17.0
