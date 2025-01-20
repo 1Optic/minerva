@@ -1,29 +1,29 @@
 use clap::{Parser, Subcommand};
 
+pub mod check;
 pub mod create;
 pub mod delete;
-pub mod check;
+pub mod deletetimestamp;
 pub mod diff;
-pub mod update;
+pub mod dump;
+pub mod list;
+pub mod part;
 pub mod partition;
 pub mod renametrend;
-pub mod list;
-pub mod dump;
-pub mod part;
-pub mod deletetimestamp;
+pub mod update;
 
 use crate::commands::common::{Cmd, CmdResult};
+use check::TrendStoreCheck;
 use create::TrendStoreCreate;
 use delete::TrendStoreDelete;
-use check::TrendStoreCheck;
+use deletetimestamp::TrendStoreDeleteTimestamp;
 use diff::TrendStoreDiff;
-use update::TrendStoreUpdate;
+use dump::TrendStoreDump;
+use list::TrendStoreList;
+use part::{TrendStorePartOpt, TrendStorePartOptCommands};
 use partition::{TrendStorePartition, TrendStorePartitionCommands};
 use renametrend::TrendStoreRenameTrend;
-use list::TrendStoreList;
-use dump::TrendStoreDump;
-use part::{TrendStorePartOpt, TrendStorePartOptCommands};
-use deletetimestamp::TrendStoreDeleteTimestamp;
+use update::TrendStoreUpdate;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStoreOpt {
@@ -75,7 +75,9 @@ impl TrendStoreOpt {
                 TrendStorePartOptCommands::Analyze(analyze) => analyze.run().await,
             },
             TrendStoreOptCommands::RenameTrend(rename_trend) => rename_trend.run().await,
-            TrendStoreOptCommands::DeleteTimestamp(delete_timestamp) => delete_timestamp.run().await,
+            TrendStoreOptCommands::DeleteTimestamp(delete_timestamp) => {
+                delete_timestamp.run().await
+            }
             TrendStoreOptCommands::Dump(dump) => dump.run().await,
         }
     }

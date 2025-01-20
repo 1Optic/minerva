@@ -36,4 +36,3 @@ impl Cmd for TrendStoreList {
         Ok(())
     }
 }
-

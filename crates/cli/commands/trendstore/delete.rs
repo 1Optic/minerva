@@ -1,5 +1,5 @@
-use clap::Parser;
 use async_trait::async_trait;
+use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
