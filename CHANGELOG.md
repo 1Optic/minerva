@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.17.0] - 2025-01-20
+
+### Fixed
+
+- Fixed Citus initialization in test databases in test clusters
+- Fixed default aggregation generation
+
+### Added
+
+- Added support for Minerva instance config file
+- Added support for specifying custom Docker image for test clusters
+- Added support for materializing attribute materialized view after curr-ptr materialization
+
+### Changed
+
+- Specifying aggregation hints is now done in Minerva instance config file
+
 ## [9.16.2] - 2024-12-30
 
 ### Fixed
