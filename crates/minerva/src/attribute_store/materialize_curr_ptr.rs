@@ -41,7 +41,7 @@ pub async fn materialize_curr_ptr<T: GenericClient + Send + Sync>(
     client: &T,
     id: i32,
 ) -> Result<MaterializeCurrPtrResult, MaterializeCurrPtrError> {
-    let query = "SELECT ast::text FROM attribute_directory.attribute_store WHERE id = $1";
+    let query = "SELECT ast::text FROM attribute_directory.attribute_store ast WHERE id = $1";
 
     let rows = client
         .query(query, &[&id])
