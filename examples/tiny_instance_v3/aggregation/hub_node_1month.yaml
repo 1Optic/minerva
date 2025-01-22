@@ -1,0 +1,9 @@
+time_aggregation:
+  source: hub_node_1d
+  name: hub_node_1month
+  data_source: hub
+  granularity: 1month
+  mapping_function: trend.mapping_1d->1month
+  parts:
+  - name: hub_node_main_1month
+    source: hub_node_main_1d

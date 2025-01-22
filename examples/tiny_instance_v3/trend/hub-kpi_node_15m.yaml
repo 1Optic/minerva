@@ -1,0 +1,11 @@
+data_source: hub-kpi
+entity_type: node
+granularity: 15m
+partition_size: 1d
+parts:
+  - name: hub-kpi_node_main_15m
+    trends:
+      - name: power_mwh
+        data_type: bigint
+      - name: power_max
+        data_type: numeric

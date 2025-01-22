@@ -1,0 +1,9 @@
+name: node->v-network
+source_entity_type: node
+target_entity_type: v-network
+query: |-
+  SELECT
+    n.id AS source_id,
+    v.id AS target_id
+  FROM entity."node" n, entity."v-network" v
+  GROUP BY n.id, v.id

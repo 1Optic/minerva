@@ -1,0 +1,151 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'minerva'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=minerva"
+                ],
+                "filter": {
+                    "name": "minerva",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'minerva-admin'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=minerva-admin",
+                    "--package=minerva-admin"
+                ],
+                "filter": {
+                    "name": "minerva-admin",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'minerva-admin' initialize",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=minerva-admin",
+                    "--package=minerva-admin"
+                ],
+                "filter": {
+                    "name": "minerva-admin",
+                    "kind": "bin"
+                }
+            },
+            "env": {
+                "PGDATABASE": "minerva",
+                "MINERVA_INSTANCE_ROOT": "${workspaceFolder}/examples/tiny_instance_v1"
+            },
+            "args": ["initialize"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'minerva-admin' load-data",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=minerva-admin",
+                    "--package=minerva-admin"
+                ],
+                "filter": {
+                    "name": "minerva-admin",
+                    "kind": "bin"
+                }
+            },
+            "env": {
+                "PGDATABASE": "minerva",
+                "PGUSER": "postgres",
+                "PGHOST": "127.0.0.1",
+                "PGSSLMODE": "disable",
+                "MINERVA_INSTANCE_ROOT": "${workspaceFolder}/examples/tiny_instance_v1"
+            },
+            "args": ["load-data", "--data-source=hub", "examples/tiny_instance_v1/sample-data/sample.csv"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'minerva-admin'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=minerva-admin",
+                    "--package=minerva-admin"
+                ],
+                "filter": {
+                    "name": "minerva-admin",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'minerva-service'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=minerva-service",
+                    "--package=minerva-service"
+                ],
+                "filter": {
+                    "name": "minerva-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PGDATABASE": "minerva"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'minerva-service'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=minerva-service",
+                    "--package=minerva-service"
+                ],
+                "filter": {
+                    "name": "minerva-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

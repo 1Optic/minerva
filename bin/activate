@@ -1,0 +1,53 @@
+# vim: filetype=sh
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=password
+export PGSSLMODE=disable
+
+function absolute_dir {
+    local old_pwd="$(pwd)"
+    cd "$1"
+    pwd
+    cd "$old_pwd"
+}
+
+SHELL_NAME="${SHELL##*/}"
+
+if [ $SHELL_NAME = "bash" ]; then
+    SCRIPT_PATH="${BASH_SOURCE[0]}"
+elif [ $SHELL_NAME = "zsh" ]; then
+    SCRIPT_PATH="${(%):-%x}"
+fi
+
+RELATIVE_SCRIPT_DIR=${SCRIPT_PATH%/*}
+
+SCRIPT_DIR=$(absolute_dir $RELATIVE_SCRIPT_DIR)
+
+echo $SCRIPT_DIR
+
+export MINERVA_ROOT=${SCRIPT_DIR%/*}
+
+export PATH=$MINERVA_ROOT/bin:$PATH
+
+# Test if at virtual environment is already configured, and if not, create one
+# and install dependencies
+if [ -z "$VIRTUAL_ENV" ] || [ ! -d "$VIRTUAL_ENV" ]
+then
+    VENV_DIR="$MINERVA_ROOT/venv"
+
+    if [ ! -d "$VENV_DIR" ]
+    then
+        echo "Creating virtualenv at '$VENV_DIR'"
+
+        python3 -m venv "$VENV_DIR"
+
+        source "$VENV_DIR/bin/activate"
+
+        pip3 install -r "$MINERVA_ROOT/bin/requirements.txt"
+    else
+        echo "Activating virtualenv at '$VENV_DIR'"
+
+        source "$VENV_DIR/bin/activate"
+    fi
+fi

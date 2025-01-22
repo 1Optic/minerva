@@ -1,0 +1,11 @@
+entity_aggregation:
+  source: hub_node_1d
+  name: hub_v-network_1d
+  basename: hub_v-network_1d
+  data_source: hub
+  entity_type: v-network
+  relation: node->v-network
+  aggregation_type: VIEW
+  parts:
+  - name: hub_v-network_main_1d
+    source: hub_node_main_1d

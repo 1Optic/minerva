@@ -1,0 +1,28 @@
+data_source: hub
+entity_type: node
+attributes:
+- name: name
+  data_type: text
+  unit: null
+  description: null
+  extra_data: null
+- name: equipment_type
+  data_type: text
+  unit: null
+  description: The equipment type
+  extra_data: null
+- name: equipment_serial
+  data_type: text
+  unit: null
+  description: The manufacturer serial number of the equipment
+  extra_data: null
+- name: longitude
+  data_type: real
+  unit: null
+  description: Coordinate of equipment location
+  extra_data: null
+- name: latitude
+  data_type: real
+  unit: null
+  description: Coordinate of equipment location
+  extra_data: null

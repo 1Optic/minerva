@@ -1,0 +1,9 @@
+time_aggregation:
+  source: hub_node_1d
+  name: hub_node_1w
+  data_source: hub
+  granularity: 1w
+  mapping_function: trend.mapping_1d->1w
+  parts:
+  - name: hub_node_main_1w
+    source: hub_node_main_1d
