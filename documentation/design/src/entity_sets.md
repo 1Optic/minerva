@@ -6,75 +6,127 @@ For reprocessing of historical data and investigating previously calculated
 data that uses entity sets, it is neccessary to keep track of the history of
 entity sets.
 
-Entity sets are stored as relations between 'entity set' entities and regular
-entities. Up until now, relations never stored a history of previous state.
-Relations are periodically re-calculated and the old state was always
-discarded.
+Entity sets used to be stored as relations between 'entity_set' entities and regular
+entities. Relations don't store a history of previous state and in this case we
+even want to store the history of subsets (per entity_set entity) of the
+relation table contents. So to enable proper history tracking, the storage of
+entity sets is redesigned using dedicated tables and no longer uses the generic
+relation mechanisms.
 
-### Storage Of Revisions
+There will still be an entity type 'entity_set' by default and a regular
+corresponding entity table `entity.entity_set`. Names of the entities will be a
+combination of attributes that makes the entity set unique and formed as a
+[Distinguished Name](https://datatracker.ietf.org/doc/html/rfc1779E) with
+commas as separators and without optional spaces around the separators.
 
-Original form of a relation table just stores a source entity Id and a target
-entity Id for each relation:
+### Tables
 
-| source_id  | target_id   |
-| ---------: | ----------: |
-| 1          | 4445        |
-| 1          | 4893        |
-| 1          | 4895        |
-| 1          | 334         |
-| 2          | 8899        |
-| 2          | 8901        |
+There is one meta-data table storing which entity sets exist in the 'directory'
+schema:
 
-With the new history tracking, we store one extra piece of information in the
-relation tables; the revision Id:
+`directory.entity_set`
 
-| Name        | Data Type |
-| -----       | --------  |
-| revision_id | integer   |
-| source_id   | integer   |
-| target_id   | integer   |
+| Name                      | Data Type                                    |
+|---------------------------|----------------------------------------------|
+| id                        | serial primary key                           |
+| name                      | text                                         |
+| entity_type_id            | integer references directory.entity_type(id) |
+| entity_id                 | integer                                      |
+| owner                     | text                                         |
+| group                     | text                                         |
+| current_revision_id       | integer                                      |
+| revision_retention_period | interval                                     |
 
-Example of a relation table with the extra information:
+There is a schema to store the actual entity set data and corresponding history
+data named `entity_set`. Two tables are generated for each entity type; one
+with the actual entity set data and one with the revision meta data. Entity
+sets of the same entity type are stored in the same tables (data and revision
+meta-data).
 
-| revision_id  | source_id  | target_id   |
-| -----------: | ---------: | ----------: |
-| 1            | 1          | 4445        |
-| 1            | 1          | 4893        |
-| 1            | 1          | 4895        |
-| 1            | 1          | 334         |
-| 1            | 2          | 8899        |
-| 1            | 2          | 8901        |
-| 2            | 1          | 4445        |
-| 2            | 1          | 334         |
-| 2            | 2          | 8899        |
-| 2            | 2          | 8901        |
+An example table for the v-cell entity type storing all revisions of all entity
+sets of 'v-cell' entities:
 
-Here we see that in the second revision, 2 relations have been removed.
+`entity_set."v-cell"`
 
-There is a corresponding meta-data table `relation.revision` for relation types that stores more
-information on the revisions:
+| Name          | Data Type                                          |
+|---------------|----------------------------------------------------|
+| entity_set_id | integer references directory.entity_set(id)        |
+| revision_id   | bigint references entity_set."v-cell_revision"(id) |
+| entity_id     | integer                                            |
 
-| Name         | Data Type |
-|--------------|-----------|
-| type_id      | integer   |
-| id           | integer   |
-| valid_period | tstzrange |
+An example table for the v-cell entity type revision meta data for all entity
+sets of 'v-cell' entities:
 
-The relation type table stores the current revision for each type in the column
-`current_revision_id` and the retention for revisions in the column
-`revision_retention`: 
+`entity_set."v-cell_revision"`
 
-| Name                | Data Type                                |
-|---------------------|------------------------------------------|
-| id                  | integer                                  |
-| name                | name                                     |
-| cardinality         | relation_directory.type_cardinality_enum |
-| current_revision_id | integer                                  |
-| revision_retention  | interval                                 |
+| Name            | Data Type                                   |
+|-----------------|---------------------------------------------|
+| id              | bigserial primary key                       |
+| entity_set_id   | integer references directory.entity_set(id) |
+| validity_period | tstzrange                                   |
 
-Example of the type table with a relation type:
+### Creation Of Entity Sets
 
-| id | name             | cardinality | current_revision_id | revision_retention |
-|---:|------------------|-------------|--------------------:|--------------------|
-|  1 | node->entity_set |             |                   2 | 3 mons             |
+1. Create a new entity_set entity with a name of 'group=<group>,owner=<owner>,name=<entity_set_name>'.
+2. Insert record in the table `directory.entity_set` leaving
+   `current_revision_id` with a NULL value.
+3. Check if there are already tables in the 'entity_set' schema for entity set
+   data and entity set revision meta data matching the entity type of the
+   entity set and if not, create them.
+4. Create a new revision record in the corresponding revision table setting the
+   start of the `validity_period` to the output of the now() function and the end
+   of the `validity_period` to NULL.
+5. Insert records in the entity set data table for the corresponding entity
+   type using the id of the newly created entity set and revision.
+6. Set the `current_revision_id` of the entity set to the id of the previously
+   created revision.
 
+### Modifying Of Entity Sets
+
+1. Create a new revision record in the corresponding revision table setting the
+   start of the `validity_period` to the output of the now() function and the end
+   of the validity_period to NULL.
+2. If the `current_revision_id` of the entity set is not NULL, update the end
+   of the `validity_period` of that revision with the start of the newly
+   created revision.
+3. Insert records for the updated set of entities in the entity set data table
+   using the id of the newly created revision.
+5. Set the `current_revision_id` of the entity set to the id of the newly  
+   created revision.
+
+### Deleting Of Entity Sets
+
+It needs to be decided if entity sets can be deleted. When entity sets are used
+for e.g. aggregation materializations, you want to keep the records of the
+entity sets that the aggregations were created from. Otherwise, if you delete
+the entity set, you will want to delete corresponding aggregated data.
+
+### Example Data
+
+`directory.entity_type`
+
+| id | name   |
+|----|--------|
+| 1  | v-cell |
+
+`directory.entity_set`
+
+| id | entity_type_id | owner    | group        | current_revision_id | revision_retention_period |
+|----|----------------|----------|--------------|---------------------|---------------------------|
+| 1  | 1              | John Doe | optimization | 3                   | 3mons                     |
+
+`entity_set."v-cell"`
+
+| entity_set_id | revision_id | entity_id |
+|---------------|-------------|-----------|
+| 1             | 1           | 97        |
+| 1             | 1           | 109       |
+| 1             | 1           | 236       |
+
+`entity_set."v-cell_revision"`
+
+| id | entity_set_id | validity_period                      |
+|----|---------------|--------------------------------------|
+| 1  | 1             | (2025-01-18 13:44, 2025-01-22 09:07] |
+| 2  | 1             | (2025-01-22 09:07, 2025-01-23 08:31] |
+| 3  | 1             | (2025-01-23 08:31, ]                 |
