@@ -111,9 +111,9 @@ the entity set, you will want to delete corresponding aggregated data.
 
 `directory.entity_set`
 
-| id | entity_type_id | owner    | group        | current_revision_id | revision_retention_period |
-|----|----------------|----------|--------------|---------------------|---------------------------|
-| 1  | 1              | John Doe | optimization | 3                   | 3mons                     |
+| id | name    | entity_type_id | owner    | group        | current_revision_id | revision_retention_period |
+|----|---------|----------------|----------|--------------|---------------------|---------------------------|
+| 1  | highway | 1              | John Doe | optimization | 3                   | 3mons                     |
 
 `entity_set."v-cell"`
 
