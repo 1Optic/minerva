@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{char, fmt::Display, str::pattern::Pattern};
 
 use tokio_postgres::GenericClient;
 
@@ -89,31 +89,41 @@ pub async fn materialize_curr_ptr_by_name<T: GenericClient + Send + Sync>(
 
     let record_count: i32 = row.get(0);
 
-    let materialized_view = if has_materialized_view(client, attribute_store_name).await? {
-        refresh_materialized_view(client, attribute_store_name).await?;
-
-        true
-    } else {
-        false
+    match curr_data_storage_method(client, attribute_store_name).await? {
+        CurrDataStorageMethod::View => {
+            // Nothing to do for a view
+        },
+        CurrDataStorageMethod::Table => {
+            update_curr_table(client, attribute_store_name).await?;
+        },
+        CurrDataStorageMethod::MaterializedView => {
+            refresh_materialized_view(client, attribute_store_name).await?;
+        }
     };
 
     Ok(MaterializeCurrPtrResult {
         record_count: record_count.try_into().unwrap(),
-        materialized_view,
+        materialized_view: false,
         attribute_store_name: attribute_store_name.to_string(),
         attribute_store_id,
     })
 }
 
-pub async fn has_materialized_view<T: GenericClient + Send + Sync>(
+pub enum CurrDataStorageMethod {
+    View,
+    MaterializedView,
+    Table,
+}
+
+pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_name: &str,
-) -> Result<bool, MaterializeCurrPtrError> {
+) -> Result<CurrDataStorageMethod, MaterializeCurrPtrError> {
     let query = concat!(
-        "SELECT relname ",
+        "SELECT relkind ",
         "FROM pg_class c ",
         "JOIN pg_namespace ns ON ns.oid = c.relnamespace ",
-        "WHERE ns.nspname = 'attribute' AND c.relname = $1 AND c.relkind = 'm'"
+        "WHERE ns.nspname = 'attribute' AND c.relname = $1 AND"
     );
 
     let rows = client
@@ -126,10 +136,28 @@ pub async fn has_materialized_view<T: GenericClient + Send + Sync>(
         })?;
 
     if rows.is_empty() {
-        Ok(false)
+        return Err(MaterializeCurrPtrError::Unexpected(
+                "Could not determine existence of materialized view: No meta data found".to_string()
+            ))
     } else {
-        Ok(true)
+        let row = rows.first().unwrap();
+
+        let kind: &str = row.get(0);
+
+        match kind {
+            'm' => Ok(CurrDataStorageMethod::MaterializedView),
+            'r' => Ok(CurrDataStorageMethod::Table),
+            'v' => Ok(CurrDataStorageMethod::View),
+        }
     }
+
+
+}
+
+pub async fn update_curr_table<T: GenericClient + Send + Sync>(
+    client: &T,
+    attribute_store_name: &str,
+) -> Result<(), MaterializeCurrPtrError> {
 }
 
 pub async fn refresh_materialized_view<T: GenericClient + Send + Sync>(
