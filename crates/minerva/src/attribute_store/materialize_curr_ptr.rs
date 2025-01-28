@@ -6,7 +6,7 @@ use crate::error::Error;
 
 pub struct MaterializeCurrPtrResult {
     pub record_count: u64,
-    pub materialized_view: bool,
+    pub updated_curr_data: String,
     pub attribute_store_name: String,
     pub attribute_store_id: i32,
 }
@@ -89,21 +89,24 @@ pub async fn materialize_curr_ptr_by_name<T: GenericClient + Send + Sync>(
 
     let record_count: i32 = row.get(0);
 
-    match curr_data_storage_method(client, attribute_store_name).await? {
+    let updated_curr_data = match curr_data_storage_method(client, attribute_store_name).await? {
         CurrDataStorageMethod::View => {
             // Nothing to do for a view
+            "view".to_string()
         }
         CurrDataStorageMethod::Table => {
             update_curr_table(client, attribute_store_name).await?;
+            "table".to_string()
         }
         CurrDataStorageMethod::MaterializedView => {
             refresh_materialized_view(client, attribute_store_name).await?;
+            "materialized view".to_string()
         }
     };
 
     Ok(MaterializeCurrPtrResult {
         record_count: record_count.try_into().unwrap(),
-        materialized_view: false,
+        updated_curr_data,
         attribute_store_name: attribute_store_name.to_string(),
         attribute_store_id,
     })
@@ -123,7 +126,7 @@ pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
         "SELECT relkind ",
         "FROM pg_class c ",
         "JOIN pg_namespace ns ON ns.oid = c.relnamespace ",
-        "WHERE ns.nspname = 'attribute' AND c.relname = $1 AND"
+        "WHERE ns.nspname = 'attribute' AND c.relname = $1"
     );
 
     let rows = client
@@ -142,15 +145,16 @@ pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
     } else {
         let row = rows.first().unwrap();
 
-        let kind: &str = row.get(0);
+        let kind: i8 = row.get(0);
+        let kind_char = kind as u8 as char;
 
-        match kind {
-            "m" => Ok(CurrDataStorageMethod::MaterializedView),
-            "r" => Ok(CurrDataStorageMethod::Table),
-            "v" => Ok(CurrDataStorageMethod::View),
+        match kind_char {
+            'm' => Ok(CurrDataStorageMethod::MaterializedView),
+            'r' => Ok(CurrDataStorageMethod::Table),
+            'v' => Ok(CurrDataStorageMethod::View),
             _ => Err(MaterializeCurrPtrError::Unexpected(format!(
                 "Unexpected relation type: '{}'",
-                kind
+                kind_char
             ))),
         }
     }
@@ -174,11 +178,15 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
             MaterializeCurrPtrError::Unexpected(format!("Could not query attributes: {e}"))
         })?;
 
-    let attribute_names: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
+    let mut columns: Vec<String> = vec!["id", "first_appearance", "modified", "hash", "entity_id", "end"].into_iter().map(String::from).collect();
+    let mut attribute_names: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
+    columns.append(&mut attribute_names);
     
-    let cols_part = attribute_names.join()
+    let cols_part = columns.join(",");
     
-    let query = format!("INSERT INTO attribute.\"{}\"({})", attribute_store_name, cols_part);
+    let query = format!("INSERT INTO attribute.\"{}\"({}) SELECT {} FROM attribute_history.\"{}\" history JOIN attribute_history.\"{}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id", attribute_store_name, cols_part, cols_part, attribute_store_name, attribute_store_name);
+
+    let result = client.execute(&query, &[]).await;
 
     Ok(())
 }
