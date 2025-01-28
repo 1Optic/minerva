@@ -1,4 +1,4 @@
-use std::{char, fmt::Display, str::pattern::Pattern};
+use std::fmt::Display;
 
 use tokio_postgres::GenericClient;
 
@@ -92,10 +92,10 @@ pub async fn materialize_curr_ptr_by_name<T: GenericClient + Send + Sync>(
     match curr_data_storage_method(client, attribute_store_name).await? {
         CurrDataStorageMethod::View => {
             // Nothing to do for a view
-        },
+        }
         CurrDataStorageMethod::Table => {
             update_curr_table(client, attribute_store_name).await?;
-        },
+        }
         CurrDataStorageMethod::MaterializedView => {
             refresh_materialized_view(client, attribute_store_name).await?;
         }
@@ -136,28 +136,51 @@ pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
         })?;
 
     if rows.is_empty() {
-        return Err(MaterializeCurrPtrError::Unexpected(
-                "Could not determine existence of materialized view: No meta data found".to_string()
-            ))
+        Err(MaterializeCurrPtrError::Unexpected(
+            "Could not determine current data storage method: No meta data found".to_string(),
+        ))
     } else {
         let row = rows.first().unwrap();
 
         let kind: &str = row.get(0);
 
         match kind {
-            'm' => Ok(CurrDataStorageMethod::MaterializedView),
-            'r' => Ok(CurrDataStorageMethod::Table),
-            'v' => Ok(CurrDataStorageMethod::View),
+            "m" => Ok(CurrDataStorageMethod::MaterializedView),
+            "r" => Ok(CurrDataStorageMethod::Table),
+            "v" => Ok(CurrDataStorageMethod::View),
+            _ => Err(MaterializeCurrPtrError::Unexpected(format!(
+                "Unexpected relation type: '{}'",
+                kind
+            ))),
         }
     }
-
-
 }
 
 pub async fn update_curr_table<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_name: &str,
 ) -> Result<(), MaterializeCurrPtrError> {
+    let query = concat!(
+        "SELECT attribute.name ",
+        "FROM attribute_directory.attribute ",
+        "JOIN attribute_directory.attribute_store ast ON ast.id = attribute.attribute_store_id ",
+        "WHERE ast::text = $1",
+    );
+
+    let rows = client
+        .query(query, &[&attribute_store_name])
+        .await
+        .map_err(|e| {
+            MaterializeCurrPtrError::Unexpected(format!("Could not query attributes: {e}"))
+        })?;
+
+    let attribute_names: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
+    
+    let cols_part = attribute_names.join()
+    
+    let query = format!("INSERT INTO attribute.\"{}\"({})", attribute_store_name, cols_part);
+
+    Ok(())
 }
 
 pub async fn refresh_materialized_view<T: GenericClient + Send + Sync>(
