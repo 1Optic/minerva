@@ -16,6 +16,7 @@ pub mod notification_store;
 pub mod relation;
 pub mod schema;
 pub mod trend_materialization;
+pub mod attribute_materialization;
 pub mod trend_store;
 pub mod trigger;
 pub mod virtual_entity;

@@ -9,6 +9,8 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::{Client, GenericClient};
 
+use crate::attribute_materialization::AddAttributeMaterialization;
+
 use super::attribute_store::{load_attribute_stores, AddAttributeStore, AttributeStore};
 use super::change::Change;
 use super::changes::trend_store::AddTrendStore;
@@ -22,6 +24,7 @@ use super::trend_materialization::{
     load_materializations, load_materializations_from, AddTrendMaterialization,
     TrendMaterialization,
 };
+use super::attribute_materialization::{AttributeMaterialization, load_attribute_materializations_from, load_attribute_materializations};
 use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore};
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
 use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
@@ -89,6 +92,7 @@ pub struct MinervaInstance {
     pub virtual_entities: Vec<VirtualEntity>,
     pub relations: Vec<Relation>,
     pub trend_materializations: Vec<TrendMaterialization>,
+    pub attribute_materializations: Vec<AttributeMaterialization>,
     pub triggers: Vec<Trigger>,
     pub entity_sets: Vec<EntitySet>,
 }
@@ -110,6 +114,8 @@ impl MinervaInstance {
         let relations = Vec::new();
 
         let trend_materializations = load_materializations(client).await?;
+        
+        let attribute_materializations = load_attribute_materializations(client).await?;
 
         let triggers = load_triggers(client)
             .await
@@ -125,22 +131,24 @@ impl MinervaInstance {
             virtual_entities,
             relations,
             trend_materializations,
+            attribute_materializations,
             triggers,
             entity_sets,
         })
     }
 
-    pub fn load_from(minerva_instance_root: &Path) -> MinervaInstance {
+    pub fn load_from(minerva_instance_root: &Path) -> Result<MinervaInstance, String> {
         let trend_stores = load_trend_stores_from(minerva_instance_root).collect();
         let notification_stores = load_notification_stores_from(minerva_instance_root).collect();
-        let attribute_stores = load_attribute_stores_from(minerva_instance_root).collect();
+        let attribute_stores = load_attribute_stores_from(minerva_instance_root).collect::<Result<Vec<AttributeStore>, String>>()?;
         let virtual_entities = load_virtual_entities_from(minerva_instance_root).collect();
         let relations = load_relations_from(minerva_instance_root).collect();
         let trend_materializations = load_materializations_from(minerva_instance_root).collect();
+        let attribute_materializations = load_attribute_materializations_from(minerva_instance_root).collect();
         let triggers = load_triggers_from(minerva_instance_root).collect();
         let entity_sets: Vec<EntitySet> = vec![];
 
-        MinervaInstance {
+        Ok(MinervaInstance {
             instance_root: Some(PathBuf::from(minerva_instance_root)),
             trend_stores,
             attribute_stores,
@@ -148,9 +156,10 @@ impl MinervaInstance {
             virtual_entities,
             relations,
             trend_materializations,
+            attribute_materializations,
             triggers,
             entity_sets,
-        }
+        })
     }
 
     pub async fn initialize<K, V>(&self, client: &mut Client, env: &[(K, V)]) -> Result<(), Error>
@@ -214,6 +223,8 @@ impl MinervaInstance {
         }
 
         initialize_trend_materializations(client, &self.trend_materializations).await?;
+
+        initialize_attribute_materializations(client, &self.attribute_materializations).await?;
 
         if let Some(instance_root) = &self.instance_root {
             initialize_custom(
@@ -368,7 +379,7 @@ pub async fn dump(client: &mut Client) {
 
 fn load_attribute_stores_from(
     minerva_instance_root: &Path,
-) -> impl Iterator<Item = AttributeStore> {
+) -> impl Iterator<Item = Result<AttributeStore, String>> {
     let glob_path = format!(
         "{}/attribute/*.yaml",
         minerva_instance_root.to_string_lossy()
@@ -378,8 +389,8 @@ fn load_attribute_stores_from(
         .expect("Failed to read glob pattern")
         .filter_map(|entry| match entry {
             Ok(path) => {
-                let f = std::fs::File::open(path).unwrap();
-                let attribute_store: AttributeStore = serde_yaml::from_reader(f).unwrap();
+                let f = std::fs::File::open(path.clone()).unwrap();
+                let attribute_store = serde_yaml::from_reader(f).map_err(|e|format!("Could not load attribute store definition '{}': {e}", path.to_string_lossy()));
 
                 Some(attribute_store)
             }
@@ -640,6 +651,29 @@ async fn initialize_relations(client: &mut Client, relations: &Vec<Relation>) ->
         }
     }
 
+    Ok(())
+}
+
+async fn initialize_attribute_materializations(
+    client: &mut Client,
+    attribute_materializations: &Vec<AttributeMaterialization>,
+) -> Result<(), Error> {
+    for materialization in attribute_materializations {
+        let change = AddAttributeMaterialization::from(materialization.clone());
+
+        let mut tx = client.transaction().await?;
+
+        match change.apply(&mut tx).await {
+            Ok(message) => {
+                tx.commit().await?;
+                println!("{message}")
+            }
+            Err(e) => {
+                tx.rollback().await?;
+                println!("{e}")
+            }
+        }
+    }
     Ok(())
 }
 

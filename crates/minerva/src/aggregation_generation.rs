@@ -36,7 +36,7 @@ pub fn generate_all_standard_aggregations(
     instance_root: &Path,
     config: InstanceConfig,
 ) -> Result<(), AggregationGenerationError> {
-    let mut instance = MinervaInstance::load_from(instance_root);
+    let mut instance = MinervaInstance::load_from(instance_root).map_err(AggregationGenerationError::Runtime)?;
 
     for trend_store in instance.trend_stores.clone() {
         if let Some(title) = &trend_store.title {

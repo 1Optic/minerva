@@ -59,7 +59,7 @@ impl Cmd for UpdateOpt {
             &minerva_instance_root.to_string_lossy()
         );
         io::stdout().flush().unwrap();
-        let instance_def = MinervaInstance::load_from(&minerva_instance_root);
+        let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
         println!("Ok");
 
         update(

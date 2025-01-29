@@ -1,0 +1,14 @@
+attribute_store:
+  data_source: hub
+  entity_type: node
+query: |-
+  SELECT
+    19 AS entity_id,
+    now() AS timestamp,
+    'south_four' AS name,
+    'base-node' AS equipment_type,
+    'b9944846' AS equipment_serial,
+    4.896 AS longitude,
+    52.377 AS latitude,
+    5 AS test
+
