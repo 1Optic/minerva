@@ -11,11 +11,11 @@ pub enum AttributeMaterializeError {
 
 pub struct AttributeStoreRef 
 {
-    id: i32,
-    name: String,
+    pub id: i32,
+    pub name: String,
 }
 
-pub async fn view_to_attribute_staging<T: GenericClient + Send + Sync>(
+pub async fn materialize_attribute<T: GenericClient + Send + Sync>(
     client: &T, attribute_store: AttributeStoreRef, view_name: &str
 ) -> Result<u64, AttributeMaterializeError> {
     let mut attribute_names = load_attribute_names(client, attribute_store.id).await.map_err(AttributeMaterializeError::Unexpected)?;
@@ -23,9 +23,10 @@ pub async fn view_to_attribute_staging<T: GenericClient + Send + Sync>(
     columns.append(&mut attribute_names);
     let columns_part = columns.iter().map(|name| escape_identifier(name)).collect::<Vec<String>>().join(",");
 
-    let query = format!("INSERT INTO attribute_staging.\"{}\"({}) SELECT {} FROM {}", attribute_store.name, columns_part, columns_part, view_name);
+    let query = format!("INSERT INTO attribute_history.\"{}\"({}) SELECT {} FROM {}", attribute_store.name, columns_part, columns_part, view_name);
 
     let record_count = client.execute(&query, &[]).await.map_err(|e|AttributeMaterializeError::Unexpected(format!("Could not stage attribute data: {e}")))?;
 
     Ok(record_count)
 }
+

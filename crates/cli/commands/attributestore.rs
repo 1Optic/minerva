@@ -7,12 +7,14 @@ pub mod create;
 pub mod list;
 pub mod materializecurrptr;
 pub mod update;
+pub mod materialize;
 
 use compact::AttributeStoreCompact;
 use create::AttributeStoreCreate;
 use list::AttributeStoreList;
 use materializecurrptr::AttributeStoreMaterializeCurrPtr;
 use update::AttributeStoreUpdate;
+use materialize::AttributeStoreMaterialize;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreOpt {
@@ -32,6 +34,8 @@ pub enum AttributeStoreOptCommands {
     MaterializeCurrPtr(AttributeStoreMaterializeCurrPtr),
     #[command(about = "compact attribute store history")]
     Compact(AttributeStoreCompact),
+    #[command(about = "materialize attribute store")]
+    Materialize(AttributeStoreMaterialize),
 }
 
 impl AttributeStoreOpt {
@@ -44,6 +48,7 @@ impl AttributeStoreOpt {
                 materialize_curr_ptr.run().await
             }
             AttributeStoreOptCommands::Compact(compact) => compact.run().await,
+            AttributeStoreOptCommands::Materialize(materialize) => materialize.run().await,
         }
     }
 }
