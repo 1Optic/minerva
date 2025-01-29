@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use clap::Parser;
 use tokio_postgres::Client;
 
-use minerva::{attribute_materialization::{attribute_materialization_view_name, load_attribute_materializations}, attribute_store::{materialize::{
-    materialize_attribute, AttributeMaterializeError, AttributeStoreRef,
-}, materialize_curr_ptr::{materialize_curr_ptr, materialize_curr_ptr_by_name}}};
+use minerva::attribute_materialization::{
+    load_attribute_materialization_by_id, load_attribute_materialization_by_name,
+    load_attribute_materializations, AttributeMaterializeError,
+};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -26,40 +27,50 @@ impl Cmd for AttributeStoreMaterialize {
             .execute("SET citus.max_intermediate_result_size = -1", &[])
             .await?;
 
-        if let Some(id) = self.id {
+        if let Some(attribute_materialization_id) = self.id {
             let transaction = client.transaction().await?;
 
-            let view_name: &str = "";
-            let attribute_store = AttributeStoreRef {
-                id: 9,
-                name: "".to_string(),
-            };
+            let attribute_materialization =
+                load_attribute_materialization_by_id(&transaction, attribute_materialization_id)
+                    .await?;
 
-            let materialize_result = materialize_attribute(&transaction, &attribute_store, view_name).await.map_err(|e| format!("Could not materialize attribute data: {e}"))?;
-
-            println!(
-                "Compacted attribute store {}: {}",
-                attribute_store, materialize_result.materialized_record_count
-            );
-
-            let result = materialize_curr_ptr(&transaction, attribute_store.id).await?;
-
-            transaction.commit().await?;
+            let materialize_result = attribute_materialization
+                .materialize_attribute(&transaction)
+                .await
+                .map_err(|e| {
+                    format!(
+                        "Could not materialize attribute data for '{}': {e}",
+                        attribute_materialization
+                    )
+                })?;
 
             println!(
-                "Compacted attribute store '{}'({}): {}",
-                result.attribute_store_name, result.attribute_store_id, result.record_count
+                "Materialized attribute store {}: {}",
+                attribute_materialization.attribute_store,
+                materialize_result.materialized_record_count
             );
         } else if let Some(name) = &self.name {
             let transaction = client.transaction().await?;
 
-            let result = materialize_curr_ptr_by_name(&transaction, name).await?;
+            let attribute_materialization =
+                load_attribute_materialization_by_name(&transaction, name).await?;
+
+            let materialize_result = attribute_materialization
+                .materialize_attribute(&transaction)
+                .await
+                .map_err(|e| {
+                    format!(
+                        "Could not materialize attribute data for '{}': {e}",
+                        attribute_materialization
+                    )
+                })?;
 
             transaction.commit().await?;
 
             println!(
-                "Compacted attribute store '{}'({}): {}",
-                result.attribute_store_name, result.attribute_store_id, result.record_count
+                "Materialized attribute store {}: {}",
+                attribute_materialization.attribute_store,
+                materialize_result.materialized_record_count
             );
         } else {
             materialize_all_attribute_stores(&mut client)
@@ -74,14 +85,18 @@ impl Cmd for AttributeStoreMaterialize {
 async fn materialize_all_attribute_stores(
     client: &mut Client,
 ) -> Result<(), AttributeMaterializeError> {
-    let attribute_materializations = load_attribute_materializations(client).await.map_err(|e| AttributeMaterializeError::Unexpected(e.to_string()))?;
+    let attribute_materializations = load_attribute_materializations(client)
+        .await
+        .map_err(|e| AttributeMaterializeError::Unexpected(e.to_string()))?;
 
     for attribute_materialization in attribute_materializations {
-        let name = format!("{}_{}", attribute_materialization.attribute_store.data_source, attribute_materialization.attribute_store.entity_type);
-        let attribute_store_ref = AttributeStoreRef::from_name(client, &name).await.map_err(|e|AttributeMaterializeError::Unexpected(e.to_string()))?; 
-        let view_name = attribute_materialization_view_name(&attribute_materialization.attribute_store);
-        let materialize_result = materialize_attribute(client, &attribute_store_ref, &view_name).await?;
-        println!("Materialized {}: {} records", attribute_materialization, materialize_result.materialized_record_count);
+        let materialize_result = attribute_materialization
+            .materialize_attribute(client)
+            .await?;
+        println!(
+            "Materialized {}: {} records",
+            attribute_materialization, materialize_result.materialized_record_count
+        );
     }
 
     Ok(())

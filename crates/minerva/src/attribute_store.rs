@@ -15,7 +15,6 @@ use crate::meas_value::DataType;
 
 pub mod compact;
 pub mod materialize_curr_ptr;
-pub mod materialize;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
 #[postgres(name = "attribute_descr")]

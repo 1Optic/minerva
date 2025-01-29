@@ -163,7 +163,7 @@ pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
 pub async fn update_curr_table<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_name: &str,
-) -> Result<(), MaterializeCurrPtrError> {
+) -> Result<u64, MaterializeCurrPtrError> {
     let query = concat!(
         "SELECT attribute.name ",
         "FROM attribute_directory.attribute ",
@@ -178,17 +178,31 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
             MaterializeCurrPtrError::Unexpected(format!("Could not query attributes: {e}"))
         })?;
 
-    let mut columns: Vec<String> = vec!["id", "first_appearance", "modified", "hash", "entity_id", "end"].into_iter().map(String::from).collect();
+    let mut columns: Vec<String> = vec![
+        "id",
+        "first_appearance",
+        "modified",
+        "hash",
+        "entity_id",
+        "end",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
     let mut attribute_names: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
     columns.append(&mut attribute_names);
-    
+
     let cols_part = columns.join(",");
-    
+
     let query = format!("INSERT INTO attribute.\"{}\"({}) SELECT {} FROM attribute_history.\"{}\" history JOIN attribute_history.\"{}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id", attribute_store_name, cols_part, cols_part, attribute_store_name, attribute_store_name);
 
-    let result = client.execute(&query, &[]).await;
+    let record_count = client.execute(&query, &[]).await.map_err(|e| {
+        MaterializeCurrPtrError::Unexpected(format!(
+            "Could not load data into curr-data table: {e}"
+        ))
+    })?;
 
-    Ok(())
+    Ok(record_count)
 }
 
 pub async fn refresh_materialized_view<T: GenericClient + Send + Sync>(

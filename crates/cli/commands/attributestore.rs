@@ -5,16 +5,16 @@ use crate::commands::common::{Cmd, CmdResult};
 pub mod compact;
 pub mod create;
 pub mod list;
+pub mod materialize;
 pub mod materializecurrptr;
 pub mod update;
-pub mod materialize;
 
 use compact::AttributeStoreCompact;
 use create::AttributeStoreCreate;
 use list::AttributeStoreList;
+use materialize::AttributeStoreMaterialize;
 use materializecurrptr::AttributeStoreMaterializeCurrPtr;
 use update::AttributeStoreUpdate;
-use materialize::AttributeStoreMaterialize;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreOpt {

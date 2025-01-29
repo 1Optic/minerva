@@ -11,6 +11,9 @@ use tokio_postgres::{Client, GenericClient};
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 
+use super::attribute_materialization::{
+    load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
+};
 use super::attribute_store::{load_attribute_stores, AddAttributeStore, AttributeStore};
 use super::change::Change;
 use super::changes::trend_store::AddTrendStore;
@@ -24,7 +27,6 @@ use super::trend_materialization::{
     load_materializations, load_materializations_from, AddTrendMaterialization,
     TrendMaterialization,
 };
-use super::attribute_materialization::{AttributeMaterialization, load_attribute_materializations_from, load_attribute_materializations};
 use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore};
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
 use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
@@ -114,7 +116,7 @@ impl MinervaInstance {
         let relations = Vec::new();
 
         let trend_materializations = load_materializations(client).await?;
-        
+
         let attribute_materializations = load_attribute_materializations(client).await?;
 
         let triggers = load_triggers(client)
@@ -140,11 +142,13 @@ impl MinervaInstance {
     pub fn load_from(minerva_instance_root: &Path) -> Result<MinervaInstance, String> {
         let trend_stores = load_trend_stores_from(minerva_instance_root).collect();
         let notification_stores = load_notification_stores_from(minerva_instance_root).collect();
-        let attribute_stores = load_attribute_stores_from(minerva_instance_root).collect::<Result<Vec<AttributeStore>, String>>()?;
+        let attribute_stores = load_attribute_stores_from(minerva_instance_root)
+            .collect::<Result<Vec<AttributeStore>, String>>()?;
         let virtual_entities = load_virtual_entities_from(minerva_instance_root).collect();
         let relations = load_relations_from(minerva_instance_root).collect();
         let trend_materializations = load_materializations_from(minerva_instance_root).collect();
-        let attribute_materializations = load_attribute_materializations_from(minerva_instance_root).collect();
+        let attribute_materializations =
+            load_attribute_materializations_from(minerva_instance_root).collect();
         let triggers = load_triggers_from(minerva_instance_root).collect();
         let entity_sets: Vec<EntitySet> = vec![];
 
@@ -390,7 +394,12 @@ fn load_attribute_stores_from(
         .filter_map(|entry| match entry {
             Ok(path) => {
                 let f = std::fs::File::open(path.clone()).unwrap();
-                let attribute_store = serde_yaml::from_reader(f).map_err(|e|format!("Could not load attribute store definition '{}': {e}", path.to_string_lossy()));
+                let attribute_store = serde_yaml::from_reader(f).map_err(|e| {
+                    format!(
+                        "Could not load attribute store definition '{}': {e}",
+                        path.to_string_lossy()
+                    )
+                });
 
                 Some(attribute_store)
             }
