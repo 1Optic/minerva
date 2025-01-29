@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use postgres_protocol::escape::escape_identifier;
 use tokio_postgres::GenericClient;
 
 use crate::error::Error;
@@ -164,6 +165,14 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_name: &str,
 ) -> Result<u64, MaterializeCurrPtrError> {
+    let query = format!("TRUNCATE TABLE attribute.\"{}\"", attribute_store_name);
+
+    let _count = client.execute(&query, &[]).await.map_err(|e| {
+        MaterializeCurrPtrError::Unexpected(format!(
+            "Could not truncate curr-data table: {e}"
+        ))
+    })?;
+
     let query = concat!(
         "SELECT attribute.name ",
         "FROM attribute_directory.attribute ",
@@ -192,9 +201,10 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
     let mut attribute_names: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
     columns.append(&mut attribute_names);
 
-    let cols_part = columns.join(",");
+    let dest_cols_part = columns.iter().map(|col_name| escape_identifier(col_name)).collect::<Vec<String>>().join(",");
+    let src_cols_part = columns.iter().map(|col_name| format!("history.{}", escape_identifier(col_name))).collect::<Vec<String>>().join(",");
 
-    let query = format!("INSERT INTO attribute.\"{}\"({}) SELECT {} FROM attribute_history.\"{}\" history JOIN attribute_history.\"{}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id", attribute_store_name, cols_part, cols_part, attribute_store_name, attribute_store_name);
+    let query = format!("INSERT INTO attribute.\"{}\"({}) SELECT {} FROM attribute_history.\"{}\" history JOIN attribute_history.\"{}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id", attribute_store_name, dest_cols_part, src_cols_part, attribute_store_name, attribute_store_name);
 
     let record_count = client.execute(&query, &[]).await.map_err(|e| {
         MaterializeCurrPtrError::Unexpected(format!(
