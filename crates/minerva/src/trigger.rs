@@ -747,7 +747,7 @@ where
     }
 }
 
-async fn trigger_exists<T: GenericClient + Sync + Send>(
+pub async fn trigger_exists<T: GenericClient + Sync + Send>(
     trigger_name: &str,
     client: &mut T,
 ) -> Result<bool, Error> {

@@ -43,7 +43,10 @@ mod kpi;
 use kpi::{delete_kpi, get_kpi, get_kpis, post_kpi, update_kpi, KpiImplementedData, KpiRawData};
 
 mod trigger;
-use trigger::{change_thresholds, get_triggers, TriggerData};
+use trigger::{
+    change_thresholds, get_triggers, get_templates, get_template, create_trigger,
+    ShortTemplateData, TemplateData, TriggerData, TemplatedTriggerDefinition
+};
 
 mod entityset;
 use entityset::{
@@ -103,6 +106,9 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             kpi::delete_kpi,
             trigger::get_triggers,
             trigger::change_thresholds,
+            trigger::get_templates,
+            trigger::get_template,
+            trigger::create_trigger,
             entityset::get_entity_sets,
             entityset::change_entity_set,
             entityset::create_entity_set,
@@ -116,7 +122,8 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
                 TrendViewMaterializationData, TrendFunctionMaterializationData,
                 TrendFull, GeneratedTrendFull, TrendStorePartFull, TrendStoreFull,
                 DataSource, EntityType, KpiRawData, KpiImplementedData,
-                TriggerData, EntitySetData,
+                TriggerData, ShortTemplateData, TemplateData, 
+                TemplatedTriggerDefinition, EntitySetData,
             )
         ),
         tags(
@@ -187,6 +194,9 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             .service(delete_kpi)
             .service(get_triggers)
             .service(change_thresholds)
+            .service(get_templates)
+            .service(get_template)
+            .service(create_trigger)
             .service(get_entity_sets)
             .service(change_entity_set)
             .service(create_entity_set)

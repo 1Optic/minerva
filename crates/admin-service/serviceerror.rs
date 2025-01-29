@@ -14,6 +14,7 @@ pub enum ServiceErrorKind {
     PoolError,
     BadRequest,
     InternalError,
+    Conflict,
 }
 
 #[derive(From, Debug)]
@@ -64,6 +65,7 @@ impl ResponseError for ServiceError {
             ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
             ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
 
@@ -84,6 +86,7 @@ impl ResponseError for ExtendedServiceError {
             ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
             ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
 
