@@ -91,7 +91,7 @@ impl From<TriggerError> for TriggerTemplateError {
 }
 
 impl Template {
-    pub fn get_parameter(self, parameter_name: String) -> Option<TemplateParameter> {
+    pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
         self.parameters
             .into_iter()
             .find(|p| p.name == parameter_name)
@@ -110,7 +110,7 @@ impl From<Template> for BareTemplate {
 }
 
 impl TemplatedTrigger {
-    pub fn check_trigger(self) -> Result<(), TriggerTemplateError> {
+    pub fn check_trigger(&self) -> Result<(), TriggerTemplateError> {
         if let Some(parm) = self.template.parameters.clone().into_iter().find(|p| {
             !self
                 .parameters
@@ -123,7 +123,7 @@ impl TemplatedTrigger {
         if let Some(parm) = self.parameters.clone().into_iter().find(|p| {
             self.template
                 .clone()
-                .get_parameter(p.parameter.clone())
+                .get_parameter(&p.parameter)
                 .is_none()
         }) {
             return Err(TriggerTemplateError::ExtraneousParameter(parm.parameter));
@@ -131,7 +131,7 @@ impl TemplatedTrigger {
         let needed_thresholds = self.parameters.clone().into_iter().filter(|p| {
             self.template
                 .clone()
-                .get_parameter(p.parameter.clone())
+                .get_parameter(&p.parameter)
                 .unwrap()
                 .parameter_type
                 == ParameterType::ThresholdVariable
@@ -159,9 +159,7 @@ impl TemplatedTrigger {
         &self,
         client: &mut Transaction<'_>,
     ) -> Result<Trigger, TriggerTemplateError> {
-        if let Err(e) = self.clone().check_trigger() {
-            return Err(e);
-        };
+        self.check_trigger()?;
 
         if trigger_exists(&self.name, client)
             .await
@@ -178,7 +176,7 @@ impl TemplatedTrigger {
             .filter(|p| {
                 self.template
                     .clone()
-                    .get_parameter(p.parameter.clone())
+                    .get_parameter(&p.parameter)
                     .unwrap()
                     .parameter_type
                     == ParameterType::Counter
