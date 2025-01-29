@@ -122,7 +122,7 @@ impl Cmd for StartOpt {
                     minerva_instance_root.to_string_lossy()
                 );
 
-                let minerva_instance = MinervaInstance::load_from(&minerva_instance_root);
+                let minerva_instance = MinervaInstance::load_from(&minerva_instance_root)?;
 
                 env.push((
                     "MINERVA_INSTANCE_ROOT".to_string(),

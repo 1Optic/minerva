@@ -5,12 +5,14 @@ use crate::commands::common::{Cmd, CmdResult};
 pub mod compact;
 pub mod create;
 pub mod list;
+pub mod materialize;
 pub mod materializecurrptr;
 pub mod update;
 
 use compact::AttributeStoreCompact;
 use create::AttributeStoreCreate;
 use list::AttributeStoreList;
+use materialize::AttributeStoreMaterialize;
 use materializecurrptr::AttributeStoreMaterializeCurrPtr;
 use update::AttributeStoreUpdate;
 
@@ -32,6 +34,8 @@ pub enum AttributeStoreOptCommands {
     MaterializeCurrPtr(AttributeStoreMaterializeCurrPtr),
     #[command(about = "compact attribute store history")]
     Compact(AttributeStoreCompact),
+    #[command(about = "materialize attribute store")]
+    Materialize(AttributeStoreMaterialize),
 }
 
 impl AttributeStoreOpt {
@@ -44,6 +48,7 @@ impl AttributeStoreOpt {
                 materialize_curr_ptr.run().await
             }
             AttributeStoreOptCommands::Compact(compact) => compact.run().await,
+            AttributeStoreOptCommands::Materialize(materialize) => materialize.run().await,
         }
     }
 }

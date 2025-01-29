@@ -112,7 +112,7 @@ impl Cmd for InitializeOpt {
             self.instance_root.to_string_lossy(),
         )];
 
-        MinervaInstance::load_from(&self.instance_root)
+        MinervaInstance::load_from(&self.instance_root)?
             .initialize(&mut client, env.as_slice())
             .await?;
 

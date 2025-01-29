@@ -1,4 +1,5 @@
 pub mod aggregation_generation;
+pub mod attribute_materialization;
 pub mod attribute_storage;
 pub mod attribute_store;
 pub mod change;

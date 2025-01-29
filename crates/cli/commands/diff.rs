@@ -36,12 +36,12 @@ impl Cmd for DiffOpt {
         let from_instance_descr = format!("dir('{}')", minerva_instance_root.to_string_lossy());
         let to_instance_descr: String;
 
-        let instance_def = MinervaInstance::load_from(&minerva_instance_root);
+        let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
 
         let other_instance = match &self.with_dir {
             Some(with_dir) => {
                 to_instance_descr = format!("dir('{}')", with_dir.to_string_lossy());
-                MinervaInstance::load_from(with_dir)
+                MinervaInstance::load_from(with_dir)?
             }
             None => {
                 let db_config = get_db_config()?;

@@ -442,6 +442,19 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
     attributes
 }
 
+pub async fn load_attribute_names<T: GenericClient + Send + Sync>(
+    conn: &T,
+    attribute_store_id: i32,
+) -> Result<Vec<String>, String> {
+    let query = "SELECT name FROM attribute_directory.attribute WHERE attribute_store_id = $1";
+    let rows = conn
+        .query(query, &[&attribute_store_id])
+        .await
+        .map_err(|e| format!("Could not load attribute names: {e}"))?;
+
+    Ok(rows.iter().map(|row| row.get::<usize, String>(0)).collect())
+}
+
 pub fn load_attribute_store_from_file(path: &PathBuf) -> Result<AttributeStore, Error> {
     let f = std::fs::File::open(path).map_err(|e| {
         ConfigurationError::from_msg(format!(

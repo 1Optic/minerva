@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.18.0] - 2025-01-29
+
+### Added
+
+- Added attribute materialization initialization
+- Added support for attribute materialization
+
 ## [9.17.1] - 2025-01-20
 
 ### Fixed
