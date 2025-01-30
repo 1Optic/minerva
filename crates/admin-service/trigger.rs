@@ -2,20 +2,21 @@ use deadpool_postgres::Pool;
 use std::ops::DerefMut;
 use std::time::Duration;
 
-use actix_web::{get, put, post, web::Data, web::Json, web::Path, HttpResponse, Responder};
+use actix_web::{get, post, put, web::Data, web::Json, web::Path, HttpResponse, Responder};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use utoipa::ToSchema;
 
+use minerva::change::Change;
 use minerva::error::DatabaseError;
 use minerva::trigger::{
     list_triggers, load_thresholds_with_client, load_trigger, set_enabled, set_thresholds,
-    Threshold, TriggerError,
+    AddTrigger, Threshold, TriggerError,
 };
 use minerva::trigger_template::{
-    Template, BareTemplate, TriggerTemplateError, TemplatedTrigger, ParameterValue,
-    show_template, list_templates, get_template_from_id,
+    get_bare_template, get_template_from_id, list_templates, BareTemplate, ParameterValue,
+    Template, TemplatedTrigger, TriggerTemplateError,
 };
 
 use super::serviceerror::{ExtendedServiceError, ServiceErrorKind};
@@ -65,7 +66,7 @@ pub struct TemplateInstanceDefinition {
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct TemplatedTriggerDefinition {
     pub name: String,
-    pub description: String,
+    pub description: Option<String>,
     pub thresholds: Vec<ThresholdData>,
     pub entity_type: String,
     #[serde(with = "humantime_serde")]
@@ -107,7 +108,7 @@ impl From<BareTemplate> for TemplateData {
 }
 
 impl From<Template> for TemplateData {
-    fn from(template:Template) -> Self {
+    fn from(template: Template) -> Self {
         BareTemplate::from(template).into()
     }
 }
@@ -122,19 +123,19 @@ impl From<TemplateData> for ShortTemplateData {
 }
 
 impl From<BareTemplate> for ShortTemplateData {
-    fn from(template:BareTemplate) -> Self {
+    fn from(template: BareTemplate) -> Self {
         TemplateData::from(template).into()
     }
 }
 
 impl From<Template> for ShortTemplateData {
-    fn from(template:Template) -> Self {
+    fn from(template: Template) -> Self {
         TemplateData::from(template).into()
     }
 }
 
 impl From<ParameterValue> for ParameterData {
-    fn from(parm:ParameterValue) -> Self {
+    fn from(parm: ParameterValue) -> Self {
         ParameterData {
             parameter: parm.parameter,
             value: parm.value,
@@ -142,11 +143,11 @@ impl From<ParameterValue> for ParameterData {
     }
 }
 
-impl Into<ParameterValue> for ParameterData {
-    fn into(self) -> ParameterValue {
+impl From<ParameterData> for ParameterValue {
+    fn from(parm: ParameterData) -> Self {
         ParameterValue {
-            parameter: self.parameter,
-            value: self.value,
+            parameter: parm.parameter,
+            value: parm.value,
         }
     }
 }
@@ -378,28 +379,32 @@ pub(super) async fn change_thresholds(pool: Data<Pool>, post: String) -> impl Re
 #[get("/templates")]
 pub(super) async fn get_templates(pool: Data<Pool>) -> impl Responder {
     let try_manager = pool.get().await;
-    
+
     match try_manager {
         Ok(mut manager) => {
             let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
             let result = list_templates(client);
             match result.await {
-                Ok(res) => HttpResponse::Ok().json(res.into_iter().map(|t| ShortTemplateData::from(t)).collect::<Vec<ShortTemplateData>>()),
+                Ok(res) => HttpResponse::Ok().json(
+                    res.into_iter()
+                        .map(ShortTemplateData::from)
+                        .collect::<Vec<ShortTemplateData>>(),
+                ),
                 Err(TriggerTemplateError::DatabaseError(e)) => {
                     let mut messages = Map::new();
                     messages.insert("general".to_string(), e.msg.into());
                     HttpResponse::InternalServerError().json(messages)
-                },
+                }
                 Err(_) => {
                     let mut messages = Map::new();
                     messages.insert("general".to_string(), "Unexpected error".into());
                     HttpResponse::InternalServerError().json(messages)
                 }
             }
-        },
+        }
         Err(e) => {
             let mut messages = Map::new();
-             messages.insert("general".to_string(), e.to_string().into());
+            messages.insert("general".to_string(), e.to_string().into());
             HttpResponse::InternalServerError().json(messages)
         }
     }
@@ -418,39 +423,42 @@ pub(super) async fn get_templates(pool: Data<Pool>) -> impl Responder {
 pub(super) async fn get_template(pool: Data<Pool>, id: Path<i32>) -> impl Responder {
     let try_manager = pool.get().await;
     let trigger_id = id.into_inner();
-    
+
     match try_manager {
         Ok(mut manager) => {
             let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
-            let result = show_template(client, trigger_id);
+            let result = get_bare_template(client, trigger_id);
             match result.await {
                 Ok(template) => HttpResponse::Ok().json(TemplateData::from(template)),
                 Err(TriggerTemplateError::DatabaseError(e)) => {
                     let mut messages = Map::new();
                     messages.insert("general".to_string(), e.msg.into());
                     HttpResponse::InternalServerError().json(messages)
-                },
+                }
                 Err(TriggerTemplateError::NoTemplate(back_id)) => {
                     let mut messages = Map::new();
-                    messages.insert("id".to_string(), format!("No template with id {}", &back_id).into());
+                    messages.insert(
+                        "id".to_string(),
+                        format!("No template with id {}", &back_id).into(),
+                    );
                     HttpResponse::NotFound().json(messages)
-                },
+                }
                 Err(_) => {
                     let mut messages = Map::new();
                     messages.insert("general".to_string(), "Unexpected error".into());
                     HttpResponse::InternalServerError().json(messages)
                 }
             }
-        },
+        }
         Err(e) => {
             let mut messages = Map::new();
-             messages.insert("general".to_string(), e.to_string().into());
+            messages.insert("general".to_string(), e.to_string().into());
             HttpResponse::InternalServerError().json(messages)
         }
     }
 }
 
-async fn change_entity_set_fn(
+async fn create_trigger_fn(
     pool: Data<Pool>,
     data: Json<TemplatedTriggerDefinition>,
 ) -> Result<HttpResponse, ExtendedServiceError> {
@@ -464,144 +472,173 @@ async fn change_entity_set_fn(
     })?;
     let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
 
-    let template = get_template_from_id(client, data.template_instance.template_id).await.map_err(|e| match e {
-        TriggerTemplateError::NoTemplate(_) => {
-            let mut messages = Map::new();
-            messages.insert("template_id".to_string(), "No template with this id".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::BadRequest,
-                messages,
-            }        
-        },
-        TriggerTemplateError::DatabaseError(e) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), e.msg.into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::InternalError,
-                messages
+    let template = get_template_from_id(client, data.template_instance.template_id)
+        .await
+        .map_err(|e| match e {
+            TriggerTemplateError::NoTemplate(_) => {
+                let mut messages = Map::new();
+                messages.insert("template_id".to_string(), "No template with this id".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::BadRequest,
+                    messages,
+                }
             }
-        },
-        _ => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), "Unexpected error".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::InternalError,
-                messages
+            TriggerTemplateError::DatabaseError(e) => {
+                let mut messages = Map::new();
+                messages.insert("general".to_string(), e.msg.into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::InternalError,
+                    messages,
+                }
             }
-        }
-    })?;
-    
+            _ => {
+                let mut messages = Map::new();
+                messages.insert("general".to_string(), "Unexpected error".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::InternalError,
+                    messages,
+                }
+            }
+        })?;
+
     let mut transaction = client.transaction().await.map_err(|e| {
         let mut messages = Map::new();
         messages.insert("general".to_string(), e.to_string().into());
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
-            messages
+            messages,
         }
     })?;
 
-    let trigger = TemplatedTrigger {
+    let templated_trigger = TemplatedTrigger {
         template,
         name: data.name.clone(),
         description: data.description.clone(),
-        parameters: data.template_instance.parameters.clone().into_iter().map(|p| ParameterValue::from(p.into())).collect(),
-        thresholds: data.thresholds.clone().into_iter().map(|th| Threshold::from(th)).collect(),
+        parameters: data
+            .template_instance
+            .parameters
+            .clone()
+            .into_iter()
+            .map(ParameterValue::from)
+            .collect(),
+        thresholds: data
+            .thresholds
+            .clone()
+            .into_iter()
+            .map(Threshold::from)
+            .collect(),
         entity_type: data.entity_type.clone(),
-        granularity: data.granularity.clone(),
+        granularity: data.granularity,
         weight: data.weight,
         enabled: data.enabled,
     };
 
-    trigger.create_trigger(&mut transaction).await.map_err(|e| match e {
-        TriggerTemplateError::MissingParameter(parm) => {
-            let mut messages = Map::new();
-            messages.insert(parm, "Parameter missing".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::BadRequest,
-                messages
+    let trigger = templated_trigger
+        .create_trigger(&mut transaction)
+        .await
+        .map_err(|e| match e {
+            TriggerTemplateError::MissingParameter(parm) => {
+                let mut messages = Map::new();
+                messages.insert(parm, "Parameter missing".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::BadRequest,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::ExtraneousParameter(parm) => {
-            let mut messages = Map::new();
-            messages.insert(parm, "Parameter not defined in template".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::BadRequest,
-                messages
+            TriggerTemplateError::ExtraneousParameter(parm) => {
+                let mut messages = Map::new();
+                messages.insert(parm, "Parameter not defined in template".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::BadRequest,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::MissingThreshold(parm) => {
-            let mut messages = Map::new();
-            messages.insert(parm, "No threshold value defined".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::BadRequest,
-                messages
+            TriggerTemplateError::MissingThreshold(parm) => {
+                let mut messages = Map::new();
+                messages.insert(parm, "No threshold value defined".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::BadRequest,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::NotAThreshold(parm) => {
-            let mut messages = Map::new();
-            messages.insert(parm, "This parameter is not a threshold".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::BadRequest,
-                messages
+            TriggerTemplateError::NotAThreshold(parm) => {
+                let mut messages = Map::new();
+                messages.insert(parm, "This parameter is not a threshold".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::BadRequest,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::DatabaseError(e2) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), e2.msg.into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::InternalError,
-                messages
+            TriggerTemplateError::DatabaseError(e2) => {
+                let mut messages = Map::new();
+                messages.insert("general".to_string(), e2.msg.into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::InternalError,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::TriggerError(TriggerError::DatabaseError(e2)) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), e2.msg.into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::InternalError,
-                messages
+            TriggerTemplateError::TriggerError(TriggerError::DatabaseError(e2)) => {
+                let mut messages = Map::new();
+                messages.insert("general".to_string(), e2.msg.into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::InternalError,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::TriggerExists(name) => {
-            let mut messages = Map::new();
-            messages.insert("name".to_string(), format!("A trigger named {} already exists", name).into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::Conflict,
-                messages
+            TriggerTemplateError::TriggerExists(name) => {
+                let mut messages = Map::new();
+                messages.insert(
+                    "name".to_string(),
+                    format!("A trigger named {} already exists", name).into(),
+                );
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::Conflict,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::NoCounter(counter) => {
-            let mut messages = Map::new();
-            messages.insert("parameters".to_string(), format!("Counter {} does not exist", counter).into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::NotFound,
-                messages
+            TriggerTemplateError::NoCounter(counter) => {
+                let mut messages = Map::new();
+                messages.insert(
+                    "parameters".to_string(),
+                    format!("Counter {} does not exist", counter).into(),
+                );
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::NotFound,
+                    messages,
+                }
             }
-        },
-        TriggerTemplateError::CounterNotUnique(counter) => {
-            let mut messages = Map::new();
-            messages.insert("parameters".to_string(), format!("Counter {} cannot be uniquely identified", counter).into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::NotFound,
-                messages
+            TriggerTemplateError::CounterNotUnique(counter) => {
+                let mut messages = Map::new();
+                messages.insert(
+                    "parameters".to_string(),
+                    format!("Counter {} cannot be uniquely identified", counter).into(),
+                );
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::NotFound,
+                    messages,
+                }
             }
-        },
-        _ => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), "Unexpected Error".into());
-            ExtendedServiceError {
-                kind: ServiceErrorKind::InternalError,
-                messages
+            _ => {
+                let mut messages = Map::new();
+                messages.insert("general".to_string(), "Unexpected Error".into());
+                ExtendedServiceError {
+                    kind: ServiceErrorKind::InternalError,
+                    messages,
+                }
             }
-        },
+        })?;
 
-    })?;
+    let change = AddTrigger {
+        trigger,
+        verify: false,
+    };
 
-    Ok(HttpResponse::Ok().json(Success {
-        code: 200,
-        message: "Successfully created trigger".to_string(),
-    }))
+    let message = change.apply(&mut transaction).await?;
+
+    Ok(HttpResponse::Ok().json(Success { code: 200, message }))
 }
 
+// curl -H "Content-Type: application/json" -X POST -d '{"name": "high_downtime", "description": "downtime higher than maximum", "thresholds": [{"name": "max_downtime", "data_type": "numeric", "value": "50"}], "entity_type": "v-cell", "granularity": "15m", "weight": 100, "enabled": true, "template_instance": {"template_id": 1, "parameters": [{"parameter": "counter", "value": "L.Cell.Unavail.Dur.Sys"}, {"parameter": "comparison", "value": ">"}, {"parameter": "value", "value": "max_downtime"}]}}' localhost:8000/triggers
 #[utoipa::path(
     post,
     path="/triggers",
@@ -612,8 +649,11 @@ async fn change_entity_set_fn(
     )
 )]
 #[post("/triggers")]
-pub(super) async fn create_trigger(pool: Data<Pool>, data: Json<TemplatedTriggerDefinition>) -> impl Responder {
-    let result = change_entity_set_fn(pool, data);
+pub(super) async fn create_trigger(
+    pool: Data<Pool>,
+    data: Json<TemplatedTriggerDefinition>,
+) -> impl Responder {
+    let result = create_trigger_fn(pool, data);
     match result.await {
         Ok(res) => res,
         Err(e) => {

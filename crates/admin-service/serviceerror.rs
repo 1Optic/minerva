@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use super::error::{Error, ExtendedError};
+use minerva::error::Error as MinervaError;
 
 #[derive(derive_more::Display, From, Debug, Serialize)]
 pub enum ServiceErrorKind {
@@ -157,6 +158,20 @@ impl From<ExtendedError> for ExtendedServiceError {
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
             messages: value.messages,
+        }
+    }
+}
+
+impl From<MinervaError> for ExtendedServiceError {
+    fn from(value: MinervaError) -> ExtendedServiceError {
+        error!("{value:?}");
+
+        let mut map = Map::new();
+        map.insert("general".to_string(), format!("{value:?}").into());
+
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: map,
         }
     }
 }

@@ -65,7 +65,7 @@ pub struct ParameterValue {
 pub struct TemplatedTrigger {
     pub template: Template,
     pub name: String,
-    pub description: String,
+    pub description: Option<String>,
     pub parameters: Vec<ParameterValue>,
     pub thresholds: Vec<Threshold>,
     pub entity_type: String,
@@ -90,14 +90,6 @@ impl From<TriggerError> for TriggerTemplateError {
     }
 }
 
-impl Template {
-    pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
-        self.parameters
-            .into_iter()
-            .find(|p| p.name == parameter_name)
-    }
-}
-
 impl From<Template> for BareTemplate {
     fn from(template: Template) -> Self {
         BareTemplate {
@@ -106,6 +98,14 @@ impl From<Template> for BareTemplate {
             body: template.description,
             sql_body: template.sql,
         }
+    }
+}
+
+impl Template {
+    pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
+        self.parameters
+            .into_iter()
+            .find(|p| p.name == parameter_name)
     }
 }
 
@@ -120,12 +120,12 @@ impl TemplatedTrigger {
         }) {
             return Err(TriggerTemplateError::MissingParameter(parm.name));
         };
-        if let Some(parm) = self.parameters.clone().into_iter().find(|p| {
-            self.template
-                .clone()
-                .get_parameter(&p.parameter)
-                .is_none()
-        }) {
+        if let Some(parm) = self
+            .parameters
+            .clone()
+            .into_iter()
+            .find(|p| self.template.clone().get_parameter(&p.parameter).is_none())
+        {
             return Err(TriggerTemplateError::ExtraneousParameter(parm.parameter));
         };
         let needed_thresholds = self.parameters.clone().into_iter().filter(|p| {
@@ -137,7 +137,8 @@ impl TemplatedTrigger {
                 == ParameterType::ThresholdVariable
         });
         if let Some(threshold) = needed_thresholds.clone().find(|p| {
-            ! self.thresholds
+            !self
+                .thresholds
                 .clone()
                 .into_iter()
                 .any(|th| th.name == p.value)
@@ -148,11 +149,27 @@ impl TemplatedTrigger {
             .thresholds
             .clone()
             .into_iter()
-            .find(|th| ! needed_thresholds.clone().any(|nt| nt.value == th.name))
+            .find(|th| !needed_thresholds.clone().any(|nt| nt.value == th.name))
         {
             return Err(TriggerTemplateError::NotAThreshold(threshold.name));
         }
         Ok(())
+    }
+
+    pub fn adapted_parameter_name(&self, parameter: &ParameterValue) -> String {
+        match self
+            .template
+            .parameters
+            .clone()
+            .into_iter()
+            .find(|p| p.name == parameter.parameter)
+        {
+            Some(template_parameter) => match template_parameter.parameter_type {
+                ParameterType::Counter => "\"".to_owned() + &parameter.value + "\"",
+                _ => parameter.value.clone(),
+            },
+            None => parameter.value.clone(),
+        }
     }
 
     pub async fn create_trigger(
@@ -224,14 +241,15 @@ impl TemplatedTrigger {
                 sources.push(source);
             };
         }
-        let mut kpi_data: Vec<KPIDataColumn> = vec![];
 
-        for counter in &sources {
-            kpi_data.push(KPIDataColumn {
-                name: counter.clone(),
+        let kpi_data = counters
+            .clone()
+            .into_iter()
+            .map(|c| KPIDataColumn {
+                name: c.value,
                 data_type: "numeric".to_string(),
-            });
-        }
+            })
+            .collect();
 
         let mut kpi_function = concat!(
             "BEGIN\n",
@@ -271,7 +289,7 @@ impl TemplatedTrigger {
         for parameter in &self.parameters {
             condition = condition.replace(
                 &("{".to_owned() + &parameter.parameter + "}"),
-                &parameter.value,
+                &self.adapted_parameter_name(parameter),
             );
         }
 
@@ -289,6 +307,20 @@ impl TemplatedTrigger {
             "\n)\nFROM entity.{} et\nWHERE et.id = $1.entity_id",
             self.entity_type
         ));
+
+        let description = match &self.description {
+            Some(value) => value.to_string(),
+            None => {
+                let mut description_from_template = self.template.description.clone();
+                for parameter in &self.parameters {
+                    description_from_template = description_from_template.replace(
+                        &("{".to_owned() + &parameter.parameter + "}"),
+                        &parameter.value,
+                    );
+                }
+                description_from_template
+            }
+        };
 
         Ok(Trigger {
             name: self.name.clone(),
@@ -310,8 +342,8 @@ impl TemplatedTrigger {
                 })
                 .collect(),
             mapping_functions: vec![],
-            description: self.description.clone(),
-            granularity: self.granularity.clone(),
+            description,
+            granularity: self.granularity,
             enabled: self.enabled,
         })
     }
@@ -323,27 +355,36 @@ pub async fn list_templates(conn: &mut Client) -> Result<Vec<BareTemplate>, Trig
         "FROM trigger.template"
     );
 
-    let result = conn.query(query, &[]).await.map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+    let result = conn
+        .query(query, &[])
+        .await
+        .map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     Ok(result
-    .into_iter()
-    .map(|row: Row| BareTemplate{
-        id: row.get(0),
-        name: row.get(1),
-        body: row.get(2),
-        sql_body: row.get(3),
-    })
-    .collect())
+        .into_iter()
+        .map(|row: Row| BareTemplate {
+            id: row.get(0),
+            name: row.get(1),
+            body: row.get(2),
+            sql_body: row.get(3),
+        })
+        .collect())
 }
 
-pub async fn show_template(conn: &mut Client, id: i32) -> Result<BareTemplate, TriggerTemplateError> {
+pub async fn get_bare_template(
+    conn: &mut Client,
+    id: i32,
+) -> Result<BareTemplate, TriggerTemplateError> {
     let query = concat!(
         "SELECT id, name, description_body, sql_body ",
         "FROM trigger.template ",
         "WHERE id = $1",
     );
 
-    let rows = conn.query(query, &[&id]).await.map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+    let rows = conn
+        .query(query, &[&id])
+        .await
+        .map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     match rows.len() {
         1 => Ok(BareTemplate {
@@ -353,28 +394,41 @@ pub async fn show_template(conn: &mut Client, id: i32) -> Result<BareTemplate, T
             sql_body: rows[0].get(3),
         }),
         0 => Err(TriggerTemplateError::NoTemplate(id.to_string())),
-        _ => Err(TriggerTemplateError::UnexpectedError)
+        _ => Err(TriggerTemplateError::UnexpectedError),
     }
 }
 
-pub async fn get_template_from_id(conn: &mut Client, id: i32) -> Result<Template, TriggerTemplateError> {
-    let bare_template = show_template(conn, id).await?;
+pub async fn get_template_from_id(
+    conn: &mut Client,
+    id: i32,
+) -> Result<Template, TriggerTemplateError> {
+    let bare_template = get_bare_template(conn, id).await?;
 
     let query = concat!(
         "SELECT name, is_variable, is_source_name ",
         "FROM trigger.template_parameter WHERE template_id = $1",
     );
 
-    let rows = conn.query(query, &[&id]).await.map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+    let rows = conn
+        .query(query, &[&id])
+        .await
+        .map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-    let parameters: Vec<TemplateParameter> = rows.into_iter().map(|row| TemplateParameter{
-        name: row.get(0),
-        parameter_type: if row.get(1) { ParameterType::Counter }
-            else if row.get(2) { ParameterType::ThresholdVariable }
-            else { ParameterType::Default },
-    }).collect();
+    let parameters: Vec<TemplateParameter> = rows
+        .into_iter()
+        .map(|row| TemplateParameter {
+            name: row.get(0),
+            parameter_type: if row.get(1) {
+                ParameterType::ThresholdVariable
+            } else if row.get(2) {
+                ParameterType::Counter
+            } else {
+                ParameterType::Default
+            },
+        })
+        .collect();
 
-    Ok(Template{
+    Ok(Template {
         id: bare_template.id,
         name: bare_template.name,
         description: bare_template.body,

@@ -1242,6 +1242,34 @@ components:
             $ref: '#/components/schemas/Threshold'
         enabled:
           type: boolean
+    TemplatedTrigger:
+      type: object
+      required:
+        - name
+        - enabled
+        - thresholds
+        - entity_type
+        - granularity
+        - weight
+        - template_instance
+      properties:
+        name:
+          type: string
+          description: name of the trigger
+        description:
+          type: string
+        entity_type:
+          type: string
+        granularity:
+          type: string
+        weight:
+          type: integer
+        thresholds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Threshold'
+        enabled:
+          type: boolean
         template_instance:
           type: object
           properties:

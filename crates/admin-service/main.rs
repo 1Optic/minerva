@@ -44,8 +44,8 @@ use kpi::{delete_kpi, get_kpi, get_kpis, post_kpi, update_kpi, KpiImplementedDat
 
 mod trigger;
 use trigger::{
-    change_thresholds, get_triggers, get_templates, get_template, create_trigger,
-    ShortTemplateData, TemplateData, TriggerData, TemplatedTriggerDefinition
+    change_thresholds, create_trigger, get_template, get_templates, get_triggers,
+    ShortTemplateData, TemplateData, TemplatedTriggerDefinition, TriggerData,
 };
 
 mod entityset;
@@ -122,7 +122,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
                 TrendViewMaterializationData, TrendFunctionMaterializationData,
                 TrendFull, GeneratedTrendFull, TrendStorePartFull, TrendStoreFull,
                 DataSource, EntityType, KpiRawData, KpiImplementedData,
-                TriggerData, ShortTemplateData, TemplateData, 
+                TriggerData, ShortTemplateData, TemplateData,
                 TemplatedTriggerDefinition, EntitySetData,
             )
         ),
