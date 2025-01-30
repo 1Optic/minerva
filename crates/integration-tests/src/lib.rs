@@ -1,6 +1,8 @@
 use std::sync::Once;
 
 pub mod common;
+pub mod minerva_admin_service;
+pub mod minerva_event_service;
 pub mod compact_attribute;
 pub mod create_kpi;
 pub mod entity_set;
@@ -9,6 +11,7 @@ pub mod initialize;
 pub mod load_data;
 pub mod trend_materialization;
 pub mod trend_storage;
+pub mod event_service;
 
 static INIT: Once = Once::new();
 

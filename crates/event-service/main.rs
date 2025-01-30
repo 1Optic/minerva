@@ -3,7 +3,7 @@ use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client, Method,
 };
-use std::env;
+use std::{env, ops::Deref};
 use std::fmt;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
@@ -14,20 +14,10 @@ use serde_json::Value;
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use rustls::ClientConfig as RustlsClientConfig;
-use tokio_postgres::{config::SslMode, Config as TokioConfig, Row};
+use tokio_postgres::{config::SslMode, Config as TokioConfig, Row, Transaction};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 static ENV_DB_CONN: &str = "MINERVA_DB_CONN";
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct NotificationData {
-    id: i32,
-    timestamp: String,
-    rule: String,
-    entity: String,
-    details: String,
-    data: Value,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Notification {
@@ -73,19 +63,6 @@ fn get_config() -> Config {
                 .into_bytes(),
         )
         .unwrap(),
-    }
-}
-
-fn notification_from_data(data: NotificationData) -> Notification {
-    Notification {
-        id: data.id,
-        timestamp: DateTime::parse_from_str(&data.timestamp, "%Y-%m-%d %H:%M:%S%.6f%#z")
-            .unwrap()
-            .into(),
-        rule: data.rule,
-        entity: data.entity,
-        details: data.details,
-        data: data.data,
     }
 }
 
@@ -219,6 +196,80 @@ async fn post_message(client: &Client, data: &Notification) -> Result<String, St
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+enum NotificationPollError {
+    #[error("Unexpected error while polling for notifications: {0}")]
+    Unexpected(String),
+}
+
+async fn poll_notifications(transaction: &Transaction<'_>, last_notification: i32, notification_store: &str, max_notifications: i32) -> Result<Vec<Notification>, NotificationPollError> {
+    let rows: Vec<Row> = match last_notification {
+        -1 => transaction.query(
+            "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_last_notifications($1, $2)",
+            &[&notification_store, &max_notifications]
+        )
+        .await
+        .map_err(|e| NotificationPollError::Unexpected(e.to_string()))?,
+        _ => transaction.query(
+            "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_next_notifications($1, $2, $3)",
+            &[&notification_store, &last_notification, &max_notifications]
+        )
+        .await
+        .map_err(|e| NotificationPollError::Unexpected(e.to_string()))?
+    };
+
+    let notifications = rows
+        .iter()
+        .map(|row| {
+            let timestamp_str: String = row.get(1);
+
+            Notification {
+                id: row.get(0),
+                timestamp: DateTime::parse_from_str(&timestamp_str, "%Y-%m-%d %H:%M:%S%.6f%#z")
+                    .unwrap()
+                    .into(),
+                rule: row.get(2),
+                entity: row.get(3),
+                details: row.get(4),
+                data: row.get(5),
+            }
+
+        })
+        .collect();
+
+    Ok(notifications)
+}
+
+async fn send_notifications(httpclient: &Client, notifications: &[Notification]) -> Result<Option<i32>, NotificationPollError> {
+    let mut last_notification: Option<i32> = None;
+
+    for notification in notifications {
+        debug!(
+            "received notification {}",
+            notification
+        );
+
+        let httpresult = post_message(httpclient, notification);
+        match httpresult.await {
+            Ok(_) => {
+                debug!("Notification sent on.");
+
+                last_notification = Some(notification.id);
+            }
+            Err(e) => {
+                error!(
+                    "{}: Sending of notification {} failed: {}",
+                    Local::now().format("%Y-%m-%d %H:%M:%S"),
+                    notification,
+                    e
+                );
+            }
+        }
+    }
+
+    Ok(last_notification)
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -238,92 +289,29 @@ async fn main() {
         )
         .await
         .unwrap();
-    let mut last_notification: i32 = result.get(0);
+    let last_notification: i32 = result.get(0);
     transaction.commit().await.unwrap();
 
     loop {
         let transaction = client.transaction().await.unwrap();
-        let result: Vec<Row> = match last_notification {
-            -1 => transaction.query(
-                "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_last_notifications($1, $2)",
-                &[&config.notification_store, &config.max_notifications]
-            )
-            .await
-            .unwrap(),
-            _ => transaction.query(
-                "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_next_notifications($1, $2, $3)",
-                &[&config.notification_store, &last_notification, &config.max_notifications]
-            )
-            .await
-            .unwrap()
-        };
 
-        let mut missed_notification = -1;
+        let notifications = poll_notifications(transaction.deref(), last_notification, &config.notification_store, config.max_notifications).await.unwrap();
 
-        if !result.is_empty() {
-            info!(
-                "{}: {} notifications received.",
-                Local::now().format("%Y-%m-%d %H:%M:%S"),
-                result.len()
-            );
+        info!(
+            "{} notifications received.",
+            notifications.len()
+        );
+        
+        let last_notification = send_notifications(&httpclient, &notifications).await.unwrap();
 
-            for row in result {
-                let notification_data = NotificationData {
-                    id: row.get(0),
-                    timestamp: row.get(1),
-                    rule: row.get(2),
-                    entity: row.get(3),
-                    details: row.get(4),
-                    data: row.get(5),
-                };
-                let notification = notification_from_data(notification_data);
-
-                debug!(
-                    "{}: received notification {}",
-                    Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    notification
-                );
-
-                let httpresult = post_message(&httpclient, &notification);
-                match httpresult.await {
-                    Ok(_) => {
-                        debug!("Notification sent on.");
-
-                        if notification.id > last_notification {
-                            last_notification = notification.id;
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            "{}: Sending of notification {} failed: {}",
-                            Local::now().format("%Y-%m-%d %H:%M:%S"),
-                            notification,
-                            e
-                        );
-
-                        if missed_notification == -1 || notification.id < missed_notification {
-                            missed_notification = notification.id;
-                        }
-                    }
-                }
-            }
-        } else {
-            info!(
-                "{}: no new notifications received.",
-                Local::now().format("%Y-%m-%d %H:%M:%S")
-            )
-        }
-        if missed_notification > -1 && missed_notification <= last_notification {
-            last_notification = missed_notification - 1;
-        }
-        if last_notification > -1 {
+        if let Some(last_notification_id) = last_notification {
             transaction
                 .execute(
                     "SELECT notification_directory.set_last_notification($1, $2, $3)",
                     &[
                         &config.identity,
                         &config.notification_store,
-                        &last_notification,
+                        &last_notification_id,
                     ],
                 )
                 .await
