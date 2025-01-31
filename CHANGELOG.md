@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for Minerva instance config file
 - Added support for specifying custom Docker image for test clusters
 - Added support for materializing attribute materialized view after curr-ptr materialization
+- Added separate materialization stability delay for historic data
 
 ### Changed
 
@@ -41,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- DB Schema: Fixed name of V2 migration 
+- DB Schema: Fixed name of V2 migration
 
 ## [9.16.1] - 2024-12-30
 
