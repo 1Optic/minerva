@@ -1,14 +1,24 @@
 # DDAs
 
-Data Delivery Agreements (DDAs) are documents that describe multiple aspects of
-the exchange of data between a producer and a consumer. In Minerva this applies
-to both ends of the system: the end where data is ingested and the end where
-data is exported. For each piece of data that a consumer sees, there will be
-a DDA that states:
+## Introduction
 
-- Who is the owner
-- What is the retention
-- What are technical aspects of the data like datatype, value range etc.
+As for every data platform, it is a given that there is data incoming and data
+outgoing. For both sides, you want to have agreements in place about aspects
+such as when data is provided, what format it has and who to contact in case of
+issues or planned changes.
+
+We want to have these agreements stored next to the data and linked to the
+data. this way, users and system operators have quick access to the details of
+these agreements.
+
+## requirements
+
+the following requirements need to be fulfilled.
+
+1. each trend and attribute has a corresponding dda
+2. a dda can change over time and the history needs to be kept
+
+## detailed design
 
 ```mermaid
 erDiagram
