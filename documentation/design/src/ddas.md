@@ -11,14 +11,14 @@ We want to have these agreements stored next to the data and linked to the
 data. this way, users and system operators have quick access to the details of
 these agreements.
 
-## requirements
+## Requirements
 
-the following requirements need to be fulfilled.
+The following requirements need to be fulfilled.
 
-1. each trend and attribute has a corresponding dda
-2. a dda can change over time and the history needs to be kept
+1. Each trend and attribute has a corresponding dda
+2. A DDA can change over time and the history needs to be kept
 
-## detailed design
+## Detailed Design
 
 ```mermaid
 erDiagram
