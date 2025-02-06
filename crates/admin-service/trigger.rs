@@ -630,10 +630,12 @@ async fn create_trigger_fn(
 
     let change = AddTrigger {
         trigger,
-        verify: false,
+        verify: true,
     };
 
     let message = change.apply(&mut transaction).await?;
+
+    transaction.commit().await?;
 
     Ok(HttpResponse::Ok().json(Success { code: 200, message }))
 }
