@@ -651,11 +651,9 @@ async fn create_trigger_fn(
     )
 )]
 #[post("/triggers")]
-pub(super) async fn create_trigger(
-    pool: Data<Pool>,
-    data: String,
-) -> impl Responder {
-    let preresult: Result<TemplatedTriggerDefinition, serde_json::Error> = serde_json::from_str(&data);
+pub(super) async fn create_trigger(pool: Data<Pool>, data: String) -> impl Responder {
+    let preresult: Result<TemplatedTriggerDefinition, serde_json::Error> =
+        serde_json::from_str(&data);
     match preresult {
         Ok(definition) => {
             let result = create_trigger_fn(pool, definition);
@@ -667,10 +665,10 @@ pub(super) async fn create_trigger(
                     HttpResponse::InternalServerError().json(messages)
                 }
             }
-        },
-        Err(e) => HttpResponse::BadRequest().json(Error{
+        }
+        Err(e) => HttpResponse::BadRequest().json(Error {
             code: 400,
             message: e.to_string(),
-        })
+        }),
     }
 }

@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use humantime::format_duration;
+use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::{Client, Row, Transaction};
-use postgres_protocol::escape::escape_identifier;
 
 use super::error::DatabaseError;
 use crate::trigger::{
@@ -270,7 +270,7 @@ impl TemplatedTrigger {
             } else {
                 kpi_function.push_str(&format!(
                     "    JOIN trend.{} t{} ON t{}.timestamp = t1.timestamp AND t{}.entity_id = t1.entity_id\n",
-                    escape_identifier(&source), sourcecounter, sourcecounter, sourcecounter
+                    escape_identifier(source), sourcecounter, sourcecounter, sourcecounter
                 ))
             };
             sourcecounter += 1;
@@ -296,12 +296,14 @@ impl TemplatedTrigger {
 
         let mut data_code = format!(
             "SELECT json_build_object(\n  '{}', {}.name",
-            self.entity_type, escape_identifier(&self.entity_type)
+            self.entity_type,
+            escape_identifier(&self.entity_type)
         );
         for counter in &counters {
             data_code.push_str(&format!(
                 ",\n  '{}', $1.{}",
-                counter.value, escape_identifier(&counter.value)
+                counter.value,
+                escape_identifier(&counter.value)
             ));
         }
         data_code.push_str(&format!(

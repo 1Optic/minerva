@@ -259,8 +259,6 @@ impl Change for AddTrigger {
 
         transaction.commit().await?;
 
-
-
         let message = match self.verify {
             false => format!("Created trigger '{}'", &self.trigger.name),
             true => format!("Created trigger '{}': {}", &self.trigger.name, check_result),

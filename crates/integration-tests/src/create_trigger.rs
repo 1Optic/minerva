@@ -10,8 +10,8 @@ mod tests {
     use minerva::changes::trend_store::AddTrendStore;
     use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
-    use minerva::trend_store::TrendStore;
     use minerva::trend_materialization::get_function_def;
+    use minerva::trend_store::TrendStore;
 
     use crate::common::get_available_port;
     use crate::common::{MinervaService, MinervaServiceConfig};
@@ -37,7 +37,6 @@ mod tests {
 
     #[tokio::test]
     async fn create_trigger() -> Result<(), Box<dyn std::error::Error>> {
-
         crate::setup();
 
         let cluster_config = MinervaClusterConfig {
@@ -159,7 +158,6 @@ mod tests {
             src.trim(),
             "SELECT * FROM trigger_rule.low_temperature_with_threshold($1) WHERE \"inside_temp\" < min_temperature;"
         );
-
 
         //assert_eq!(language, "plpgsql");
 
