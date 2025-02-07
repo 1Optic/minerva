@@ -2,7 +2,7 @@ use deadpool_postgres::Pool;
 use std::ops::DerefMut;
 use std::time::Duration;
 
-use actix_web::{get, post, put, web::Data, web::Json, web::Path, HttpResponse, Responder};
+use actix_web::{get, post, put, web::Data, web::Path, HttpResponse, Responder};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -460,7 +460,7 @@ pub(super) async fn get_template(pool: Data<Pool>, id: Path<i32>) -> impl Respon
 
 async fn create_trigger_fn(
     pool: Data<Pool>,
-    data: Json<TemplatedTriggerDefinition>,
+    data: TemplatedTriggerDefinition,
 ) -> Result<HttpResponse, ExtendedServiceError> {
     let mut manager = pool.get().await.map_err(|e| {
         let mut messages = Map::new();
@@ -630,7 +630,7 @@ async fn create_trigger_fn(
 
     let change = AddTrigger {
         trigger,
-        verify: true,
+        verify: false,
     };
 
     let message = change.apply(&mut transaction).await?;
@@ -653,15 +653,24 @@ async fn create_trigger_fn(
 #[post("/triggers")]
 pub(super) async fn create_trigger(
     pool: Data<Pool>,
-    data: Json<TemplatedTriggerDefinition>,
+    data: String,
 ) -> impl Responder {
-    let result = create_trigger_fn(pool, data);
-    match result.await {
-        Ok(res) => res,
-        Err(e) => {
-            let mut messages = Map::new();
-            messages.insert("general".to_string(), e.to_string().into());
-            HttpResponse::InternalServerError().json(messages)
-        }
+    let preresult: Result<TemplatedTriggerDefinition, serde_json::Error> = serde_json::from_str(&data);
+    match preresult {
+        Ok(definition) => {
+            let result = create_trigger_fn(pool, definition);
+            match result.await {
+                Ok(res) => res,
+                Err(e) => {
+                    let mut messages = Map::new();
+                    messages.insert("general".to_string(), e.to_string().into());
+                    HttpResponse::InternalServerError().json(messages)
+                }
+            }
+        },
+        Err(e) => HttpResponse::BadRequest().json(Error{
+            code: 400,
+            message: e.to_string(),
+        })
     }
 }
