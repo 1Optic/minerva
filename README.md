@@ -9,36 +9,34 @@ This project provides the Minerva ETL platform components:
 
 # Installation
 
-To install the latest version of the administration command for your system,
-use the install script:
+To install the administration command using cargo:
 
 ```
-curl -sS https://raw.githubusercontent.com/hendrikx-itc/minerva-admin/master/install.sh | sh
+cargo install --path crates/cli
+```
+
+After that, you should have the Minerva CLI command available:
+
+```
+$ minerva --version
+minerva 9.18.0
 ```
 
 # Start Test Database
 
 To develop Minerva instances, or work on the code in this project, you will
-need a running Minerva database. You can start an empty Minerva database using
-Docker:
+need a running Minerva database. You can start a Minerva database initialized
+with a test instance using the CLI:
 
 ```
-docker run -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 citusdata/citus
+minerva start --with-definition examples/tiny_instance_v1
 ```
 
-# Run Integration Tests
+# Run Tests
 
-After a test database is started, run the following command:
-
-```
-PGSSLMODE=disable PGHOST=127.0.0.1 PGUSER=postgres cargo test -p integration-tests --lib
-```
-
-# Load Test Instance
-
-To load a provided test instance into the empty Minerva database, use the following command:
+Running the unit- and integration tests is as simple as running unit tests,
+because test containers are automatically started in the tests.
 
 ```
-PGSSLMODE=disable PGUSER=postgres PGHOST=127.0.0.1 cargo run --bin=minerva -- initialize --create-schema --with-definition examples/tiny_instance_v1
+cargo test
 ```
-
