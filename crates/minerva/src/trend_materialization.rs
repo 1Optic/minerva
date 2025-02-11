@@ -1198,7 +1198,7 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
 
     let query = concat!(
         "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, ",
-        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold, m.old_data_stability_delay ",
+        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold::text, m.old_data_stability_delay::text ",
         "FROM trend_directory.materialization AS m ",
         "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
         "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
