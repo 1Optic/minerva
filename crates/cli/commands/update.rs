@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use dialoguer::Confirm;
 
+use minerva::instance::DiffOptions;
 use tokio_postgres::Client;
 
 use minerva::error::{ConfigurationError, Error, RuntimeError};
@@ -20,6 +21,10 @@ pub struct UpdateOpt {
     non_interactive: bool,
     #[arg(help = "Minerva instance root directory")]
     instance_root: Option<PathBuf>,
+    #[arg(long)]
+    ignore_trend_extra_data: bool,
+    #[arg(long)]
+    ignore_trend_data_type: bool,
 }
 
 #[async_trait]
@@ -62,11 +67,17 @@ impl Cmd for UpdateOpt {
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
         println!("Ok");
 
+        let diff_options = DiffOptions {
+            ignore_trend_extra_data: self.ignore_trend_extra_data,
+            ignore_trend_data_type: self.ignore_trend_data_type,
+        };
+
         update(
             &mut client,
             &instance_db,
             &instance_def,
             !self.non_interactive,
+            diff_options,
         )
         .await
     }
@@ -77,8 +88,9 @@ async fn update(
     db_instance: &MinervaInstance,
     other: &MinervaInstance,
     interactive: bool,
+    diff_options: DiffOptions,
 ) -> CmdResult {
-    let changes = db_instance.diff(other);
+    let changes = db_instance.diff(other, diff_options);
 
     println!("Applying changes:");
 

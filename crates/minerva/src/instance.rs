@@ -27,7 +27,7 @@ use super::trend_materialization::{
     load_materializations, load_materializations_from, AddTrendMaterialization,
     TrendMaterialization,
 };
-use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore};
+use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions};
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
 use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
 
@@ -39,6 +39,11 @@ pub enum AggregationType {
     ViewMaterialization,
     #[serde(rename = "FUNCTION_MATERIALIZATION")]
     FunctionMaterialization,
+}
+
+pub struct DiffOptions {
+    pub ignore_trend_extra_data: bool,
+    pub ignore_trend_data_type: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -256,7 +261,7 @@ impl MinervaInstance {
         Ok(())
     }
 
-    pub fn diff(&self, other: &MinervaInstance) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(&self, other: &MinervaInstance, options: DiffOptions) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         // Check for changes in trend stores
@@ -267,7 +272,12 @@ impl MinervaInstance {
                     && my_trend_store.granularity == other_trend_store.granularity
             }) {
                 Some(my_trend_store) => {
-                    changes.append(&mut my_trend_store.diff(other_trend_store));
+                    let diff_options = TrendStoreDiffOptions {
+                        ignore_trend_extra_data: options.ignore_trend_extra_data,
+                        ignore_trend_data_type: options.ignore_trend_data_type,
+                    };
+
+                    changes.append(&mut my_trend_store.diff(other_trend_store, diff_options));
                 }
                 None => {
                     changes.push(Box::new(AddTrendStore {
@@ -334,8 +344,9 @@ impl MinervaInstance {
         &self,
         client: &mut T,
         other: &MinervaInstance,
+        diff_options: DiffOptions,
     ) -> Result<(), Error> {
-        let changes = self.diff(other);
+        let changes = self.diff(other, diff_options);
 
         println!("Applying changes:");
 

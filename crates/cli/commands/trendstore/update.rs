@@ -32,7 +32,12 @@ impl Cmd for TrendStoreUpdate {
 
         match result {
             Ok(trend_store_db) => {
-                let changes = trend_store_db.diff(&trend_store);
+                let diff_options = minerva::trend_store::TrendStoreDiffOptions {
+                    ignore_trend_extra_data: false,
+                    ignore_trend_data_type: false,
+                };
+
+                let changes = trend_store_db.diff(&trend_store, diff_options);
 
                 if !changes.is_empty() {
                     println!("Updating trend store");

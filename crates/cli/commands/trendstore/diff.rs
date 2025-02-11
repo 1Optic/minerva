@@ -31,7 +31,7 @@ impl Cmd for TrendStoreDiff {
 
         match result {
             Ok(trend_store_db) => {
-                let changes = trend_store_db.diff(&trend_store);
+                let changes = trend_store_db.diff(&trend_store, minerva::trend_store::TrendStoreDiffOptions::default());
 
                 if !changes.is_empty() {
                     println!("Differences with the database");
