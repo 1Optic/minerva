@@ -907,7 +907,11 @@ impl TrendStorePart {
         Ok(())
     }
 
-    pub fn diff(&self, other: &TrendStorePart, options: TrendStorePartDiffOptions) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &TrendStorePart,
+        options: TrendStorePartDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         let mut new_trends: Vec<Trend> = Vec::new();
@@ -922,7 +926,9 @@ impl TrendStorePart {
             {
                 Some(my_trend) => {
                     // The trend already exists, check for changes
-                    if !options.ignore_trend_data_type && my_trend.data_type != other_trend.data_type {
+                    if !options.ignore_trend_data_type
+                        && my_trend.data_type != other_trend.data_type
+                    {
                         alter_trend_data_types.push(ModifyTrendDataType {
                             trend_name: my_trend.name.clone(),
                             from_type: my_trend.data_type,
@@ -930,7 +936,9 @@ impl TrendStorePart {
                         });
                     }
 
-                    if !options.ignore_trend_extra_data && my_trend.extra_data != other_trend.extra_data {
+                    if !options.ignore_trend_extra_data
+                        && my_trend.extra_data != other_trend.extra_data
+                    {
                         changes.push(Box::new(ModifyTrendExtraData {
                             trend_store_part_name: self.name.clone(),
                             trend_name: my_trend.name.clone(),
@@ -1019,7 +1027,11 @@ pub struct TrendStore {
 }
 
 impl TrendStore {
-    pub fn diff(&self, other: &TrendStore, options: TrendStoreDiffOptions) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &TrendStore,
+        options: TrendStoreDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         for other_part in &other.parts {

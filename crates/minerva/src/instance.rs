@@ -27,7 +27,9 @@ use super::trend_materialization::{
     load_materializations, load_materializations_from, AddTrendMaterialization,
     TrendMaterialization,
 };
-use super::trend_store::{load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions};
+use super::trend_store::{
+    load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
+};
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
 use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
 
@@ -261,7 +263,11 @@ impl MinervaInstance {
         Ok(())
     }
 
-    pub fn diff(&self, other: &MinervaInstance, options: DiffOptions) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &MinervaInstance,
+        options: DiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         // Check for changes in trend stores
