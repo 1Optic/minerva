@@ -19,9 +19,15 @@ impl fmt::Display for RemoveTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "RemoveTrends({}, {})",
+            "RemoveTrends({}, {}):\n{}",
             &self.trend_store_part,
-            self.trends.len()
+            self.trends.len(),
+            &self
+                .trends
+                .iter()
+                .map(|t| format!(" - {}\n", &t))
+                .collect::<Vec<String>>()
+                .join("")
         )
     }
 }
@@ -85,9 +91,15 @@ impl fmt::Display for AddTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AddTrends({}, {})",
+            "AddTrends({}, {}):\n{}",
             &self.trend_store_part,
-            self.trends.len()
+            &self.trends.len(),
+            &self
+                .trends
+                .iter()
+                .map(|t| format!(" - {}: {}\n", &t.name, &t.data_type))
+                .collect::<Vec<String>>()
+                .join("")
         )
     }
 }
@@ -161,9 +173,14 @@ impl fmt::Display for ModifyTrendDataTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "ModifyTrendDataTypes({}, {})",
+            "ModifyTrendDataTypes({}, {}):\n{}",
             &self.trend_store_part,
             self.modifications.len(),
+            self.modifications
+                .iter()
+                .map(|m| format!(" - {}: {} -> {}\n", m.trend_name, m.from_type, m.to_type))
+                .collect::<Vec<String>>()
+                .join(""),
         )
     }
 }

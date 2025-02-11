@@ -254,6 +254,12 @@ fn default_empty_string() -> String {
     String::new()
 }
 
+#[derive(Default, Debug)]
+pub struct TrendStorePartDiffOptions {
+    pub ignore_trend_extra_data: bool,
+    pub ignore_trend_data_type: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
 #[postgres(name = "trend_store_part_descr")]
 pub struct TrendStorePart {
@@ -901,7 +907,11 @@ impl TrendStorePart {
         Ok(())
     }
 
-    pub fn diff(&self, other: &TrendStorePart) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &TrendStorePart,
+        options: TrendStorePartDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         let mut new_trends: Vec<Trend> = Vec::new();
@@ -916,7 +926,9 @@ impl TrendStorePart {
             {
                 Some(my_trend) => {
                     // The trend already exists, check for changes
-                    if my_trend.data_type != other_trend.data_type {
+                    if !options.ignore_trend_data_type
+                        && my_trend.data_type != other_trend.data_type
+                    {
                         alter_trend_data_types.push(ModifyTrendDataType {
                             trend_name: my_trend.name.clone(),
                             from_type: my_trend.data_type,
@@ -924,7 +936,9 @@ impl TrendStorePart {
                         });
                     }
 
-                    if my_trend.extra_data != other_trend.extra_data {
+                    if !options.ignore_trend_extra_data
+                        && my_trend.extra_data != other_trend.extra_data
+                    {
                         changes.push(Box::new(ModifyTrendExtraData {
                             trend_store_part_name: self.name.clone(),
                             trend_name: my_trend.name.clone(),
@@ -985,6 +999,21 @@ impl fmt::Display for TrendStorePart {
     }
 }
 
+#[derive(Default)]
+pub struct TrendStoreDiffOptions {
+    pub ignore_trend_extra_data: bool,
+    pub ignore_trend_data_type: bool,
+}
+
+impl TrendStoreDiffOptions {
+    pub fn part_diff_options(&self) -> TrendStorePartDiffOptions {
+        TrendStorePartDiffOptions {
+            ignore_trend_extra_data: self.ignore_trend_extra_data,
+            ignore_trend_data_type: self.ignore_trend_data_type,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendStore {
     pub title: Option<String>,
@@ -998,7 +1027,11 @@ pub struct TrendStore {
 }
 
 impl TrendStore {
-    pub fn diff(&self, other: &TrendStore) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &TrendStore,
+        options: TrendStoreDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         for other_part in &other.parts {
@@ -1008,7 +1041,7 @@ impl TrendStore {
                 .find(|my_part| my_part.name == other_part.name)
             {
                 Some(my_part) => {
-                    changes.append(&mut my_part.diff(other_part));
+                    changes.append(&mut my_part.diff(other_part, options.part_diff_options()));
                 }
                 None => {
                     changes.push(Box::new(AddTrendStorePart {

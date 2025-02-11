@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{ConfigurationError, Error};
-use minerva::instance::MinervaInstance;
+use minerva::instance::{DiffOptions, MinervaInstance};
 
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT};
 
@@ -16,6 +16,10 @@ pub struct DiffOpt {
         help = "compare with other Minerva instance directory"
     )]
     with_dir: Option<PathBuf>,
+    #[arg(long)]
+    ignore_trend_extra_data: bool,
+    #[arg(long)]
+    ignore_trend_data_type: bool,
 }
 
 #[async_trait]
@@ -54,7 +58,12 @@ impl Cmd for DiffOpt {
             }
         };
 
-        let changes = other_instance.diff(&instance_def);
+        let diff_options = DiffOptions {
+            ignore_trend_extra_data: self.ignore_trend_extra_data,
+            ignore_trend_data_type: self.ignore_trend_data_type,
+        };
+
+        let changes = other_instance.diff(&instance_def, diff_options);
 
         if !changes.is_empty() {
             println!("Differences {from_instance_descr} -> {to_instance_descr}");

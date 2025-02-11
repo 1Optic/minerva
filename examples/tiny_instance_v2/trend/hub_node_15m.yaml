@@ -7,6 +7,10 @@ parts:
     trends:
       - name: outside_temp
         data_type: bigint
+        extra_data:
+          range:
+            min: -50
+            max: 50
       - name: inside_temp
         data_type: integer
       - name: power_kwh
