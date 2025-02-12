@@ -755,6 +755,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TemplateRef'
+              example:
+                - id: 1
+                  name: OneTrendTrigger
+                - id: 2
+                  name: TwoTrendTrigger
   /templates/{templateId}:
     get:
       summary: Get template with specified Id
@@ -764,7 +769,9 @@ paths:
        - name: templateId
          in: path
          schema:
-           type: string
+           type: integer
+           format: int64
+           example: 42
          required: true
       responses:
         '200':
@@ -773,6 +780,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+              example:
+                id: 2
+                name: TwoTrendTrigger
+                body: "When {kpi1} {op1} {thr1} is true, trigger event"
+                sql_body: "SELECT {kpi1} {op1} {thr1}"
   /triggers:
     get:
       summary: List of existing triggers
@@ -786,6 +798,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Trigger'
+              example:
+                - name: low_temperature
+                  enabled: true
+                  description: "inside temperature is low"
+                  thresholds:
+                    - name: min_temperature
+                      data_type: numeric
+                      value: "10"
         401:
           description: User is not allowed to perform this operation
           content:
@@ -806,6 +826,26 @@ paths:
           'application/json':
             schema:
               $ref: '#/components/schemas/TemplatedTrigger'
+            example:
+              name: low_temperature
+              description: inside temperature is low
+              thresholds:
+                - name: min_temperature
+                  data_type: numeric
+                  value: "10"
+              entity_type: node
+              granularity: 15m
+              weight: 100
+              enabled: true
+              template_instance:
+                template_id: 3
+                parameters:
+                  - name: counter
+                    value: inside_temp
+                  - name: comparison
+                    value: "<"
+                  - name: value
+                    value: min_temp
       responses:
         200:
           description: Trigger successfully created
@@ -813,6 +853,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Success'
+              example:
+                code: 200
+                message: "Created trigger 'low_temperature'"
         400:
           description: The input is incorrectly formatted
           content:
@@ -1274,7 +1317,9 @@ components:
           type: object
           properties:
             template_id:
-              type: string
+              type: integer
+              format: int64
+              example: 42
             parameters:
               type: array
               items:

@@ -58,7 +58,7 @@ pub struct BareTemplate {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ParameterValue {
-    pub parameter: String,
+    pub name: String,
     pub value: String,
 }
 
@@ -117,7 +117,7 @@ impl TemplatedTrigger {
                 .parameters
                 .clone()
                 .into_iter()
-                .any(|pp| pp.parameter == p.name)
+                .any(|pp| pp.name == p.name)
         }) {
             return Err(TriggerTemplateError::MissingParameter(parm.name));
         };
@@ -125,14 +125,14 @@ impl TemplatedTrigger {
             .parameters
             .clone()
             .into_iter()
-            .find(|p| self.template.clone().get_parameter(&p.parameter).is_none())
+            .find(|p| self.template.clone().get_parameter(&p.name).is_none())
         {
-            return Err(TriggerTemplateError::ExtraneousParameter(parm.parameter));
+            return Err(TriggerTemplateError::ExtraneousParameter(parm.name));
         };
         let needed_thresholds = self.parameters.clone().into_iter().filter(|p| {
             self.template
                 .clone()
-                .get_parameter(&p.parameter)
+                .get_parameter(&p.name)
                 .unwrap()
                 .parameter_type
                 == ParameterType::ThresholdVariable
@@ -163,7 +163,7 @@ impl TemplatedTrigger {
             .parameters
             .clone()
             .into_iter()
-            .find(|p| p.name == parameter.parameter)
+            .find(|p| p.name == parameter.name)
         {
             Some(template_parameter) => match template_parameter.parameter_type {
                 ParameterType::Counter => "\"".to_owned() + &parameter.value + "\"",
@@ -194,7 +194,7 @@ impl TemplatedTrigger {
             .filter(|p| {
                 self.template
                     .clone()
-                    .get_parameter(&p.parameter)
+                    .get_parameter(&p.name)
                     .unwrap()
                     .parameter_type
                     == ParameterType::Counter
@@ -289,7 +289,7 @@ impl TemplatedTrigger {
         let mut condition = self.template.sql.clone();
         for parameter in &self.parameters {
             condition = condition.replace(
-                &("{".to_owned() + &parameter.parameter + "}"),
+                &("{".to_owned() + &parameter.name + "}"),
                 &self.adapted_parameter_name(parameter),
             );
         }
@@ -316,10 +316,8 @@ impl TemplatedTrigger {
             None => {
                 let mut description_from_template = self.template.description.clone();
                 for parameter in &self.parameters {
-                    description_from_template = description_from_template.replace(
-                        &("{".to_owned() + &parameter.parameter + "}"),
-                        &parameter.value,
-                    );
+                    description_from_template = description_from_template
+                        .replace(&("{".to_owned() + &parameter.name + "}"), &parameter.value);
                 }
                 description_from_template
             }
