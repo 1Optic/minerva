@@ -798,6 +798,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Trigger'
+              example:
+                - name: low_temperature
+                  enabled: true
+                  description: "inside temperature is low"
+                  thresholds:
+                    - name: min_temperature
+                      data_type: numeric
+                      value: 10
         401:
           description: User is not allowed to perform this operation
           content:
@@ -818,6 +826,26 @@ paths:
           'application/json':
             schema:
               $ref: '#/components/schemas/TemplatedTrigger'
+            example:
+              name: low_temperature
+              description: inside temperature is low
+              thresholds:
+                - name: min_temperature
+                  data_type: numeric
+                  value: 10
+              entity_type: node
+              granularity: 15m
+              weight: 100
+              enabled: true
+              template_instance:
+                template_id: 3
+              parameters:
+                - parameter: counter
+                  value: inside_temp
+                - parameter: comparison
+                  value: "<"
+                - parameter: value
+                  value: min_temp
       responses:
         200:
           description: Trigger successfully created
@@ -825,6 +853,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Success'
+              example:
+                code: 200
+                message: "Created trigger 'low_temperature'"
         400:
           description: The input is incorrectly formatted
           content:
