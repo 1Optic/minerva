@@ -68,7 +68,7 @@ mod tests {
             let row = tx.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
 
             let trigger_template_id: i32 = row.get(0);
-             
+
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
 
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
@@ -180,24 +180,6 @@ mod tests {
             src.trim(),
             "SELECT * FROM trigger_rule.low_temperature_with_threshold($1) WHERE \"inside_temp\" < min_temperature;"
         );
-
-        //assert_eq!(language, "plpgsql");
-
-        //let expected_src = concat!(
-        //    "\nBEGIN\n",
-        //    "RETURN QUERY EXECUTE $query$\n",
-        //    "SELECT\n",
-        //    "  t1.entity_id,\n",
-        //    "  $1 AS timestamp,\n",
-        //    "  inside_temp - outside_temp AS \"test-kpi-name\"\n",
-        //    "FROM trend.\"hub_node_main_15m\" t1\n",
-        //    "WHERE t1.timestamp = $1\n",
-        //    "GROUP BY t1.entity_id\n",
-        //    "$query$ USING $1;\n",
-        //    "END;\n\n"
-        //);
-
-        //assert_eq!(src, expected_src);
 
         Ok(())
     }
