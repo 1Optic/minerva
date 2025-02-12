@@ -316,10 +316,8 @@ impl TemplatedTrigger {
             None => {
                 let mut description_from_template = self.template.description.clone();
                 for parameter in &self.parameters {
-                    description_from_template = description_from_template.replace(
-                        &("{".to_owned() + &parameter.name + "}"),
-                        &parameter.value,
-                    );
+                    description_from_template = description_from_template
+                        .replace(&("{".to_owned() + &parameter.name + "}"), &parameter.value);
                 }
                 description_from_template
             }
