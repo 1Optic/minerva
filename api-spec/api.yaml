@@ -755,6 +755,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TemplateRef'
+              example:
+                - id: 1
+                  name: OneTrendTrigger
+                - id: 2
+                  name: TwoTrendTrigger
   /templates/{templateId}:
     get:
       summary: Get template with specified Id
@@ -764,7 +769,9 @@ paths:
        - name: templateId
          in: path
          schema:
-           type: string
+           type: integer
+           format: int64
+           example: 42
          required: true
       responses:
         '200':
@@ -773,6 +780,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+            example:
+              id: 2
+              name: TwoTrendTrigger
+              body: "When {kpi1} {op1} {thr1} is true, trigger event"
+              sql_body: "SELECT {kpi1} {op1} {thr1}"
   /triggers:
     get:
       summary: List of existing triggers
