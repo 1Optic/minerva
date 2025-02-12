@@ -805,7 +805,7 @@ paths:
                   thresholds:
                     - name: min_temperature
                       data_type: numeric
-                      value: 10
+                      value: "10"
         401:
           description: User is not allowed to perform this operation
           content:
@@ -832,20 +832,20 @@ paths:
               thresholds:
                 - name: min_temperature
                   data_type: numeric
-                  value: 10
+                  value: "10"
               entity_type: node
               granularity: 15m
               weight: 100
               enabled: true
               template_instance:
                 template_id: 3
-              parameters:
-                - parameter: counter
-                  value: inside_temp
-                - parameter: comparison
-                  value: "<"
-                - parameter: value
-                  value: min_temp
+                parameters:
+                  - name: counter
+                    value: inside_temp
+                  - name: comparison
+                    value: "<"
+                  - name: value
+                    value: min_temp
       responses:
         200:
           description: Trigger successfully created
@@ -1317,7 +1317,9 @@ components:
           type: object
           properties:
             template_id:
-              type: string
+              type: integer
+              format: int64
+              example: 42
             parameters:
               type: array
               items:

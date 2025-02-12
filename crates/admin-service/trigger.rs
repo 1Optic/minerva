@@ -53,7 +53,7 @@ pub struct ShortTemplateData {
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ParameterData {
-    pub parameter: String,
+    pub name: String,
     pub value: String,
 }
 
@@ -137,7 +137,7 @@ impl From<Template> for ShortTemplateData {
 impl From<ParameterValue> for ParameterData {
     fn from(parm: ParameterValue) -> Self {
         ParameterData {
-            parameter: parm.parameter,
+            name: parm.name,
             value: parm.value,
         }
     }
@@ -146,7 +146,7 @@ impl From<ParameterValue> for ParameterData {
 impl From<ParameterData> for ParameterValue {
     fn from(parm: ParameterData) -> Self {
         ParameterValue {
-            parameter: parm.parameter,
+            name: parm.name,
             value: parm.value,
         }
     }
