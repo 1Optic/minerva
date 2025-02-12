@@ -12,6 +12,8 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_materialization::get_function_def;
     use minerva::trend_store::TrendStore;
+    use reqwest::StatusCode;
+    use serde_json::json;
 
     use crate::common::get_available_port;
     use crate::common::{MinervaService, MinervaServiceConfig};
@@ -50,7 +52,7 @@ mod tests {
 
         debug!("Created database '{}'", test_database.name);
 
-        {
+        let trigger_template_id = {
             let mut client = test_database.connect().await?;
             create_schema(&mut client).await?;
 
@@ -63,8 +65,10 @@ mod tests {
 
             add_trend_store.apply(&mut tx).await?;
 
-            tx.execute("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}');", &[]).await?;
+            let row = tx.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
 
+            let trigger_template_id: i32 = row.get(0);
+             
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
 
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
@@ -72,7 +76,9 @@ mod tests {
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
             tx.commit().await?;
-        }
+
+            trigger_template_id
+        };
 
         let service_address = Ipv4Addr::new(127, 0, 0, 1);
         let service_port = get_available_port(service_address).unwrap();
@@ -97,40 +103,44 @@ mod tests {
         let client = reqwest::Client::new();
 
         let url = format!("http://{address}/triggers");
-        let request_body = r#"{
-    "name": "low_temperature",
-    "description": "inside temperature low",
-    "thresholds": [
-        {
-            "name": "min_temperature",
-            "data_type": "numeric",
-            "value": "10"
-        }
-    ],
-    "entity_type": "node",
-    "granularity": "15m",
-    "weight": 100,
-    "enabled": true,
-    "template_instance": {
-        "template_id": 1,
-        "parameters": [
-            {
-                "parameter": "counter",
-                "value": "inside_temp"
-            },
-            {
-                "parameter": "comparison",
-                "value": "<"
-            },
-            {
-                "parameter": "value",
-                "value": "min_temperature"
+        let request_data = json!({
+            "name": "low_temperature",
+            "description": "inside temperature low",
+            "thresholds": [
+                {
+                    "name": "min_temperature",
+                    "data_type": "numeric",
+                    "value": "10"
+                }
+            ],
+            "entity_type": "node",
+            "granularity": "15m",
+            "weight": 100,
+            "enabled": true,
+            "template_instance": {
+                "template_id": trigger_template_id,
+                "parameters": [
+                    {
+                        "parameter": "counter",
+                        "value": "inside_temp"
+                    },
+                    {
+                        "parameter": "comparison",
+                        "value": "<"
+                    },
+                    {
+                        "parameter": "value",
+                        "value": "min_temperature"
+                    }
+                ]
             }
-        ]
-    }
-}"#;
+        });
+
+        let request_body = serde_json::to_string(&request_data)?;
+        println!("{}", request_body);
 
         let response = client.post(url.clone()).body(request_body).send().await?;
+        assert_eq!(response.status(), StatusCode::OK);
         let body = response.text().await?;
 
         assert_eq!(
@@ -139,12 +149,24 @@ mod tests {
         );
 
         let response = client.get(url).send().await?;
-        let body = response.text().await?;
+        let response_data: serde_json::Value = response.json().await?;
 
-        assert_eq!(
-            body,
-            "[{\"name\":\"low_temperature\",\"enabled\":true,\"description\":\"inside temperature low\",\"thresholds\":[{\"name\":\"min_temperature\",\"data_type\":\"numeric\",\"value\":\"10\"}]}]"
-        );
+        let expected_response = json!([
+            {
+                "name": "low_temperature",
+                "enabled": true,
+                "description": "inside temperature low",
+                "thresholds": [
+                    {
+                        "name": "min_temperature",
+                        "data_type": "numeric",
+                        "value": "10"
+                    }
+                ]
+            }
+        ]);
+
+        assert_eq!(response_data, expected_response);
 
         let (_, src): (String, String) = {
             let mut client = test_database.connect().await?;
