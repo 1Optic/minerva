@@ -136,9 +136,7 @@ mod tests {
             }
         });
 
-        let request_body = serde_json::to_string(&request_data)?;
-
-        let response = client.post(url.clone()).body(request_body).send().await?;
+        let response = client.post(url.clone()).json(&request_data).send().await?;
         assert_eq!(response.status(), StatusCode::OK);
         let response_data: serde_json::Value = response.json().await?;
 
