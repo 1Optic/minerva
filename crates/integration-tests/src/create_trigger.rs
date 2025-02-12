@@ -137,15 +137,17 @@ mod tests {
         });
 
         let request_body = serde_json::to_string(&request_data)?;
-        println!("{}", request_body);
 
         let response = client.post(url.clone()).body(request_body).send().await?;
         assert_eq!(response.status(), StatusCode::OK);
-        let body = response.text().await?;
+        let response_data: serde_json::Value = response.json().await?;
 
         assert_eq!(
-            body,
-            "{\"code\":200,\"message\":\"Created trigger 'low_temperature'\"}"
+            response_data,
+            json!({
+                "code": 200,
+                "message": "Created trigger 'low_temperature'"
+            })
         );
 
         let response = client.get(url).send().await?;
