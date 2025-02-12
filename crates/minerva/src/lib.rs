@@ -19,6 +19,7 @@ pub mod schema;
 pub mod trend_materialization;
 pub mod trend_store;
 pub mod trigger;
+pub mod trigger_template;
 pub mod virtual_entity;
 
 #[cfg(feature = "test-containers")]

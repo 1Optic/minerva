@@ -805,10 +805,10 @@ paths:
         content:
           'application/json':
             schema:
-              $ref: '#/components/schemas/Trigger'
+              $ref: '#/components/schemas/TemplatedTrigger'
       responses:
         200:
-          description: Trigger successfully changed
+          description: Trigger successfully created
           content:
             application/json:
               schema:
@@ -821,6 +821,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         401:
           description: User is not allowed to perform this operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Template does not exist
           content:
             application/json:
               schema:
@@ -1201,6 +1207,9 @@ components:
           description: SQL definition of the actual KPI definition
     Threshold:
       type: object
+      required:
+        - name
+        - value
       properties:
         name:
           type: string
@@ -1219,10 +1228,48 @@ components:
         name:
           type: string
           description: name of the trigger
-        enabled:
-          type: boolean
         description:
           type: string
+        entity_type:
+          type: string
+        granularity:
+          type: string
+        weight:
+          type: integer
+        thresholds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Threshold'
+        enabled:
+          type: boolean
+    TemplatedTrigger:
+      type: object
+      required:
+        - name
+        - enabled
+        - thresholds
+        - entity_type
+        - granularity
+        - weight
+        - template_instance
+      properties:
+        name:
+          type: string
+          description: name of the trigger
+        description:
+          type: string
+        entity_type:
+          type: string
+        granularity:
+          type: string
+        weight:
+          type: integer
+        thresholds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Threshold'
+        enabled:
+          type: boolean
         template_instance:
           type: object
           properties:

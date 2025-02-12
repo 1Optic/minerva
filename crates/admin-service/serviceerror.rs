@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use super::error::{Error, ExtendedError};
+use minerva::error::Error as MinervaError;
 
 #[derive(derive_more::Display, From, Debug, Serialize)]
 pub enum ServiceErrorKind {
@@ -14,6 +15,7 @@ pub enum ServiceErrorKind {
     PoolError,
     BadRequest,
     InternalError,
+    Conflict,
 }
 
 #[derive(From, Debug)]
@@ -64,6 +66,7 @@ impl ResponseError for ServiceError {
             ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
             ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
 
@@ -84,6 +87,7 @@ impl ResponseError for ExtendedServiceError {
             ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
             ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
 
@@ -154,6 +158,20 @@ impl From<ExtendedError> for ExtendedServiceError {
         ExtendedServiceError {
             kind: ServiceErrorKind::InternalError,
             messages: value.messages,
+        }
+    }
+}
+
+impl From<MinervaError> for ExtendedServiceError {
+    fn from(value: MinervaError) -> ExtendedServiceError {
+        error!("{value:?}");
+
+        let mut map = Map::new();
+        map.insert("general".to_string(), format!("{value:?}").into());
+
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages: map,
         }
     }
 }
