@@ -121,15 +121,15 @@ mod tests {
                 "template_id": trigger_template_id,
                 "parameters": [
                     {
-                        "parameter": "counter",
+                        "name": "counter",
                         "value": "inside_temp"
                     },
                     {
-                        "parameter": "comparison",
+                        "name": "comparison",
                         "value": "<"
                     },
                     {
-                        "parameter": "value",
+                        "name": "value",
                         "value": "min_temperature"
                     }
                 ]
