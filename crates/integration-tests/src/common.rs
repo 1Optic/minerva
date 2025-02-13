@@ -48,6 +48,7 @@ pub struct MinervaServiceConfig {
     pub pg_port: String,
     pub pg_sslmode: String,
     pub pg_database: String,
+    pub pg_user: String,
     pub service_address: String,
     pub service_port: u16,
 }
@@ -65,6 +66,7 @@ impl MinervaService {
             .env("PGPORT", &conf.pg_port)
             .env("PGSSLMODE", &conf.pg_sslmode)
             .env("PGDATABASE", &conf.pg_database)
+            .env("PGUSER", &conf.pg_user)
             .env("SERVICE_ADDRESS", &conf.service_address)
             .env("SERVICE_PORT", conf.service_port.to_string());
 
