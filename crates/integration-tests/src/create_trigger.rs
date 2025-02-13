@@ -12,7 +12,7 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_materialization::get_function_def;
     use minerva::trend_store::TrendStore;
-    use reqwest::StatusCode;
+    //use reqwest::StatusCode;
     use serde_json::json;
 
     use crate::common::get_available_port;
