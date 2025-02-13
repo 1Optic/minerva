@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.20.2] - 2025-02-12
+
+### Fixed
+
+- Materialization: Fixed selection of materializations for execution
+
 ## [9.20.1] - 2025-02-12
 
 ### Fixed
@@ -262,7 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.1...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.2...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -297,3 +303,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.19.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.18.1...9.19.0
 [9.20.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.19.0...9.20.0
 [9.20.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.0...9.20.1
+[9.20.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.1...9.20.2
