@@ -75,7 +75,11 @@ mod tests {
 
             tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute("CREATE ROLE webservice WITH login IN ROLE minerva_admin" , &[]).await?;
+            tx.execute(
+                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                &[],
+            )
+            .await?;
 
             tx.commit().await?;
 
