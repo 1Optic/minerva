@@ -72,6 +72,7 @@ mod tests {
                 pg_port: cluster.controller_port.to_string(),
                 pg_sslmode: "disable".to_string(),
                 pg_database: test_database.name.to_string(),
+                pg_user: "webservice".to_string(),
                 service_address: service_address.to_string(),
                 service_port,
             };
