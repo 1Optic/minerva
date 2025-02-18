@@ -11,7 +11,7 @@ use crate::change::{Change, ChangeResult};
 use crate::error::DatabaseError;
 use crate::meas_value::DataType;
 use crate::trend_store::create::create_trend_store;
-use crate::trend_store::{Trend, TrendStore, TrendStorePart};
+use crate::trend_store::{GeneratedTrend, Trend, TrendStore, TrendStorePart};
 
 pub struct RemoveTrends {
     pub trend_store_part: TrendStorePart,
@@ -133,13 +133,7 @@ impl fmt::Debug for AddTrends {
 #[async_trait]
 impl Change for AddTrends {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let query = concat!(
-            "SELECT trend_directory.create_table_trends(trend_store_part, $1) ",
-            "FROM trend_directory.trend_store_part WHERE name = $2",
-        );
-
-        client
-            .query_one(query, &[&self.trends, &self.trend_store_part.name])
+        create_table_trends(client, &self.trend_store_part.name, &self.trends)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!("Error adding trends to trend store part: {e}"))
@@ -158,6 +152,55 @@ impl Change for AddTrends {
         tx.commit().await?;
         Ok(result)
     }
+}
+
+async fn create_table_trends<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str,
+    trends: &[Trend],
+) -> Result<(), tokio_postgres::Error> {
+    let rows = client
+        .query(
+            "SELECT id FROM trend_directory.trend_store_part WHERE name = $1",
+            &[&trend_store_part_name],
+        )
+        .await?;
+
+    let trend_store_part_id: i32 = rows.first().unwrap().get(0);
+
+    define_table_trends(client, trend_store_part_id, trends).await?;
+    initialize_table_trends(client, trend_store_part_name, trends).await?;
+
+    Ok(())
+}
+
+async fn initialize_table_trends<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str,
+    trends: &[Trend],
+) -> Result<(), tokio_postgres::Error> {
+    let column_specs = trends
+        .iter()
+        .map(|trend| {
+            format!(
+                "ADD COLUMN {} {}",
+                escape_identifier(&trend.name),
+                trend.data_type
+            )
+        })
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let alter_table_query = format!(
+        "ALTER TABLE {}.{} {}",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(trend_store_part_name),
+        column_specs
+    );
+
+    client.execute(&alter_table_query, &[]).await?;
+
+    Ok(())
 }
 
 pub struct ModifyTrendDataType {
@@ -388,69 +431,120 @@ pub struct AddTrendStorePart {
 
 const BASE_TABLE_SCHEMA: &str = "trend";
 
-async fn trend_column_spec(trend: Trend) -> String {
-    format!("{} {}", escape_identifier(trend.name), trend.data_type)
+fn trend_column_spec(trend: &Trend) -> String {
+    format!("{} {}", escape_identifier(&trend.name), trend.data_type)
 }
 
-async fn generated_trend_column_spec(trend: Trend) -> String {
-    format!("{} {} GENERATED ALWAYS AS ({}) STORED", escape_identifier(generated_trend.name), generated_trend.data_type, generated_trend.expression)
+fn generated_trend_column_spec(generated_trend: &GeneratedTrend) -> String {
+    format!(
+        "{} {} GENERATED ALWAYS AS ({}) STORED",
+        escape_identifier(&generated_trend.name),
+        generated_trend.data_type,
+        generated_trend.expression
+    )
 }
 
-async fn create_base_table<T: GenericClient>(client: &mut T, trend_store_part: &TrendStorePart) -> Result<(), tokio_postgres::Error> {
-    let default_column_specs = vec!(
-        "job_id bigint NOT NULL".to_string()
-    );
+async fn create_base_table<T: GenericClient>(
+    client: &mut T,
+    trend_store_part: &TrendStorePart,
+) -> Result<(), tokio_postgres::Error> {
+    let column_spec = std::iter::once("job_id bigint NOT NULL".to_string())
+        .chain(trend_store_part.trends.iter().map(trend_column_spec))
+        .chain(
+            trend_store_part
+                .generated_trends
+                .iter()
+                .map(generated_trend_column_spec),
+        )
+        .collect::<Vec<String>>()
+        .join(", ");
 
-    let trend_column_specs = trend_store_part
-        .trends
-        .iter()
-        .map(trend_column_spec)
-        .collect();
-
-    let generated_trend_column_specs = trend_store_part
-        .generated_trends
-        .iter()
-        .map(generated_trend_column_spec)
-        .collect();
-
-    let column_spec = "";//array_to_string(ARRAY['job_id bigint NOT NULL'] || trend_directory.column_specs($1), ',')
-    let query = format!(
+    let create_table_query = format!(
         concat!(
             "CREATE TABLE {}.{} (",
             "entity_id integer NOT NULL, ",
             "\"timestamp\" timestamp with time zone NOT NULL, ",
             "created timestamp with time zone NOT NULL, ",
-            "{}"
+            "{}",
             ") PARTITION BY RANGE (\"timestamp\")"
         ),
         BASE_TABLE_SCHEMA,
-        base_table_name(trend_store_part),
+        escape_identifier(&trend_store_part.name),
         column_spec,
     );
 
-    format(
-        'ALTER TABLE %I.%I ADD PRIMARY KEY (entity_id, "timestamp");',
-        trend_directory.base_table_schema(),
-        trend_directory.base_table_name($1)
-    ),
-    format(
-        'CREATE INDEX ON %I.%I USING btree (job_id)',
-        trend_directory.base_table_schema(),
-        trend_directory.base_table_name($1)
-    ),
-    format(
-        'CREATE INDEX ON %I.%I USING btree (timestamp);',
-        trend_directory.base_table_schema(),
-        trend_directory.base_table_name($1)
-    ),
-    format(
-        'SELECT create_distributed_table(''%I.%I'', ''entity_id'')',
-        trend_directory.base_table_schema(),
-        trend_directory.base_table_name($1)
-    )
+    client.execute(&create_table_query, &[]).await?;
+
+    let primary_key_query = format!(
+        "ALTER TABLE {}.{} ADD PRIMARY KEY (entity_id, \"timestamp\");",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(&trend_store_part.name),
+    );
+
+    client.execute(&primary_key_query, &[]).await?;
+
+    let create_job_id_index_query = format!(
+        "CREATE INDEX ON {}.{} USING btree (job_id)",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(&trend_store_part.name),
+    );
+
+    client.execute(&create_job_id_index_query, &[]).await?;
+
+    let create_timestamp_index_query = format!(
+        "CREATE INDEX ON {}.{} USING btree (timestamp)",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(&trend_store_part.name),
+    );
+
+    client.execute(&create_timestamp_index_query, &[]).await?;
+
+    let distribute_table_query = format!(
+        "SELECT create_distributed_table('{}.{}', 'entity_id')",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(&trend_store_part.name),
+    );
+
+    client.execute(&distribute_table_query, &[]).await?;
+
+    Ok(())
 }
 
-async fn create_trend_store_part<T: GenericClient>(client: &mut T, trend_store: &TrendStore, trend_store_part: &TrendStorePart) -> Result<(), tokio_postgres::Error> {
+async fn define_table_trends<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_id: i32,
+    trends: &[Trend],
+) -> Result<(), tokio_postgres::Error> {
+    let define_trend_query = concat!(
+        "INSERT INTO trend_directory.table_trend(name, data_type, trend_store_part_id, description, time_aggregation, entity_aggregation, extra_data) ",
+        "VALUES ($1, $2, $3, $4, $5, $6, $7)"
+    );
+
+    for trend in trends {
+        client
+            .execute(
+                define_trend_query,
+                &[
+                    &trend.name,
+                    &trend.data_type,
+                    &trend_store_part_id,
+                    &trend.description,
+                    &trend.time_aggregation,
+                    &trend.entity_aggregation,
+                    &trend.extra_data,
+                ],
+            )
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn create_trend_store_part<T: GenericClient>(
+    client: &mut T,
+    trend_store: &TrendStore,
+    trend_store_part: &TrendStorePart,
+) -> Result<(), tokio_postgres::Error> {
     let query = concat!(
         "INSERT INTO trend_directory.trend_store_part(trend_store_id, name) ",
         "SELECT trend_store.id, $4 ",
@@ -458,12 +552,49 @@ async fn create_trend_store_part<T: GenericClient>(client: &mut T, trend_store: 
         "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
         "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
         "WHERE data_source.name = $1 AND entity_type.name = $2 AND granularity = $3::text::interval ",
-        "RETURNING *;"
+        "RETURNING id;"
     );
-    
+
     let granularity_str: String = format_duration(trend_store.granularity).to_string();
 
-    client.query(query, &[&trend_store.data_source, &trend_store.entity_type, &granularity_str, &trend_store_part.name]).await?;
+    let trend_store_part_rows = client
+        .query(
+            query,
+            &[
+                &trend_store.data_source,
+                &trend_store.entity_type,
+                &granularity_str,
+                &trend_store_part.name,
+            ],
+        )
+        .await?;
+
+    let trend_store_part_id: i32 = trend_store_part_rows.first().unwrap().get(0);
+
+    define_table_trends(client, trend_store_part_id, &trend_store_part.trends).await?;
+
+    let define_generated_trend_query = concat!(
+        "INSERT INTO trend_directory.generated_table_trend(trend_store_part_id, name, data_type, expression, extra_data, description) ",
+        "VALUES ($1, $2, $3, $4, $5, $6)"
+    );
+
+    for generated_trend in &trend_store_part.generated_trends {
+        client
+            .execute(
+                define_generated_trend_query,
+                &[
+                    &trend_store_part_id,
+                    &generated_trend.name,
+                    &generated_trend.data_type,
+                    &generated_trend.expression,
+                    &generated_trend.extra_data,
+                    &generated_trend.description,
+                ],
+            )
+            .await?;
+    }
+
+    create_base_table(client, trend_store_part).await?;
 
     Ok(())
 }
@@ -513,7 +644,7 @@ impl fmt::Display for AddTrendStore {
         write!(
             f,
             "AddTrendStore({})\n{}",
-            &self.trend_store, 
+            &self.trend_store,
             &self
                 .trend_store
                 .parts
