@@ -230,6 +230,11 @@ impl Change for ChangeAttribute {
     }
 }
 
+#[derive(Default, Debug)]
+pub struct AttributeStoreDiffOptions {
+    pub ignore_deletions: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AttributeStore {
     pub data_source: String,
@@ -238,7 +243,11 @@ pub struct AttributeStore {
 }
 
 impl AttributeStore {
-    pub fn diff(&self, other: &AttributeStore) -> Vec<Box<dyn Change + Send>> {
+    pub fn diff(
+        &self,
+        other: &AttributeStore,
+        options: AttributeStoreDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         let mut new_attributes: Vec<Attribute> = Vec::new();
@@ -289,7 +298,7 @@ impl AttributeStore {
             }
         }
 
-        if !removed_attributes.is_empty() {
+        if !options.ignore_deletions && !removed_attributes.is_empty() {
             changes.push(Box::new(RemoveAttributes {
                 attribute_store: self.clone(),
                 attributes: removed_attributes,
@@ -497,7 +506,11 @@ mod tests {
             }],
         };
 
-        let changes = my_attribute_store.diff(&other_attribute_store);
+        let diff_options = AttributeStoreDiffOptions {
+            ignore_deletions: false,
+        };
+
+        let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
         assert_eq!(changes.len(), 1);
         let first_change = changes.first().expect("Should have a change");
@@ -526,7 +539,11 @@ mod tests {
             attributes: vec![],
         };
 
-        let changes = my_attribute_store.diff(&other_attribute_store);
+        let diff_options = AttributeStoreDiffOptions {
+            ignore_deletions: false,
+        };
+
+        let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
         assert_eq!(changes.len(), 1);
         let first_change = changes.first().expect("Should have a change");
