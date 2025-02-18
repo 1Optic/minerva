@@ -202,6 +202,55 @@ async fn initialize_table_trends<T: GenericClient>(
     Ok(())
 }
 
+async fn create_table_trends<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str,
+    trends: &[Trend],
+) -> Result<(), tokio_postgres::Error> {
+    let rows = client
+        .query(
+            "SELECT id FROM trend_directory.trend_store_part WHERE name = $1",
+            &[&trend_store_part_name],
+        )
+        .await?;
+
+    let trend_store_part_id: i32 = rows.first().unwrap().get(0);
+
+    define_table_trends(client, trend_store_part_id, trends).await?;
+    initialize_table_trends(client, trend_store_part_name, trends).await?;
+
+    Ok(())
+}
+
+async fn initialize_table_trends<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str,
+    trends: &[Trend],
+) -> Result<(), tokio_postgres::Error> {
+    let column_specs = trends
+        .iter()
+        .map(|trend| {
+            format!(
+                "ADD COLUMN {} {}",
+                escape_identifier(&trend.name),
+                trend.data_type
+            )
+        })
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let alter_table_query = format!(
+        "ALTER TABLE {}.{} {}",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(trend_store_part_name),
+        column_specs
+    );
+
+    client.execute(&alter_table_query, &[]).await?;
+
+    Ok(())
+}
+
 pub struct ModifyTrendDataType {
     pub trend_name: String,
     pub from_type: DataType,
@@ -431,6 +480,20 @@ pub struct AddTrendStorePart {
 const BASE_TABLE_SCHEMA: &str = "trend";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+fn trend_column_spec(trend: &Trend) -> String {
+    format!("{} {}", escape_identifier(&trend.name), trend.data_type)
+}
+
+fn generated_trend_column_spec(generated_trend: &GeneratedTrend) -> String {
+    format!(
+        "{} {} GENERATED ALWAYS AS ({}) STORED",
+        escape_identifier(&generated_trend.name),
+        generated_trend.data_type,
+        generated_trend.expression
+    )
+}
+
 fn trend_column_spec(trend: &Trend) -> String {
     format!("{} {}", escape_identifier(&trend.name), trend.data_type)
 }
@@ -460,34 +523,6 @@ async fn create_base_table<T: GenericClient>(
         .join(", ");
 
     let create_table_query = format!(
-=======
-async fn trend_column_spec(trend: Trend) -> String {
-    format!("{} {}", escape_identifier(trend.name), trend.data_type)
-}
-
-async fn generated_trend_column_spec(trend: Trend) -> String {
-    format!("{} {} GENERATED ALWAYS AS ({}) STORED", escape_identifier(generated_trend.name), generated_trend.data_type, generated_trend.expression)
-}
-
-async fn create_base_table<T: GenericClient>(client: &mut T, trend_store_part: &TrendStorePart) -> Result<(), tokio_postgres::Error> {
-    let default_column_specs = vec!(
-        "job_id bigint NOT NULL".to_string()
-    );
-
-    let trend_column_specs = trend_store_part
-        .trends
-        .iter()
-        .map(trend_column_spec)
-        .collect();
-
-    let generated_trend_column_specs = trend_store_part
-        .generated_trends
-        .iter()
-        .map(generated_trend_column_spec)
-        .collect();
-
-    let column_spec = "";//array_to_string(ARRAY['job_id bigint NOT NULL'] || trend_directory.column_specs($1), ',')
-    let query = format!(
         concat!(
             "CREATE TABLE {}.{} (",
             "entity_id integer NOT NULL, ",
@@ -673,7 +708,6 @@ impl fmt::Display for AddTrendStore {
             f,
             "AddTrendStore({})\n{}",
             &self.trend_store,
-            &self.trend_store, 
             &self
                 .trend_store
                 .parts
