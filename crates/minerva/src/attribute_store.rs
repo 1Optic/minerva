@@ -506,7 +506,9 @@ mod tests {
             }],
         };
 
-        let diff_options = AttributeStoreDiffOptions { ignore_deletions: false };
+        let diff_options = AttributeStoreDiffOptions {
+            ignore_deletions: false,
+        };
 
         let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
@@ -537,7 +539,9 @@ mod tests {
             attributes: vec![],
         };
 
-        let diff_options = AttributeStoreDiffOptions { ignore_deletions: false };
+        let diff_options = AttributeStoreDiffOptions {
+            ignore_deletions: false,
+        };
 
         let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
