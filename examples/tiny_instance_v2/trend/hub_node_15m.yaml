@@ -13,20 +13,17 @@ parts:
             max: 50
       - name: inside_temp
         data_type: integer
-      - name: power_kwh
-        data_type: integer
       - name: bytes_tx
         data_type: bigint
       - name: bytes_rx
         data_type: bigint
-    generated_trends:
-      - name: power_Mwh
-        data_type: integer
-        description: test
-        expression: power_kwh / 1000
   - name: t_1month
     trends: []
     generated_trends: []
   - name: u_1month
     trends: []
     generated_trends: []
+  - name: hub_node_energy_15m
+    trends:
+      - name: power_kwh
+        data_type: integer
