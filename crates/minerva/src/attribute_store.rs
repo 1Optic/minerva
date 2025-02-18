@@ -506,7 +506,9 @@ mod tests {
             }],
         };
 
-        let changes = my_attribute_store.diff(&other_attribute_store);
+        let diff_options = AttributeStoreDiffOptions { ignore_deletions: false };
+
+        let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
         assert_eq!(changes.len(), 1);
         let first_change = changes.first().expect("Should have a change");
@@ -535,7 +537,9 @@ mod tests {
             attributes: vec![],
         };
 
-        let changes = my_attribute_store.diff(&other_attribute_store);
+        let diff_options = AttributeStoreDiffOptions { ignore_deletions: false };
+
+        let changes = my_attribute_store.diff(&other_attribute_store, diff_options);
 
         assert_eq!(changes.len(), 1);
         let first_change = changes.first().expect("Should have a change");
