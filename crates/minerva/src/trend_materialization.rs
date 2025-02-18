@@ -829,10 +829,16 @@ impl TrendMaterialization {
         match self {
             TrendMaterialization::View(m) => match other {
                 TrendMaterialization::View(other_m) => m.diff(other_m),
-                TrendMaterialization::Function(_) => panic!("Incompatible materialization types"),
+                TrendMaterialization::Function(_) => {
+                    println!("Mismatching materialization type for materialization '{}'", self.name());
+                    vec!()
+                },
             },
             TrendMaterialization::Function(m) => match other {
-                TrendMaterialization::View(_) => panic!("Incompatible materialization types"),
+                TrendMaterialization::View(_) => {
+                    println!("Mismatching materialization type for materialization '{}'", self.name());
+                    vec!()
+                },
                 TrendMaterialization::Function(other_m) => m.diff(other_m),
             },
         }

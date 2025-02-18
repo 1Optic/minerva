@@ -1,3 +1,5 @@
+use humantime::format_duration;
+use postgres_protocol::escape::escape_identifier;
 use serde_json::Value;
 use std::fmt;
 use tokio_postgres::{Client, Transaction};
@@ -384,32 +386,92 @@ pub struct AddTrendStorePart {
     pub trend_store_part: TrendStorePart,
 }
 
+const BASE_TABLE_SCHEMA: &str = "trend";
+
+async fn trend_column_spec(trend: Trend) -> String {
+    format!("{} {}", escape_identifier(trend.name), trend.data_type)
+}
+
+async fn generated_trend_column_spec(trend: Trend) -> String {
+    format!("{} {} GENERATED ALWAYS AS ({}) STORED", escape_identifier(generated_trend.name), generated_trend.data_type, generated_trend.expression)
+}
+
+async fn create_base_table<T: GenericClient>(client: &mut T, trend_store_part: &TrendStorePart) -> Result<(), tokio_postgres::Error> {
+    let default_column_specs = vec!(
+        "job_id bigint NOT NULL".to_string()
+    );
+
+    let trend_column_specs = trend_store_part
+        .trends
+        .iter()
+        .map(trend_column_spec)
+        .collect();
+
+    let generated_trend_column_specs = trend_store_part
+        .generated_trends
+        .iter()
+        .map(generated_trend_column_spec)
+        .collect();
+
+    let column_spec = "";//array_to_string(ARRAY['job_id bigint NOT NULL'] || trend_directory.column_specs($1), ',')
+    let query = format!(
+        concat!(
+            "CREATE TABLE {}.{} (",
+            "entity_id integer NOT NULL, ",
+            "\"timestamp\" timestamp with time zone NOT NULL, ",
+            "created timestamp with time zone NOT NULL, ",
+            "{}"
+            ") PARTITION BY RANGE (\"timestamp\")"
+        ),
+        BASE_TABLE_SCHEMA,
+        base_table_name(trend_store_part),
+        column_spec,
+    );
+
+    format(
+        'ALTER TABLE %I.%I ADD PRIMARY KEY (entity_id, "timestamp");',
+        trend_directory.base_table_schema(),
+        trend_directory.base_table_name($1)
+    ),
+    format(
+        'CREATE INDEX ON %I.%I USING btree (job_id)',
+        trend_directory.base_table_schema(),
+        trend_directory.base_table_name($1)
+    ),
+    format(
+        'CREATE INDEX ON %I.%I USING btree (timestamp);',
+        trend_directory.base_table_schema(),
+        trend_directory.base_table_name($1)
+    ),
+    format(
+        'SELECT create_distributed_table(''%I.%I'', ''entity_id'')',
+        trend_directory.base_table_schema(),
+        trend_directory.base_table_name($1)
+    )
+}
+
+async fn create_trend_store_part<T: GenericClient>(client: &mut T, trend_store: &TrendStore, trend_store_part: &TrendStorePart) -> Result<(), tokio_postgres::Error> {
+    let query = concat!(
+        "INSERT INTO trend_directory.trend_store_part(trend_store_id, name) ",
+        "SELECT trend_store.id, $4 ",
+        "FROM trend_directory.trend_store ",
+        "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
+        "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
+        "WHERE data_source.name = $1 AND entity_type.name = $2 AND granularity = $3::text::interval ",
+        "RETURNING *;"
+    );
+    
+    let granularity_str: String = format_duration(trend_store.granularity).to_string();
+
+    client.query(query, &[&trend_store.data_source, &trend_store.entity_type, &granularity_str, &trend_store_part.name]).await?;
+
+    Ok(())
+}
+
 #[async_trait]
 impl Change for AddTrendStorePart {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let query = concat!(
-            "SELECT trend_directory.create_trend_store_part(trend_store.id, $1) ",
-            "FROM trend_directory.trend_store ",
-            "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
-            "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
-            "WHERE data_source.name = $2 AND entity_type.name = $3 AND granularity = $4::integer * interval '1 sec'",
-        );
-
-        let mut granularity_seconds: i32 = self.trend_store.granularity.as_secs() as i32;
-        if (granularity_seconds > 2500000) & (granularity_seconds < 3000000) {
-            granularity_seconds = 2592000 // rust and postgres disagree on the number of seconds in a month
-        }
-
-        client
-            .query_one(
-                query,
-                &[
-                    &self.trend_store_part.name,
-                    &self.trend_store.data_source,
-                    &self.trend_store.entity_type,
-                    &granularity_seconds,
-                ],
-            )
+        create_trend_store_part(client, &self.trend_store, &self.trend_store_part)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
@@ -448,7 +510,18 @@ pub struct AddTrendStore {
 
 impl fmt::Display for AddTrendStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddTrendStore({})", &self.trend_store)
+        write!(
+            f,
+            "AddTrendStore({})\n{}",
+            &self.trend_store, 
+            &self
+                .trend_store
+                .parts
+                .iter()
+                .map(|part| format!(" - {}\n", &part.name))
+                .collect::<Vec<String>>()
+                .join("")
+        )
     }
 }
 
