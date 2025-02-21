@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
+use log::{error, warn, info, debug, trace};
+
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
 
@@ -214,10 +216,11 @@ impl fmt::Display for AddTrigger {
 
 const MAX_TRIGGER_NAME_LENGTH: usize = 45;
 
-#[async_trait]
-impl Change for AddTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+impl AddTrigger {
+    async fn apply1(&self, transaction: &mut Transaction<'_>) -> Result<(), Error> {
+        trace!("Adding trigger (part 1)");
         if self.trigger.name.len() > MAX_TRIGGER_NAME_LENGTH {
+            error!("Trigger name too long: {}", self.trigger.name);
             return Err(Error::Configuration(ConfigurationError::from_msg(format!(
                 "Trigger name too long ({} > {})",
                 self.trigger.name.len(),
@@ -225,39 +228,70 @@ impl Change for AddTrigger {
             ))));
         }
 
-        let mut transaction = client.transaction().await?;
+        let query = "SET citus.multi_shard_modify_mode TO 'sequential';";
+        transaction.execute(query, &[]).await?;
 
-        create_type(&self.trigger, &mut transaction).await?;
+        create_type(&self.trigger, transaction).await?;
+        trace!("Type created");
 
-        create_kpi_function(&self.trigger, &mut transaction).await?;
+        create_kpi_function(&self.trigger, transaction).await?;
+        trace!("KPI function created");
 
-        create_rule(&self.trigger, &mut transaction).await?;
+        create_rule(&self.trigger, transaction).await?;
+        trace!("Rule created");
 
-        set_weight(&self.trigger, &mut transaction).await?;
+        set_weight(&self.trigger, transaction).await?;
+        trace!("Weight set");
+        
+        Ok(())
+    }
 
-        set_thresholds(&self.trigger, &mut transaction).await?;
+    async fn apply2(&self, transaction: &mut Transaction<'_>) -> Result<String, Error> {
+        trace!("Adding trigger (part 2)");
+        if self.trigger.name.len() > MAX_TRIGGER_NAME_LENGTH {
+            error!("Trigger name too long: {}", self.trigger.name);
+            return Err(Error::Configuration(ConfigurationError::from_msg(format!(
+                "Trigger name too long ({} > {})",
+                self.trigger.name.len(),
+                MAX_TRIGGER_NAME_LENGTH
+            ))));
+        }
 
-        set_condition(&self.trigger, &mut transaction).await?;
 
-        define_notification_message(&self.trigger, &mut transaction).await?;
+        let query = "SET citus.multi_shard_modify_mode TO 'sequential';";
+        transaction.execute(query, &[]).await?;
 
-        define_notification_data(&self.trigger, &mut transaction).await?;
 
-        create_mapping_functions(&self.trigger, &mut transaction).await?;
+        set_thresholds(&self.trigger, transaction).await?;
+        trace!("Thresholds set");
 
-        link_trend_stores(&self.trigger, &mut transaction).await?;
+        set_condition(&self.trigger, transaction).await?;
+        trace!("Condition set");
 
-        set_description(&self.trigger, &mut transaction).await?;
+        define_notification_message(&self.trigger, transaction).await?;
+        trace!("Notification message defined");
 
-        set_enabled(&mut transaction, &self.trigger.name, self.trigger.enabled).await?;
+        define_notification_data(&self.trigger, transaction).await?;
+        trace!("Notification data defined");
+
+        create_mapping_functions(&self.trigger, transaction).await?;
+        trace!("Mapping functions created");
+
+        link_trend_stores(&self.trigger, transaction).await?;
+        trace!("Trend stores linked");
+
+        set_description(&self.trigger, transaction).await?;
+        trace!("Description set");
+
+        set_enabled(transaction, &self.trigger.name, self.trigger.enabled).await?;
+        trace!("Enabled/disabled set");
 
         let mut check_result: String = "No check has run".to_string();
 
         if self.verify {
-            check_result = run_checks(&self.trigger.name, &mut transaction).await?;
+            trace!("Doing verification");
+            check_result = run_checks(&self.trigger.name, transaction).await?;
         }
-
-        transaction.commit().await?;
 
         let message = match self.verify {
             false => format!("Created trigger '{}'", &self.trigger.name),
@@ -265,6 +299,26 @@ impl Change for AddTrigger {
         };
 
         Ok(message)
+    }
+}
+
+#[async_trait]
+impl Change for AddTrigger {
+    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+        self.apply1(client).await?;
+
+        self.apply2(client).await
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx1 = client.transaction().await?;
+        self.apply1(&mut tx1).await?;
+        tx1.commit().await?;
+
+        let mut tx2 = client.transaction().await?;
+        let result = self.apply2(&mut tx2).await?;
+        tx2.commit().await?;
+        Ok(result)
     }
 }
 
@@ -474,6 +528,10 @@ async fn set_weight<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> ChangeResult {
+    let query = "SELECT name FROM trigger.rule";
+    let rows = client.query(query, &[]).await.unwrap();
+    debug!("result: {:?}", rows.into_iter().map(|r| r.get::<usize, String>(0)).collect::<Vec<String>>());
+    
     let query = "SELECT trigger.set_weight($1::name, $2::text)";
 
     client
@@ -528,7 +586,10 @@ async fn define_notification_message<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> ChangeResult {
+    let query = "SELECT name FROM trigger.rule";
+    let rows = client.query(query, &[]).await.unwrap();
     let query = "SELECT trigger.define_notification_message($1, $2)";
+    debug!("query: SELECT trigger.define_notification_message('{}', '{}')", &trigger.name, &trigger.notification);
 
     client
         .execute(query, &[&trigger.name, &trigger.notification])
@@ -849,6 +910,13 @@ impl Change for DeleteTrigger {
 
         Ok(format!("Removed trigger '{}'", &self.trigger_name))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
+    }
 }
 
 pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
@@ -953,6 +1021,13 @@ impl Change for UpdateTrigger {
 
         Ok(message)
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
+    }
 }
 
 pub struct RenameTrigger {
@@ -1045,6 +1120,13 @@ impl Change for RenameTrigger {
 
         Ok(message)
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
+    }
 }
 
 pub struct VerifyTrigger {
@@ -1065,6 +1147,13 @@ impl Change for VerifyTrigger {
         let message = run_checks(&self.trigger_name, &mut transaction).await?;
 
         Ok(message)
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
     }
 }
 
@@ -1089,6 +1178,13 @@ impl Change for EnableTrigger {
 
         Ok(message)
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
+    }
 }
 
 pub struct DisableTrigger {
@@ -1111,6 +1207,13 @@ impl Change for DisableTrigger {
         transaction.commit().await?;
 
         Ok(message)
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1312,6 +1415,13 @@ where
         transaction.commit().await?;
 
         Ok(message)
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

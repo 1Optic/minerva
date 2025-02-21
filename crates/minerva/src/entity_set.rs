@@ -305,6 +305,13 @@ impl Change for ChangeEntitySet {
             })),
         }
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+       let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl NewEntitySet {
@@ -427,5 +434,12 @@ impl Change for CreateEntitySet {
                 "Unexpected Error".to_string(),
             ))),
         }
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+         let result = self.apply(&mut tx).await?;
+         tx.commit().await?;
+         Ok(result)
     }
 }

@@ -1,6 +1,7 @@
 use deadpool_postgres::Pool;
 use std::ops::DerefMut;
 use std::time::Duration;
+use log::{info, debug, trace};
 
 use actix_web::{get, post, put, web::Data, web::Path, HttpResponse, Responder};
 
@@ -462,6 +463,7 @@ async fn create_trigger_fn(
     pool: Data<Pool>,
     data: TemplatedTriggerDefinition,
 ) -> Result<HttpResponse, ExtendedServiceError> {
+    trace!("Entering create trigger function");
     let mut manager = pool.get().await.map_err(|e| {
         let mut messages = Map::new();
         messages.insert("general".to_string(), e.to_string().into());
@@ -471,6 +473,7 @@ async fn create_trigger_fn(
         }
     })?;
     let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    trace!("Created client");
 
     let template = get_template_from_id(client, data.template_instance.template_id)
         .await
@@ -500,8 +503,9 @@ async fn create_trigger_fn(
                 }
             }
         })?;
+    debug!("Got template {:?}", template);
 
-    let mut transaction = client.transaction().await.map_err(|e| {
+    let mut transaction: tokio_postgres::Transaction<'_> = client.transaction().await.map_err(|e| {
         let mut messages = Map::new();
         messages.insert("general".to_string(), e.to_string().into());
         ExtendedServiceError {
@@ -532,6 +536,7 @@ async fn create_trigger_fn(
         weight: data.weight,
         enabled: data.enabled,
     };
+    debug!("Got trigger {:?}", templated_trigger);
 
     let trigger = templated_trigger
         .create_trigger(&mut transaction)
@@ -627,15 +632,20 @@ async fn create_trigger_fn(
                 }
             }
         })?;
+    debug!("Created trigger {:?}", trigger);
+
+    transaction.commit().await?;
 
     let change = AddTrigger {
         trigger,
         verify: false,
     };
 
-    let message = change.apply(&mut transaction).await?;
+    let message = change.client_apply(client).await?;
 
-    transaction.commit().await?;
+    debug!("Returned message {}", message);
+
+    trace!("Transaction committed");
 
     Ok(HttpResponse::Ok().json(Success { code: 200, message }))
 }
@@ -652,10 +662,12 @@ async fn create_trigger_fn(
 )]
 #[post("/triggers")]
 pub(super) async fn create_trigger(pool: Data<Pool>, data: String) -> impl Responder {
+    trace!("create_trigger is called");
     let preresult: Result<TemplatedTriggerDefinition, serde_json::Error> =
         serde_json::from_str(&data);
     match preresult {
         Ok(definition) => {
+            trace!("create_trigger_function will be called");
             let result = create_trigger_fn(pool, definition);
             match result.await {
                 Ok(res) => res,

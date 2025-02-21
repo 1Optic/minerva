@@ -3,7 +3,7 @@ use std::boxed::Box;
 use std::fmt;
 use std::path::PathBuf;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient, Transaction};
 
 use async_trait::async_trait;
 
@@ -102,6 +102,13 @@ impl Change for AddAttributes {
             &self.attribute_store
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 pub struct RemoveAttributes {
@@ -170,6 +177,13 @@ impl Change for RemoveAttributes {
             &self.attribute_store
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 pub struct ChangeAttribute {
@@ -227,6 +241,13 @@ impl Change for ChangeAttribute {
             "Changed type of attribute '{}' in store '{}'",
             &self.attribute, &self.attribute_store
         ))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -360,6 +381,13 @@ impl Change for AddAttributeStore {
             "Created attribute store '{}'",
             &self.attribute_store
         ))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

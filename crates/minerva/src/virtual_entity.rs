@@ -3,7 +3,7 @@ use std::fmt;
 use std::{io::Read, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tokio_postgres::Transaction;
+use tokio_postgres::{Client, Transaction};
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error};
@@ -69,6 +69,13 @@ impl Change for AddVirtualEntity {
 
         Ok(format!("Added virtual entity {}", &self.virtual_entity))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }   
 }
 
 impl From<VirtualEntity> for AddVirtualEntity {

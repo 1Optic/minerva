@@ -90,6 +90,11 @@ mod tests {
 
             add_trend_store.apply(&mut tx).await?;
 
+            tx.execute(
+              "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+              &[],
+            ).await?;
+
             tx.commit().await?;
         }
 
