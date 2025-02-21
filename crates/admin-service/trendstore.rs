@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use minerva::change::Change;
-use minerva::changes::trend_store::{AddTrendStore, AddTrendStorePart, AddTrends};
+use minerva::changes::trend_store::{AddTrendStore, AddTrendStorePart};
 use minerva::interval::parse_interval;
 use minerva::trend_store::{load_trend_store, GeneratedTrend, Trend, TrendStore, TrendStorePart};
 
@@ -281,18 +281,6 @@ impl TrendStorePartCompleteData {
         action.apply(&mut tx).await.map_err(|e| Error {
             code: 409,
             message: format!("Creation of trendstorepart failed: {e}"),
-        })?;
-
-        let action = AddTrends {
-            trend_store_part: self.trend_store_part().as_minerva(),
-            trends: self.trend_store_part().as_minerva().trends,
-        };
-
-        action.apply(&mut tx).await.map_err(|e| Error {
-            code: 409,
-            message: format!(
-                "Creation of trendstorepart succeeded, but inserting trends failed: {e}"
-            ),
         })?;
 
         let (trend_store_part_id, trend_store_id): (i32, i32) = tx

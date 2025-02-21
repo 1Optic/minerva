@@ -307,7 +307,7 @@ impl Change for ChangeEntitySet {
     }
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-       let mut tx = client.transaction().await?;
+        let mut tx = client.transaction().await?;
         let result = self.apply(&mut tx).await?;
         tx.commit().await?;
         Ok(result)
@@ -438,8 +438,8 @@ impl Change for CreateEntitySet {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }

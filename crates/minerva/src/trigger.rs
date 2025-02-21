@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, trace};
 
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
@@ -242,7 +242,7 @@ impl AddTrigger {
 
         set_weight(&self.trigger, transaction).await?;
         trace!("Weight set");
-        
+
         Ok(())
     }
 
@@ -257,10 +257,8 @@ impl AddTrigger {
             ))));
         }
 
-
         let query = "SET citus.multi_shard_modify_mode TO 'sequential';";
         transaction.execute(query, &[]).await?;
-
 
         set_thresholds(&self.trigger, transaction).await?;
         trace!("Thresholds set");
@@ -530,8 +528,13 @@ async fn set_weight<T: GenericClient + Sync + Send>(
 ) -> ChangeResult {
     let query = "SELECT name FROM trigger.rule";
     let rows = client.query(query, &[]).await.unwrap();
-    debug!("result: {:?}", rows.into_iter().map(|r| r.get::<usize, String>(0)).collect::<Vec<String>>());
-    
+    debug!(
+        "result: {:?}",
+        rows.into_iter()
+            .map(|r| r.get::<usize, String>(0))
+            .collect::<Vec<String>>()
+    );
+
     let query = "SELECT trigger.set_weight($1::name, $2::text)";
 
     client
@@ -586,10 +589,11 @@ async fn define_notification_message<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> ChangeResult {
-    let query = "SELECT name FROM trigger.rule";
-    let rows = client.query(query, &[]).await.unwrap();
     let query = "SELECT trigger.define_notification_message($1, $2)";
-    debug!("query: SELECT trigger.define_notification_message('{}', '{}')", &trigger.name, &trigger.notification);
+    debug!(
+        "query: SELECT trigger.define_notification_message('{}', '{}')",
+        &trigger.name, &trigger.notification
+    );
 
     client
         .execute(query, &[&trigger.name, &trigger.notification])
@@ -913,9 +917,9 @@ impl Change for DeleteTrigger {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1024,9 +1028,9 @@ impl Change for UpdateTrigger {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1123,9 +1127,9 @@ impl Change for RenameTrigger {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1151,9 +1155,9 @@ impl Change for VerifyTrigger {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1181,9 +1185,9 @@ impl Change for EnableTrigger {
 
     async fn client_apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-         let result = self.apply(&mut tx).await?;
-         tx.commit().await?;
-         Ok(result)
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
