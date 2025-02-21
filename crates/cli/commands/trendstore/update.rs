@@ -35,6 +35,7 @@ impl Cmd for TrendStoreUpdate {
                 let diff_options = minerva::trend_store::TrendStoreDiffOptions {
                     ignore_trend_extra_data: false,
                     ignore_trend_data_type: false,
+                    ignore_deletions: false,
                 };
 
                 let changes = trend_store_db.diff(&trend_store, diff_options);

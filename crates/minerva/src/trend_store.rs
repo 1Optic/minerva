@@ -258,6 +258,7 @@ fn default_empty_string() -> String {
 pub struct TrendStorePartDiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
+    pub ignore_deletions: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
@@ -975,7 +976,7 @@ impl TrendStorePart {
             }
         }
 
-        if !removed_trends.is_empty() {
+        if !options.ignore_deletions && !removed_trends.is_empty() {
             changes.push(Box::new(RemoveTrends {
                 trend_store_part: self.clone(),
                 trends: removed_trends,
@@ -1003,6 +1004,7 @@ impl fmt::Display for TrendStorePart {
 pub struct TrendStoreDiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
+    pub ignore_deletions: bool,
 }
 
 impl TrendStoreDiffOptions {
@@ -1010,6 +1012,7 @@ impl TrendStoreDiffOptions {
         TrendStorePartDiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
+            ignore_deletions: self.ignore_deletions,
         }
     }
 }

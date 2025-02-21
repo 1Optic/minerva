@@ -6,11 +6,6 @@ attributes:
   unit: null
   description: null
   extra_data: null
-- name: equipment_type
-  data_type: text
-  unit: null
-  description: The equipment type
-  extra_data: null
 - name: equipment_serial
   data_type: text
   unit: null

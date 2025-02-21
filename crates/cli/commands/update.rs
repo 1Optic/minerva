@@ -25,6 +25,8 @@ pub struct UpdateOpt {
     ignore_trend_extra_data: bool,
     #[arg(long)]
     ignore_trend_data_type: bool,
+    #[arg(long)]
+    ignore_deletions: bool,
 }
 
 #[async_trait]
@@ -70,6 +72,7 @@ impl Cmd for UpdateOpt {
         let diff_options = DiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
+            ignore_deletions: self.ignore_deletions,
         };
 
         update(

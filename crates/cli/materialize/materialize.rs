@@ -330,10 +330,15 @@ async fn load_materialization_chunks(
         "AND (",
         "source_fingerprint != processed_fingerprint OR ",
         "processed_fingerprint IS NULL",
-        ") AND m.enabled AND ms.timestamp + m.processing_delay < now() AND ms.timestamp + m.reprocessing_period > now() ",
-        "AND (ms.max_modified IS NULL ",
-	"OR ((now() - ms.max_modified) > m.stability_delay AND (m.old_data_threshold IS NULL OR now() - ms.timestamp < m.old_data_threshold))) ",
-	"OR ((now() - ms.max_modified) > COALESCE(m.old_data_stability_delay, m.stability_delay))"
+        ") ",
+        "AND m.enabled ",
+        "AND ms.timestamp + m.processing_delay < now() ",
+        "AND ms.timestamp + m.reprocessing_period > now() ",
+        "AND (",
+        "ms.max_modified IS NULL ",
+	    "OR ((now() - ms.max_modified) > m.stability_delay AND (m.old_data_threshold IS NULL OR now() - ms.timestamp < m.old_data_threshold)) ",
+	    "OR ((now() - ms.max_modified) > COALESCE(m.old_data_stability_delay, m.stability_delay))",
+        ")",
     )));
 
     // Only apply tag filtering if a filter is specified

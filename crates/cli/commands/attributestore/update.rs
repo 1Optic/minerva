@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::attribute_store::{
-    load_attribute_store, load_attribute_store_from_file, AttributeStore,
+    load_attribute_store, load_attribute_store_from_file, AttributeStore, AttributeStoreDiffOptions,
 };
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -31,7 +31,11 @@ impl Cmd for AttributeStoreUpdate {
         )
         .await?;
 
-        let changes = attribute_store_db.diff(&attribute_store);
+        let diff_options = AttributeStoreDiffOptions {
+            ignore_deletions: false,
+        };
+
+        let changes = attribute_store_db.diff(&attribute_store, diff_options);
 
         if !changes.is_empty() {
             println!("Updating attribute store");

@@ -14,7 +14,9 @@ use crate::attribute_materialization::AddAttributeMaterialization;
 use super::attribute_materialization::{
     load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
 };
-use super::attribute_store::{load_attribute_stores, AddAttributeStore, AttributeStore};
+use super::attribute_store::{
+    load_attribute_stores, AddAttributeStore, AttributeStore, AttributeStoreDiffOptions,
+};
 use super::change::Change;
 use super::changes::trend_store::AddTrendStore;
 use super::entity_set::{load_entity_sets, EntitySet};
@@ -46,6 +48,7 @@ pub enum AggregationType {
 pub struct DiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
+    pub ignore_deletions: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -281,6 +284,7 @@ impl MinervaInstance {
                     let diff_options = TrendStoreDiffOptions {
                         ignore_trend_extra_data: options.ignore_trend_extra_data,
                         ignore_trend_data_type: options.ignore_trend_data_type,
+                        ignore_deletions: options.ignore_deletions,
                     };
 
                     changes.append(&mut my_trend_store.diff(other_trend_store, diff_options));
@@ -300,7 +304,13 @@ impl MinervaInstance {
                     && my_attribute_store.entity_type == other_attribute_store.entity_type
             }) {
                 Some(my_attribute_store) => {
-                    changes.append(&mut my_attribute_store.diff(other_attribute_store));
+                    let attribute_store_diff_options = AttributeStoreDiffOptions {
+                        ignore_deletions: options.ignore_deletions,
+                    };
+                    changes.append(
+                        &mut my_attribute_store
+                            .diff(other_attribute_store, attribute_store_diff_options),
+                    );
                 }
                 None => {
                     changes.push(Box::new(AddAttributeStore {

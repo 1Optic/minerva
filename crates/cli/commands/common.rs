@@ -21,6 +21,37 @@ pub trait Cmd {
     async fn run(&self) -> CmdResult;
 }
 
+pub fn show_db_config(config: &Config) -> String {
+    let hosts = config.get_hosts();
+
+    let host = match &hosts[0] {
+        tokio_postgres::config::Host::Tcp(tcp_host) => tcp_host.clone(),
+        tokio_postgres::config::Host::Unix(socket_path) => {
+            socket_path.to_string_lossy().to_string()
+        }
+    };
+
+    let port = config.get_ports()[0];
+
+    let dbname = config.get_dbname().unwrap_or("");
+
+    let sslmode = match config.get_ssl_mode() {
+        SslMode::Prefer => "prefer".to_string(),
+        SslMode::Disable => "disable".to_string(),
+        SslMode::Require => "require".to_string(),
+        _ => "<UNSUPPORTED MODE>".to_string(),
+    };
+
+    let user_at_host = match config.get_user() {
+        Some(user) => {
+            format!("{user}@{host}")
+        }
+        None => host.to_string(),
+    };
+
+    format!("postgresql://{user_at_host}:{port}/{dbname}?sslmode={sslmode}")
+}
+
 pub fn get_db_config() -> Result<Config, Error> {
     let config = match env::var(ENV_DB_CONN) {
         Ok(value) => Config::new().options(&value).clone(),
