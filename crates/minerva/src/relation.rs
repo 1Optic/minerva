@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient, Transaction};
 
 use crate::change::ChangeResult;
 
@@ -81,6 +81,13 @@ impl Change for AddRelation {
 
         Ok(format!("Added relation '{}'", &self.relation))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl From<Relation> for AddRelation {
@@ -113,6 +120,13 @@ impl Change for UpdateRelation {
             .map_err(|e| DatabaseError::from_msg(format!("Error updating relation view: {e}")))?;
 
         Ok(format!("Updated relation {}", &self.relation))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

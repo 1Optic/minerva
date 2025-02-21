@@ -679,9 +679,9 @@ pub(super) async fn post_kpi(pool: Data<Pool>, post: String) -> Result<HttpRespo
         message: format!("Unable to parse input JSON data: {e}"),
     })?;
 
-    let mut manager = pool.get().await.map_err(|_| ServiceError {
+    let mut manager = pool.get().await.map_err(|e| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: e.to_string(),
     })?;
 
     let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();

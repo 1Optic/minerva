@@ -7,11 +7,11 @@ use std::fmt;
 use std::marker::{Send, Sync};
 use std::path::Path;
 use std::time::Duration;
-use tokio_postgres::{Row, Transaction};
+use tokio_postgres::{Client, GenericClient, Row, Transaction};
 
 use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
-use tokio_postgres::{types::ToSql, types::Type, GenericClient};
+use tokio_postgres::{types::ToSql, types::Type};
 
 use humantime::format_duration;
 
@@ -331,6 +331,13 @@ impl Change for UpdateTrendViewMaterializationAttributes {
 
         Ok("Updated attributes of view materialization".into())
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl fmt::Display for UpdateTrendViewMaterializationAttributes {
@@ -365,6 +372,13 @@ impl Change for UpdateView {
             "Updated view {}",
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         ))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -1489,6 +1503,13 @@ impl Change for AddTrendMaterialization {
             })),
         }
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl From<TrendMaterialization> for AddTrendMaterialization {
@@ -1524,6 +1545,13 @@ impl Change for RemoveTrendMaterialization {
                 })
             })
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 pub struct UpdateTrendMaterialization {
@@ -1555,6 +1583,13 @@ impl Change for UpdateTrendMaterialization {
                 ),
             })),
         }
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

@@ -60,6 +60,11 @@ mod tests {
             )
             .await?;
 
+            tx.execute(
+                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                &[],
+              ).await?;
+
             tx.commit().await?;
         }
 

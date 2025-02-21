@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use glob::glob;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient, Transaction};
 
 use super::change::{Change, ChangeResult};
 use super::error::{Error, RuntimeError};
@@ -351,6 +351,13 @@ impl Change for AddAttributeMaterialization {
                 ),
             })),
         }
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 

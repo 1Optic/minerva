@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::fmt;
-use tokio_postgres::Transaction;
+use tokio_postgres::{Client, Transaction};
+use log::{error, info};
 
 use async_trait::async_trait;
 
@@ -76,6 +77,13 @@ impl Change for RemoveTrends {
             &self.trend_store_part.name
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 ////////////
@@ -140,6 +148,13 @@ impl Change for AddTrends {
             &self.trends.len(),
             &self.trend_store_part.name
         ))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
@@ -296,6 +311,13 @@ impl Change for ModifyTrendDataTypes {
             &self.trend_store_part.name
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 pub struct ModifyTrendExtraData {
@@ -348,6 +370,13 @@ impl Change for ModifyTrendExtraData {
             &self.trend_store_part_name, &self.trend_name,
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 pub struct AddTrendStorePart {
@@ -394,6 +423,13 @@ impl Change for AddTrendStorePart {
             &self.trend_store_part.name, &self.trend_store
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 impl fmt::Display for AddTrendStorePart {
@@ -424,5 +460,12 @@ impl Change for AddTrendStore {
             .map_err(|e| DatabaseError::from_msg(format!("Error creating trend store: {e}")))?;
 
         Ok(format!("Added trend store {}", &self.trend_store))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }

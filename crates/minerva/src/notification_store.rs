@@ -74,6 +74,13 @@ impl Change for AddAttributes {
             &self.notification_store
         ))
     }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -150,6 +157,13 @@ impl Change for AddNotificationStore {
             "Created attribute store '{}'",
             &self.notification_store
         ))
+    }
+
+    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+        let result = self.apply(&mut tx).await?;
+        tx.commit().await?;
+        Ok(result)
     }
 }
 
