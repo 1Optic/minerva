@@ -2,8 +2,7 @@ use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
 use serde_json::Value;
 use std::fmt;
-use tokio_postgres::{Client, Transaction};
-use log::{error, info};
+use tokio_postgres::{GenericClient, Client, Transaction};
 
 use async_trait::async_trait;
 
