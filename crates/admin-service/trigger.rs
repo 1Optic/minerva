@@ -1,7 +1,7 @@
 use deadpool_postgres::Pool;
+use log::{debug, trace};
 use std::ops::DerefMut;
 use std::time::Duration;
-use log::{info, debug, trace};
 
 use actix_web::{get, post, put, web::Data, web::Path, HttpResponse, Responder};
 
@@ -505,14 +505,15 @@ async fn create_trigger_fn(
         })?;
     debug!("Got template {:?}", template);
 
-    let mut transaction: tokio_postgres::Transaction<'_> = client.transaction().await.map_err(|e| {
-        let mut messages = Map::new();
-        messages.insert("general".to_string(), e.to_string().into());
-        ExtendedServiceError {
-            kind: ServiceErrorKind::InternalError,
-            messages,
-        }
-    })?;
+    let mut transaction: tokio_postgres::Transaction<'_> =
+        client.transaction().await.map_err(|e| {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            ExtendedServiceError {
+                kind: ServiceErrorKind::InternalError,
+                messages,
+            }
+        })?;
 
     let templated_trigger = TemplatedTrigger {
         template,

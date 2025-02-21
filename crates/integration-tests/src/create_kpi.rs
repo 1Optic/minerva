@@ -91,9 +91,10 @@ mod tests {
             add_trend_store.apply(&mut tx).await?;
 
             tx.execute(
-              "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-              &[],
-            ).await?;
+                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                &[],
+            )
+            .await?;
 
             tx.commit().await?;
         }
@@ -157,6 +158,11 @@ mod tests {
 
         let body = response.text().await?;
 
+        assert_eq!(
+            body,
+            "{\"code\":200,\"message\":\"Successfully created KPI\"}"
+        );
+
         let (language, src): (String, String) = {
             let mut client = test_database.connect().await?;
 
@@ -164,11 +170,6 @@ mod tests {
                 .await
                 .unwrap()
         };
-
-        assert_eq!(
-            body,
-            "{\"code\":200,\"message\":\"Successfully created KPI\"}"
-        );
 
         assert_eq!(language, "plpgsql");
 

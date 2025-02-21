@@ -75,7 +75,7 @@ impl Change for AddVirtualEntity {
         let result = self.apply(&mut tx).await?;
         tx.commit().await?;
         Ok(result)
-    }   
+    }
 }
 
 impl From<VirtualEntity> for AddVirtualEntity {
