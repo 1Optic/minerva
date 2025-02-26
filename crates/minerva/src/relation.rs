@@ -62,6 +62,7 @@ pub fn load_relation_from_file(path: &PathBuf) -> Result<Relation, Error> {
     }
 }
 
+#[derive(Serialize)]
 pub struct AddRelation {
     pub relation: Relation,
 }
@@ -93,6 +94,7 @@ impl From<Relation> for AddRelation {
     }
 }
 
+#[derive(Serialize)]
 pub struct UpdateRelation {
     pub relation: Relation,
 }

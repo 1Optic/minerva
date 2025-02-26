@@ -322,6 +322,7 @@ pub async fn load_attribute_materializations<T: GenericClient + Send + Sync>(
     Ok(attribute_materializations)
 }
 
+#[derive(Serialize)]
 pub struct AddAttributeMaterialization {
     pub attribute_materialization: AttributeMaterialization,
 }

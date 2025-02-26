@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 
+use erased_serde::Serializer;
 use minerva::error::{ConfigurationError, Error};
 use minerva::instance::{DiffOptions, MinervaInstance};
 
@@ -24,6 +25,8 @@ pub struct DiffOpt {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long, help = "output diff in json format")]
+    json: bool,
 }
 
 #[async_trait]
@@ -73,10 +76,18 @@ impl Cmd for DiffOpt {
         let changes = other_instance.diff(&instance_def, diff_options);
 
         if !changes.is_empty() {
-            println!("Differences {from_instance_descr} -> {to_instance_descr}");
+            if !self.json {
+                println!("Differences {from_instance_descr} -> {to_instance_descr}");
+            }
 
             for change in changes {
-                println!("* {}", &change);
+                if self.json {
+                    let json = &mut serde_json::Serializer::new(std::io::stdout());
+                    let mut serializer = Box::new(<dyn Serializer>::erase(json));
+                    let _ = change.erased_serialize(&mut serializer);
+                } else {
+                    println!("* {}", &change);
+                }
             }
         } else {
             println!("Database is up-to-date");
