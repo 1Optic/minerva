@@ -21,6 +21,13 @@ pub struct Success {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct CreationSuccess {
+    pub code: i32,
+    pub message: String,
+    pub id: Option<i32>,
+}
+
 #[derive(Display, From, Debug)]
 pub struct BadRequest {
     pub message: String,

@@ -13,7 +13,7 @@ use minerva::entity_set::{
 use minerva::error::DatabaseError;
 
 use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};
-use crate::error::{Error, Success};
+use crate::error::{CreationSuccess, Error, Success};
 
 type PostgresName = String;
 
@@ -244,9 +244,10 @@ async fn create_entity_set_fn(
     match result {
         Ok(entity_set) => {
             tx.commit().await?;
-            Ok(HttpResponse::Ok().json(Success {
+            Ok(HttpResponse::Ok().json(CreationSuccess {
                 code: 200,
-                message: format!("Entity set number {} created", &entity_set.id),
+                message: "Entity set created".to_string(),
+                id: Some(entity_set.id),
             }))
         }
         Err(EntitySetError::DatabaseError(DatabaseError { msg: e, kind: _ })) => {
@@ -297,7 +298,7 @@ async fn create_entity_set_fn(
     post,
     path="/entitysets",
     responses(
-    (status = 200, description = "Creating entity set succeeded", body = Success),
+    (status = 200, description = "Creating entity set succeeded", body = CreationSuccess),
     (status = 400, description = "Request could not be parsed", body = Error),
     (status = 409, description = "Creating entity set failed", body = Error),
     (status = 500, description = "Database unreachable", body = Error),
