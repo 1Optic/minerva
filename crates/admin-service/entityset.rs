@@ -13,7 +13,7 @@ use minerva::entity_set::{
 use minerva::error::DatabaseError;
 
 use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};
-use crate::error::{Error, Success, CreationSuccess};
+use crate::error::{CreationSuccess, Error, Success};
 
 type PostgresName = String;
 
@@ -246,7 +246,7 @@ async fn create_entity_set_fn(
             tx.commit().await?;
             Ok(HttpResponse::Ok().json(CreationSuccess {
                 code: 200,
-                message: format!("Entity set created"),
+                message: "Entity set created".to_string(),
                 id: Some(entity_set.id),
             }))
         }
