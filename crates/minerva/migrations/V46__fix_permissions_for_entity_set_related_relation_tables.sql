@@ -16,6 +16,10 @@ BEGIN
     entity_type_name
   );
   EXECUTE FORMAT(
+    'GRANT INSERT,UPDATE,DELETE ON relation."%s->entity_set" TO minerva_writer;',
+    entity_type_name
+  );
+  EXECUTE FORMAT(
     'GRANT SELECT ON relation."%s->entity_set" TO minerva;',
     entity_type_name
   );
