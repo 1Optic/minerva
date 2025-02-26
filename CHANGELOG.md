@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.21.1] - 2025-02-25
+
+### Fixed
+
+- Fixed addition of samples trend for generated entity aggregations
+
 ## [9.21.0] - 2025-02-18
 
 ### Added
@@ -274,7 +280,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.0...HEAD
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.1...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -311,3 +317,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.20.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.0...9.20.1
 [9.20.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.1...9.20.2
 [9.21.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.2...9.21.0
+[9.21.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.0...9.21.1

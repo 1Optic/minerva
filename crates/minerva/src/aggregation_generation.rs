@@ -740,11 +740,23 @@ fn define_aggregate_trend_store(
                     "Could not find part in source matching name '{}'",
                     aggregate_part_def.source
                 ))?;
-            let trends = src_part
+            let mut trends: Vec<Trend> = src_part
                 .trends
                 .iter()
                 .map(define_entity_aggregate_trend)
                 .collect();
+
+            if !trends.iter().any(|t| t.name.eq("samples")) {
+                trends.push(Trend {
+                    name: "samples".to_string(),
+                    data_type: DataType::Integer,
+                    description: "number of source samples".to_string(),
+                    entity_aggregation: "sum".to_string(),
+                    time_aggregation: "sum".to_string(),
+                    extra_data: serde_json::Value::Null,
+                });
+            }
+
             let generated_trends = vec![];
 
             Ok::<TrendStorePart, String>(TrendStorePart {
