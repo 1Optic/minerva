@@ -1,0 +1,3 @@
+--GRANT INSERT ON TABLE "trigger".rule TO minerva_writer;
+--GRANT SELECT ON TABLE "trigger"."template" TO minerva;
+--GRANT SELECT ON TABLE "trigger"."template_parameter" TO minerva;
