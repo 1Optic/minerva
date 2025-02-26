@@ -1,4 +1,5 @@
 use serde_json::Value;
+use serde::{Serialize, Deserialize};
 use std::fmt;
 use tokio_postgres::Transaction;
 
@@ -10,6 +11,7 @@ use crate::meas_value::DataType;
 use crate::trend_store::create::create_trend_store;
 use crate::trend_store::{Trend, TrendStore, TrendStorePart};
 
+#[derive(Serialize, Deserialize)]
 pub struct RemoveTrends {
     pub trend_store_part: TrendStorePart,
     pub trends: Vec<String>,
@@ -82,6 +84,7 @@ impl Change for RemoveTrends {
 // AddTrends
 ////////////
 
+#[derive(Serialize, Deserialize)]
 pub struct AddTrends {
     pub trend_store_part: TrendStorePart,
     pub trends: Vec<Trend>,
@@ -143,6 +146,7 @@ impl Change for AddTrends {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ModifyTrendDataType {
     pub trend_name: String,
     pub from_type: DataType,
@@ -164,6 +168,7 @@ impl fmt::Display for ModifyTrendDataType {
 ///
 /// The change of data types for multiple trends in a trend store part is
 /// grouped into one operation for efficiency purposes.
+#[derive(Serialize, Deserialize)]
 pub struct ModifyTrendDataTypes {
     pub trend_store_part: TrendStorePart,
     pub modifications: Vec<ModifyTrendDataType>,
@@ -298,6 +303,7 @@ impl Change for ModifyTrendDataTypes {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ModifyTrendExtraData {
     pub trend_name: String,
     pub trend_store_part_name: String,
@@ -350,6 +356,7 @@ impl Change for ModifyTrendExtraData {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct AddTrendStorePart {
     pub trend_store: TrendStore,
     pub trend_store_part: TrendStorePart,
@@ -406,6 +413,7 @@ impl fmt::Display for AddTrendStorePart {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct AddTrendStore {
     pub trend_store: TrendStore,
 }

@@ -44,6 +44,7 @@ pub fn load_virtual_entity_from_file(path: &PathBuf) -> Result<VirtualEntity, Er
     Ok(virtual_entity)
 }
 
+#[derive(Serialize)]
 pub struct AddVirtualEntity {
     pub virtual_entity: VirtualEntity,
 }

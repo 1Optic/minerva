@@ -6,7 +6,7 @@ use std::time::Duration;
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
 
-use chrono::{DateTime, TimeZone, Timelike};
+use chrono::{DateTime, Timelike, Utc};
 use postgres_protocol::escape::{escape_identifier, escape_literal};
 use tokio_postgres::{Client, GenericClient, Row, Transaction};
 
@@ -201,6 +201,7 @@ pub async fn list_triggers(conn: &mut Client) -> Result<Vec<TriggerRepr>, String
     triggers
 }
 
+#[derive(Serialize)]
 pub struct AddTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -810,6 +811,7 @@ async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
     ))
 }
 
+#[derive(Serialize)]
 pub struct DeleteTrigger {
     pub trigger_name: String,
 }
@@ -889,6 +891,7 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
     }
 }
 
+#[derive(Serialize)]
 pub struct UpdateTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -955,6 +958,7 @@ impl Change for UpdateTrigger {
     }
 }
 
+#[derive(Serialize)]
 pub struct RenameTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -1047,6 +1051,7 @@ impl Change for RenameTrigger {
     }
 }
 
+#[derive(Serialize)]
 pub struct VerifyTrigger {
     pub trigger_name: String,
 }
@@ -1068,6 +1073,7 @@ impl Change for VerifyTrigger {
     }
 }
 
+#[derive(Serialize)]
 pub struct EnableTrigger {
     pub trigger_name: String,
 }
@@ -1091,6 +1097,7 @@ impl Change for EnableTrigger {
     }
 }
 
+#[derive(Serialize)]
 pub struct DisableTrigger {
     pub trigger_name: String,
 }
@@ -1284,29 +1291,28 @@ where
     Ok(notifications)
 }
 
-pub struct CreateNotifications<Tz: TimeZone> {
+#[derive(Serialize)]
+pub struct CreateNotifications {
     pub trigger_name: String,
-    pub timestamp: Option<DateTime<Tz>>,
+    pub timestamp: DateTime<Utc>,
 }
 
-impl<Tz: TimeZone> fmt::Display for CreateNotifications<Tz> {
+impl fmt::Display for CreateNotifications {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CreateNotifications({})", &self.trigger_name)
     }
 }
 
 #[async_trait]
-impl<Tz> Change for CreateNotifications<Tz>
+impl Change for CreateNotifications
 where
-    Tz: TimeZone,
-    <Tz as TimeZone>::Offset: Sync + Send,
-    DateTime<Tz>: ToSql,
+    DateTime<Utc>: ToSql,
 {
     async fn apply(&self, client: &mut Transaction) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let message =
-            create_notifications(&mut transaction, &self.trigger_name, self.timestamp.clone())
+            create_notifications(&mut transaction, &self.trigger_name, Some(self.timestamp.clone()))
                 .await?;
 
         transaction.commit().await?;

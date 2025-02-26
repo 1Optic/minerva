@@ -35,6 +35,7 @@ fn default_empty_string() -> String {
     String::new()
 }
 
+#[derive(Serialize)]
 pub struct AddAttributes {
     pub attribute_store: AttributeStore,
     pub attributes: Vec<Attribute>,
@@ -104,6 +105,7 @@ impl Change for AddAttributes {
     }
 }
 
+#[derive(Serialize)]
 pub struct RemoveAttributes {
     pub attribute_store: AttributeStore,
     pub attributes: Vec<String>,
@@ -172,6 +174,7 @@ impl Change for RemoveAttributes {
     }
 }
 
+#[derive(Serialize)]
 pub struct ChangeAttribute {
     pub attribute_store: AttributeStore,
     pub attribute: Attribute,
@@ -319,6 +322,7 @@ impl fmt::Display for AttributeStore {
     }
 }
 
+#[derive(Serialize)]
 pub struct AddAttributeStore {
     pub attribute_store: AttributeStore,
 }

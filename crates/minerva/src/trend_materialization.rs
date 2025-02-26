@@ -318,6 +318,7 @@ async fn drop_fingerprint_function<T: GenericClient + Send + Sync>(
     }
 }
 
+#[derive(Serialize)]
 pub struct UpdateTrendViewMaterializationAttributes {
     pub trend_view_materialization: TrendViewMaterialization,
 }
@@ -343,6 +344,7 @@ impl fmt::Display for UpdateTrendViewMaterializationAttributes {
     }
 }
 
+#[derive(Serialize)]
 pub struct UpdateView {
     pub trend_view_materialization: TrendViewMaterialization,
 }
@@ -1459,6 +1461,7 @@ pub async fn get_function_return_type<T: GenericClient + Send + Sync>(
     Some(format!("TABLE (\n{}\n)\n", columns_part))
 }
 
+#[derive(Serialize)]
 pub struct AddTrendMaterialization {
     pub trend_materialization: TrendMaterialization,
 }
@@ -1499,6 +1502,7 @@ impl From<TrendMaterialization> for AddTrendMaterialization {
     }
 }
 
+#[derive(Serialize)]
 pub struct RemoveTrendMaterialization {
     pub name: String,
 }
@@ -1526,6 +1530,7 @@ impl Change for RemoveTrendMaterialization {
     }
 }
 
+#[derive(Serialize)]
 pub struct UpdateTrendMaterialization {
     pub trend_materialization: TrendMaterialization,
 }

@@ -270,7 +270,7 @@ impl MinervaInstance {
         &self,
         other: &MinervaInstance,
         options: DiffOptions,
-    ) -> Vec<Box<dyn Change + Send>> {
+    ) -> Vec<Box<dyn Change + Send + 'static>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         // Check for changes in trend stores

@@ -259,6 +259,7 @@ impl EntitySet {
     }
 }
 
+#[derive(Serialize)]
 pub struct ChangeEntitySet {
     pub entity_set: EntitySet,
     pub entities: Vec<String>,
@@ -381,6 +382,7 @@ impl NewEntitySet {
     }
 }
 
+#[derive(Serialize)]
 pub struct CreateEntitySet {
     pub entity_set: NewEntitySet,
 }
