@@ -202,55 +202,6 @@ async fn initialize_table_trends<T: GenericClient>(
     Ok(())
 }
 
-async fn create_table_trends<T: GenericClient>(
-    client: &mut T,
-    trend_store_part_name: &str,
-    trends: &[Trend],
-) -> Result<(), tokio_postgres::Error> {
-    let rows = client
-        .query(
-            "SELECT id FROM trend_directory.trend_store_part WHERE name = $1",
-            &[&trend_store_part_name],
-        )
-        .await?;
-
-    let trend_store_part_id: i32 = rows.first().unwrap().get(0);
-
-    define_table_trends(client, trend_store_part_id, trends).await?;
-    initialize_table_trends(client, trend_store_part_name, trends).await?;
-
-    Ok(())
-}
-
-async fn initialize_table_trends<T: GenericClient>(
-    client: &mut T,
-    trend_store_part_name: &str,
-    trends: &[Trend],
-) -> Result<(), tokio_postgres::Error> {
-    let column_specs = trends
-        .iter()
-        .map(|trend| {
-            format!(
-                "ADD COLUMN {} {}",
-                escape_identifier(&trend.name),
-                trend.data_type
-            )
-        })
-        .collect::<Vec<String>>()
-        .join(",");
-
-    let alter_table_query = format!(
-        "ALTER TABLE {}.{} {}",
-        BASE_TABLE_SCHEMA,
-        escape_identifier(trend_store_part_name),
-        column_specs
-    );
-
-    client.execute(&alter_table_query, &[]).await?;
-
-    Ok(())
-}
-
 pub struct ModifyTrendDataType {
     pub trend_name: String,
     pub from_type: DataType,
