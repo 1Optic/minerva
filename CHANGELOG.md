@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CLI: Exit with error code 1 on errors
+
 ## [9.21.1] - 2025-02-25
 
 ### Fixed
@@ -35,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Service: Add endpoints for template-based trigger management 
+- Service: Add endpoints for template-based trigger management
 
 ## [9.19.0] - 2025-02-11
 
