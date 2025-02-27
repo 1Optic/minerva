@@ -1,6 +1,7 @@
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
+use std::process::ExitCode;
 
 pub mod commands;
 
@@ -66,7 +67,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("Failed to install rustls crypto provider");
@@ -95,11 +96,13 @@ async fn main() {
         Some(Commands::Start(start)) => start.run().await,
         Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
-        None => return,
+        None => return ExitCode::FAILURE,
     };
 
     if let Err(e) = result {
         println!("{e}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
+
+    ExitCode::SUCCESS
 }
