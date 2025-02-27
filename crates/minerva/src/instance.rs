@@ -761,7 +761,7 @@ async fn initialize_triggers(client: &mut Client, triggers: &Vec<Trigger>) -> Re
     Ok(())
 }
 
-async fn load_sql<'a>(client: &'a mut Client, path: &PathBuf) -> Result<(), String> {
+async fn load_sql(client: &mut Client, path: &PathBuf) -> Result<(), String> {
     let mut f = match std::fs::File::open(path) {
         Ok(file) => file,
         Err(e) => {

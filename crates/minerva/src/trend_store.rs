@@ -710,7 +710,7 @@ impl TrendStorePart {
         Ok(row_count)
     }
 
-    pub async fn store_copy_from_package<'a, 'b, U>(
+    pub async fn store_copy_from_package<U>(
         &self,
         client: &mut Client,
         data_package: &U,

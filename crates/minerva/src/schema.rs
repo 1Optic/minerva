@@ -42,7 +42,7 @@ pub async fn get_pending_migrations(client: &mut Client) -> Result<Vec<(u32, Str
 
     let mut pending_migrations = migrations
         .iter()
-        .filter(|m| last_applied_migration.map_or(true, |applied| m.version() > applied))
+        .filter(|m| last_applied_migration.is_none_or(|applied| m.version() > applied))
         .map(|m| (m.version(), m.name().to_string()))
         .collect::<Vec<_>>();
 
