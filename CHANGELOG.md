@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- CLI: Exit with error code 1 on errors
+- CLI: Exit with error failure code on errors
 
 ## [9.21.1] - 2025-02-25
 
