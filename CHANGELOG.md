@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.21.2] - 2025-02-27
+
+### Fixed
+
+- CLI: Exit with error failure code on errors
+- Service: Show id in a separate field when creating an entity set in backend
+- Database: Fix permissions for entity set related relation tables
+
 ## [9.21.1] - 2025-02-25
 
 ### Fixed
@@ -35,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Service: Add endpoints for template-based trigger management 
+- Service: Add endpoints for template-based trigger management
 
 ## [9.19.0] - 2025-02-11
 
