@@ -155,7 +155,7 @@ pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client
     Ok(client)
 }
 
-pub async fn create_database<'a>(client: &'a Client, database_name: &str) -> Result<(), String> {
+pub async fn create_database(client: &Client, database_name: &str) -> Result<(), String> {
     let query = format!("CREATE DATABASE \"{database_name}\"");
 
     client
@@ -166,7 +166,7 @@ pub async fn create_database<'a>(client: &'a Client, database_name: &str) -> Res
     Ok(())
 }
 
-pub async fn drop_database<'a>(client: &'a mut Client, database_name: &str) -> Result<(), String> {
+pub async fn drop_database(client: &mut Client, database_name: &str) -> Result<(), String> {
     let query = format!("DROP DATABASE IF EXISTS \"{database_name}\"");
 
     client
