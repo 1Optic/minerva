@@ -147,11 +147,28 @@ where
     }
 }
 
-async fn materialize_select_virtual_entities<C, T>(client: &mut C, names: &[T])
+#[derive(Debug, Error)]
+enum VirtualEntityMaterializeError {
+    #[error("Runtime error: {0}")]
+    RuntimeError(String),
+}
+
+impl From<VirtualEntityMaterializeError> for minerva::error::Error {
+    fn from(err: VirtualEntityMaterializeError) -> minerva::error::Error {
+        minerva::error::Error::Runtime(minerva::error::RuntimeError::from_msg(err.to_string()))
+    }
+}
+
+async fn materialize_select_virtual_entities<C, T>(
+    client: &mut C,
+    names: &[T],
+) -> Result<(), VirtualEntityMaterializeError>
 where
     C: GenericClient,
     T: AsRef<str>,
 {
+    let mut error_count = 0;
+
     for name in names {
         match materialize_virtual_entity_type(client, name.as_ref()).await {
             Ok(record_count) => {
@@ -163,20 +180,31 @@ where
             }
             Err(e) => {
                 println!("Error materializing relation '{}': {e}", name.as_ref());
+                error_count += 1;
             }
         }
     }
+
+    if error_count > 0 {
+        return Err(VirtualEntityMaterializeError::RuntimeError(format!(
+            "{error_count} virtual entity types failed to materialize"
+        )));
+    }
+
+    Ok(())
 }
 
-async fn materialize_all_virtual_entities<C>(client: &mut C) -> Result<(), String>
+async fn materialize_all_virtual_entities<C>(
+    client: &mut C,
+) -> Result<(), VirtualEntityMaterializeError>
 where
     C: GenericClient,
 {
-    let entity_type_names = get_virtual_entity_type_names(client).await?;
+    let entity_type_names = get_virtual_entity_type_names(client)
+        .await
+        .map_err(VirtualEntityMaterializeError::RuntimeError)?;
 
-    materialize_select_virtual_entities(client, entity_type_names.as_slice()).await;
-
-    Ok(())
+    materialize_select_virtual_entities(client, entity_type_names.as_slice()).await
 }
 
 #[async_trait]
@@ -185,9 +213,13 @@ impl Cmd for VirtualEntityMaterialize {
         let mut client = connect_db().await?;
 
         if self.name.is_empty() {
-            let _ = materialize_all_virtual_entities(&mut client).await;
+            materialize_all_virtual_entities(&mut client)
+                .await
+                .map_err(|e| format!("{e}"))?;
         } else {
-            let _ = materialize_select_virtual_entities(&mut client, &self.name).await;
+            materialize_select_virtual_entities(&mut client, &self.name)
+                .await
+                .map_err(|e| format!("{e}"))?;
         }
 
         Ok(())

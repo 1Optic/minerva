@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.21.3] - 2025-02-27
+
+### Fixed
+
+- CLI: Propagate errors for relation and virtual entity materializations
+
 ## [9.21.2] - 2025-02-27
 
 ### Fixed
@@ -288,7 +294,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AttributeDataRow now includes timestamp field
 
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.1...HEAD
 [8.0.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/7.7.1...8.0.0
 [8.1.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.0.0...8.1.0
 [8.1.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/8.1.0...8.1.1
@@ -326,3 +331,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.20.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.1...9.20.2
 [9.21.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.20.2...9.21.0
 [9.21.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.0...9.21.1
+[9.21.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.1...9.21.2
+[9.21.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.2...9.21.3
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.3...HEAD

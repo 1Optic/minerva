@@ -88,6 +88,8 @@ async fn get_relation_names(client: &Client) -> Vec<String> {
 #[async_trait]
 impl Cmd for RelationMaterialize {
     async fn run(&self) -> CmdResult {
+        let mut error_count = 0;
+
         let mut client = connect_db().await?;
 
         let relation_names = match &self.name {
@@ -109,8 +111,17 @@ impl Cmd for RelationMaterialize {
                 Err(e) => {
                     tx.rollback().await?;
                     println!("Error materializing relation '{name}': {e}");
+                    error_count += 1;
                 }
             }
+        }
+
+        if error_count > 0 {
+            return Err(minerva::error::Error::Runtime(
+                minerva::error::RuntimeError::from_msg(format!(
+                    "{error_count} relations failed to materialize"
+                )),
+            ));
         }
 
         Ok(())
