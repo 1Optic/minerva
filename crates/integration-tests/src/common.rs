@@ -5,12 +5,12 @@ use std::time::Duration;
 use assert_cmd::prelude::*;
 use log::{debug, error};
 use minerva::error::{Error, RuntimeError};
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 
 use tokio::io::AsyncBufReadExt;
 
 pub fn generate_name(len: usize) -> String {
-    Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    Alphanumeric.sample_string(&mut rand::rng(), len)
 }
 
 pub fn get_available_port(ip_addr: Ipv4Addr) -> Option<u16> {
