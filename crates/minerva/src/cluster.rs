@@ -12,7 +12,7 @@ use bollard::Docker;
 use log::{debug, error, info};
 
 use futures_util::StreamExt;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 
 use tokio::io::AsyncBufReadExt;
 use tokio::time::{sleep, Duration};
@@ -27,7 +27,7 @@ use crate::database::{connect_to_db, create_database, drop_database};
 use crate::error::Error;
 
 pub fn generate_name(len: usize) -> String {
-    Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    Alphanumeric.sample_string(&mut rand::rng(), len)
 }
 
 pub fn create_citus_container(
