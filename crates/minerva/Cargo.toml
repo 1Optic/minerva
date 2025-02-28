@@ -32,11 +32,11 @@ thiserror = "2.0"
 log = "0.4"
 url = { version = "2.5", optional = true}
 rand = { version = "0.8", optional = true}
-testcontainers = { version = "0.23", optional = true }
+testcontainers = { version = "0.23.3", optional = true }
 quick_cache = "0.6.1"
 refinery = { version = "0.8.14", features = ["tokio-postgres"] }
-bollard = "0.17"
-bollard-stubs = "=1.45.0-rc.26.0.1"
+bollard = "0.18.1"
+bollard-stubs = "=1.47.1-rc.27.3.1"
 
 [dev-dependencies]
 env_logger = { version = "=0.11.6" }
