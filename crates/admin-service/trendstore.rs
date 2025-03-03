@@ -4,7 +4,7 @@ use std::ops::DerefMut;
 use std::time::Duration;
 
 use deadpool_postgres::Pool;
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient, Transaction};
 
 use actix_web::{get, post, web::Data, web::Path, web::Query, HttpResponse};
 
@@ -247,9 +247,9 @@ impl TrendStorePartCompleteData {
         }
     }
 
-    pub async fn create<T: GenericClient + Send + Sync>(
+    pub async fn create(
         &self,
-        client: &mut T,
+        client: &mut Client,
     ) -> Result<TrendStorePartFull, Error> {
         let mut tx = client.transaction().await.map_err(|_| Error {
             code: 500,
@@ -278,7 +278,7 @@ impl TrendStorePartCompleteData {
             trend_store_part: self.trend_store_part().as_minerva(),
         };
 
-        action.apply(&mut tx).await.map_err(|e| Error {
+        action.apply(&mut client).await.map_err(|e| Error {
             code: 409,
             message: format!("Creation of trendstorepart failed: {e}"),
         })?;

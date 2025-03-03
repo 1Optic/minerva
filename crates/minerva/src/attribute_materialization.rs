@@ -338,26 +338,21 @@ impl fmt::Display for AddAttributeMaterialization {
 
 #[async_trait]
 impl Change for AddAttributeMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.attribute_materialization.create(client).await {
-            Ok(_) => Ok(format!(
-                "Added attribute materialization '{}'",
-                &self.attribute_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.attribute_materialization.create(&mut tx).await.map_err(|e|
+            Error::Runtime(RuntimeError {
                 msg: format!(
                     "Error adding attribute materialization '{}': {}",
                     &self.attribute_materialization, e
                 ),
-            })),
-        }
-    }
+            })
+        )?;
 
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Added attribute materialization '{}'", &self.attribute_materialization))
     }
 }
 

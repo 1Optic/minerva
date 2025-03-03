@@ -302,13 +302,7 @@ impl AddTrigger {
 
 #[async_trait]
 impl Change for AddTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        self.apply1(client).await?;
-
-        self.apply2(client).await
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx1 = client.transaction().await?;
         self.apply1(&mut tx1).await?;
         tx1.commit().await?;
@@ -316,6 +310,7 @@ impl Change for AddTrigger {
         let mut tx2 = client.transaction().await?;
         let result = self.apply2(&mut tx2).await?;
         tx2.commit().await?;
+
         Ok(result)
     }
 }
@@ -887,8 +882,10 @@ impl fmt::Display for DeleteTrigger {
 
 #[async_trait]
 impl Change for DeleteTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let row = client
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
+        let row = tx
             .query_one(
                 "SELECT count(*) FROM trigger.rule WHERE name = $1",
                 &[&self.trigger_name],
@@ -907,19 +904,13 @@ impl Change for DeleteTrigger {
             ))));
         }
 
-        client
-            .execute("SELECT trigger.delete_rule($1)", &[&self.trigger_name])
+        tx.execute("SELECT trigger.delete_rule($1)", &[&self.trigger_name])
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error deleting rule: {e}")))?;
 
-        Ok(format!("Removed trigger '{}'", &self.trigger_name))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Removed trigger '{}'", &self.trigger_name))
     }
 }
 
@@ -974,7 +965,7 @@ impl fmt::Display for UpdateTrigger {
 
 #[async_trait]
 impl Change for UpdateTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         // Tear down
@@ -1025,13 +1016,6 @@ impl Change for UpdateTrigger {
 
         Ok(message)
     }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
-    }
 }
 
 pub struct RenameTrigger {
@@ -1048,7 +1032,7 @@ impl fmt::Display for RenameTrigger {
 
 #[async_trait]
 impl Change for RenameTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         if self.trigger.name.len() > MAX_TRIGGER_NAME_LENGTH {
             return Err(Error::Configuration(ConfigurationError::from_msg(format!(
                 "Trigger name too long ({} > {})",
@@ -1124,13 +1108,6 @@ impl Change for RenameTrigger {
 
         Ok(message)
     }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
-    }
 }
 
 pub struct VerifyTrigger {
@@ -1145,19 +1122,14 @@ impl fmt::Display for VerifyTrigger {
 
 #[async_trait]
 impl Change for VerifyTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let message = run_checks(&self.trigger_name, &mut transaction).await?;
 
-        Ok(message)
-    }
+        transaction.commit().await?;
 
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
+        Ok(message)
     }
 }
 
@@ -1173,7 +1145,7 @@ impl fmt::Display for EnableTrigger {
 
 #[async_trait]
 impl Change for EnableTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let message = set_enabled(&mut transaction, &self.trigger_name, true).await?;
@@ -1181,13 +1153,6 @@ impl Change for EnableTrigger {
         transaction.commit().await?;
 
         Ok(message)
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -1203,7 +1168,7 @@ impl fmt::Display for DisableTrigger {
 
 #[async_trait]
 impl Change for DisableTrigger {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let message = set_enabled(&mut transaction, &self.trigger_name, false).await?;
@@ -1211,13 +1176,6 @@ impl Change for DisableTrigger {
         transaction.commit().await?;
 
         Ok(message)
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -1409,7 +1367,7 @@ where
     <Tz as TimeZone>::Offset: Sync + Send,
     DateTime<Tz>: ToSql,
 {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let message =
@@ -1419,13 +1377,6 @@ where
         transaction.commit().await?;
 
         Ok(message)
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 

@@ -324,19 +324,16 @@ pub struct UpdateTrendViewMaterializationAttributes {
 
 #[async_trait]
 impl Change for UpdateTrendViewMaterializationAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
         self.trend_view_materialization
-            .update_attributes(client)
+            .update_attributes(&mut tx)
             .await?;
 
-        Ok("Updated attributes of view materialization".into())
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok("Updated attributes of view materialization".into())
     }
 }
 
@@ -356,29 +353,26 @@ pub struct UpdateView {
 
 #[async_trait]
 impl Change for UpdateView {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
         drop_materialization_view(
-            client,
+            &mut tx,
             &self.trend_view_materialization.target_trend_store_part,
         )
         .await
         .unwrap();
         self.trend_view_materialization
-            .create_view(client)
+            .create_view(&mut tx)
             .await
             .unwrap();
+
+        tx.commit().await?;
 
         Ok(format!(
             "Updated view {}",
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -1501,26 +1495,27 @@ impl fmt::Display for AddTrendMaterialization {
 
 #[async_trait]
 impl Change for AddTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.trend_materialization.create(client).await {
-            Ok(_) => Ok(format!(
-                "Added trend materialization '{}'",
-                &self.trend_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error adding trend materialization '{}': {}",
-                    &self.trend_materialization, e
-                ),
-            })),
-        }
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
+
+        self.trend_materialization
+            .create(&mut tx)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error adding trend materialization '{}': {}",
+                        &self.trend_materialization, e
+                    ),
+                })
+            })?;
+
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!(
+            "Added trend materialization '{}'",
+            &self.trend_materialization
+        ))
     }
 }
 
@@ -1544,10 +1539,11 @@ impl fmt::Display for RemoveTrendMaterialization {
 
 #[async_trait]
 impl Change for RemoveTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        remove_trend_materialization(client, &self.name)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        remove_trend_materialization(&mut tx, &self.name)
             .await
-            .map(|_| format!("Removed trend materialization '{}'", &self.name,))
             .map_err(|e| {
                 Error::Runtime(RuntimeError {
                     msg: format!(
@@ -1555,14 +1551,11 @@ impl Change for RemoveTrendMaterialization {
                         &self.name, e
                     ),
                 })
-            })
-    }
+            });
 
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Removed trend materialization '{}'", &self.name,))
     }
 }
 
@@ -1582,26 +1575,27 @@ impl fmt::Display for UpdateTrendMaterialization {
 
 #[async_trait]
 impl Change for UpdateTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.trend_materialization.update(client).await {
-            Ok(_) => Ok(format!(
-                "Updated trend materialization '{}'",
-                &self.trend_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error updating trend materialization '{}': {}",
-                    &self.trend_materialization, e
-                ),
-            })),
-        }
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
+
+        match self.trend_materialization.update(&mut tx).await {
+            Ok(_) => {
+                tx.commit().await?;
+                Ok(format!(
+                    "Updated trend materialization '{}'",
+                    &self.trend_materialization
+                ))
+            }
+            Err(e) => {
+                tx.rollback().await?;
+                Err(Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error updating trend materialization '{}': {}",
+                        &self.trend_materialization, e
+                    ),
+                }))
+            }
+        }
     }
 }
 

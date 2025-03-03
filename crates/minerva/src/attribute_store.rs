@@ -68,7 +68,9 @@ impl fmt::Debug for AddAttributes {
 
 #[async_trait]
 impl Change for AddAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "SELECT attribute_directory.create_attribute(attribute_store, $1::name, $2::text, $3::text) ",
             "FROM attribute_directory.attribute_store ",
@@ -78,7 +80,7 @@ impl Change for AddAttributes {
         );
 
         for attribute in &self.attributes {
-            client
+            tx
                 .query_one(
                     query,
                     &[
@@ -97,17 +99,12 @@ impl Change for AddAttributes {
                 })?;
         }
 
+        tx.commit().await?;
+
         Ok(format!(
             "Added attributes to attribute store '{}'",
             &self.attribute_store
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -144,7 +141,9 @@ impl fmt::Debug for RemoveAttributes {
 
 #[async_trait]
 impl Change for RemoveAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+        
         let query = concat!(
             "SELECT attribute_directory.drop_attribute(attribute_store, $1) ",
             "FROM attribute_directory.attribute_store ",
@@ -154,7 +153,7 @@ impl Change for RemoveAttributes {
         );
 
         for attribute in &self.attributes {
-            client
+            tx
                 .query(
                     query,
                     &[
@@ -171,18 +170,13 @@ impl Change for RemoveAttributes {
                 })?;
         }
 
+        tx.commit().await?;
+
         Ok(format!(
             "Removed {} attributes from attribute store '{}'",
             &self.attributes.len(),
             &self.attribute_store
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -213,7 +207,9 @@ impl fmt::Debug for ChangeAttribute {
 
 #[async_trait]
 impl Change for ChangeAttribute {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "UPDATE attribute_directory.attribute ",
             "SET data_type = $1 ",
@@ -224,7 +220,7 @@ impl Change for ChangeAttribute {
             "AND attribute.name = $2 AND data_source.name = $3 AND entity_type.name = $4",
         );
 
-        client
+        tx
             .execute(
                 query,
                 &[
@@ -237,17 +233,12 @@ impl Change for ChangeAttribute {
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
 
+        tx.commit().await?;
+
         Ok(format!(
             "Changed type of attribute '{}' in store '{}'",
             &self.attribute, &self.attribute_store
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -352,7 +343,9 @@ impl fmt::Display for AddAttributeStore {
 
 #[async_trait]
 impl Change for AddAttributeStore {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "CALL attribute_directory.create_attribute_store(",
             "$1::text, $2::text, ",
@@ -360,7 +353,7 @@ impl Change for AddAttributeStore {
             ")"
         );
 
-        client
+        tx
             .execute(
                 query,
                 &[
@@ -377,17 +370,12 @@ impl Change for AddAttributeStore {
                 ))
             })?;
 
+        tx.commit().await?;
+
         Ok(format!(
             "Created attribute store '{}'",
             &self.attribute_store
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 

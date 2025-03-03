@@ -74,19 +74,16 @@ impl fmt::Display for AddRelation {
 
 #[async_trait]
 impl Change for AddRelation {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_relation(client, &self.relation)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        create_relation(&mut tx, &self.relation)
             .await
             .map_err(|e| format!("Could not create relation '{}': {e}", self.relation.name))?;
 
-        Ok(format!("Added relation '{}'", &self.relation))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Added relation '{}'", &self.relation))
     }
 }
 
@@ -108,25 +105,21 @@ impl fmt::Display for UpdateRelation {
 
 #[async_trait]
 impl Change for UpdateRelation {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = format!(
             "CREATE OR REPLACE VIEW relation_def.\"{}\" AS {}",
             self.relation.name, self.relation.query
         );
 
-        client
-            .query(&query, &[])
+        tx.query(&query, &[])
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error updating relation view: {e}")))?;
 
-        Ok(format!("Updated relation {}", &self.relation))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Updated relation {}", &self.relation))
     }
 }
 

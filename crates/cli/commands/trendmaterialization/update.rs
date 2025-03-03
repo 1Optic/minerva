@@ -31,17 +31,15 @@ impl Cmd for TrendMaterializationUpdate {
         println!("Loaded definition, updating trend materialization");
         let mut client = connect_db().await?;
 
-        let mut transaction = client.transaction().await?;
-
         let change = UpdateTrendMaterialization {
             trend_materialization: trend_materialization.clone(),
         };
 
-        change.apply(&mut transaction).await?;
+        change.apply(&mut client).await?;
 
         let result = if self.verify {
             let report =
-                check_trend_materialization(&mut transaction, &trend_materialization).await?;
+                check_trend_materialization(&mut client, &trend_materialization).await?;
 
             if report.is_empty() {
                 Ok(())
@@ -54,8 +52,6 @@ impl Cmd for TrendMaterializationUpdate {
 
         match result {
             Ok(_) => {
-                transaction.commit().await?;
-
                 println!("Updated trend materialization");
 
                 Ok(())

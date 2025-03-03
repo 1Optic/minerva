@@ -52,7 +52,9 @@ impl fmt::Debug for RemoveTrends {
 
 #[async_trait]
 impl Change for RemoveTrends {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "SELECT trend_directory.remove_table_trend(table_trend) ",
             "FROM trend_directory.table_trend ",
@@ -61,7 +63,7 @@ impl Change for RemoveTrends {
         );
 
         for trend_name in &self.trends {
-            client
+            tx 
                 .query_one(query, &[&self.trend_store_part.name, &trend_name])
                 .await
                 .map_err(|e| {
@@ -72,18 +74,13 @@ impl Change for RemoveTrends {
                 })?;
         }
 
+        tx.commit().await?;
+
         Ok(format!(
             "Removed {} trends from trend store part '{}'",
             &self.trends.len(),
             &self.trend_store_part.name
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -131,25 +128,22 @@ impl fmt::Debug for AddTrends {
 
 #[async_trait]
 impl Change for AddTrends {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_table_trends(client, &self.trend_store_part.name, &self.trends)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        create_table_trends(&mut tx, &self.trend_store_part.name, &self.trends)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!("Error adding trends to trend store part: {e}"))
             })?;
+
+        tx.commit().await?;
 
         Ok(format!(
             "Added {} trends to trend store part '{}'",
             &self.trends.len(),
             &self.trend_store_part.name
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -260,7 +254,7 @@ impl fmt::Debug for ModifyTrendDataTypes {
 
 #[async_trait]
 impl Change for ModifyTrendDataTypes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client
             .transaction()
             .await
@@ -355,13 +349,6 @@ impl Change for ModifyTrendDataTypes {
             &self.trend_store_part.name
         ))
     }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
-    }
 }
 
 pub struct ModifyTrendExtraData {
@@ -386,7 +373,9 @@ impl fmt::Display for ModifyTrendExtraData {
 
 #[async_trait]
 impl Change for ModifyTrendExtraData {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "UPDATE trend_directory.table_trend tt ",
             "SET extra_data = $1 ",
@@ -394,32 +383,23 @@ impl Change for ModifyTrendExtraData {
             "WHERE tsp.id = tt.trend_store_part_id AND tsp.name = $2 AND tt.name = $3"
         );
 
-        let result = client
-            .execute(
-                query,
-                &[
-                    &self.to_extra_data,
-                    &self.trend_store_part_name,
-                    &self.trend_name,
-                ],
-            )
-            .await;
+        tx.execute(
+            query,
+            &[
+                &self.to_extra_data,
+                &self.trend_store_part_name,
+                &self.trend_name,
+            ],
+        )
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error changing extra_data: {e}")))?;
 
-        if let Err(e) = result {
-            return Err(DatabaseError::from_msg(format!("Error changing extra_data: {e}")).into());
-        }
+        tx.commit().await?;
 
         Ok(format!(
             "Altered extra_data for trend '{}'.'{}'",
             &self.trend_store_part_name, &self.trend_name,
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -615,8 +595,10 @@ async fn create_trend_store_part<T: GenericClient>(
 
 #[async_trait]
 impl Change for AddTrendStorePart {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_trend_store_part(client, &self.trend_store, &self.trend_store_part)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        create_trend_store_part(&mut tx, &self.trend_store, &self.trend_store_part)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
@@ -625,17 +607,12 @@ impl Change for AddTrendStorePart {
                 ))
             })?;
 
+        tx.commit().await?;
+
         Ok(format!(
             "Added trend store part '{}' to trend store '{}'",
             &self.trend_store_part.name, &self.trend_store
         ))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
-        tx.commit().await?;
-        Ok(result)
     }
 }
 
@@ -672,18 +649,15 @@ impl fmt::Display for AddTrendStore {
 
 #[async_trait]
 impl Change for AddTrendStore {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_trend_store(client, &self.trend_store)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        create_trend_store(&mut tx, &self.trend_store)
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error creating trend store: {e}")))?;
 
-        Ok(format!("Added trend store {}", &self.trend_store))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Added trend store {}", &self.trend_store))
     }
 }

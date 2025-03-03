@@ -642,7 +642,7 @@ async fn create_trigger_fn(
         verify: false,
     };
 
-    let message = change.client_apply(client).await?;
+    let message = change.apply(client).await?;
 
     debug!("Returned message {}", message);
 

@@ -26,11 +26,7 @@ impl Cmd for TrendStoreCreate {
 
         let change = AddTrendStore { trend_store };
 
-        let mut tx = client.transaction().await?;
-
-        change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        change.apply(&mut client).await?;
 
         println!("Created trend store");
 

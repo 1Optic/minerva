@@ -56,9 +56,10 @@ impl fmt::Display for AddVirtualEntity {
 
 #[async_trait]
 impl Change for AddVirtualEntity {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        client
-            .batch_execute(&self.virtual_entity.sql)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
+        tx.batch_execute(&self.virtual_entity.sql)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
@@ -67,14 +68,9 @@ impl Change for AddVirtualEntity {
                 ))
             })?;
 
-        Ok(format!("Added virtual entity {}", &self.virtual_entity))
-    }
-
-    async fn client_apply(&self, client: &mut Client) -> ChangeResult {
-        let mut tx = client.transaction().await?;
-        let result = self.apply(&mut tx).await?;
         tx.commit().await?;
-        Ok(result)
+
+        Ok(format!("Added virtual entity {}", &self.virtual_entity))
     }
 }
 
