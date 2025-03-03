@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.22.0] - 2025-03-03
+
+### Changed
+
+- Library: Use Client instead of Transaction in Change::apply
+- Library: Create trend store part including all trends
+
+### Fixed
+
+- Service: Fixed rigts issues with creation of user defined triggers
+
 ## [9.21.3] - 2025-02-27
 
 ### Fixed
