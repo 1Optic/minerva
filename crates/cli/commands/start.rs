@@ -74,6 +74,7 @@ impl Cmd for StartOpt {
                     }),
                     config_file,
                     worker_count: node_count,
+                    ..Default::default()
                 }
             } else {
                 MinervaClusterConfig {
