@@ -9,12 +9,10 @@ use actix_web::{delete, get, post, put, web::Data, web::Path, HttpResponse, Resp
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use minerva::change::Change;
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::{
-    AddTrendMaterialization, TrendFunctionMaterialization, TrendMaterialization,
+    TrendFunctionMaterialization, TrendMaterialization,
     TrendMaterializationFunction, TrendMaterializationSource, TrendViewMaterialization,
-    UpdateTrendMaterialization,
 };
 use tokio_postgres::Transaction;
 
@@ -221,10 +219,9 @@ impl TrendViewMaterializationData {
         &self,
         transaction: &mut Transaction<'_>,
     ) -> Result<TrendViewMaterializationFull, Error> {
-        let action = AddTrendMaterialization {
-            trend_materialization: self.as_minerva(),
-        };
-        action.apply(transaction).await.map_err(|e| Error {
+        let trend_materialization = self.as_minerva();
+
+        trend_materialization.create(transaction).await.map_err(|e| Error {
             code: 409,
             message: e.to_string(),
         })?;
@@ -319,13 +316,11 @@ impl TrendFunctionMaterializationData {
 
     pub async fn create(
         &self,
-        client: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_>,
     ) -> Result<TrendFunctionMaterializationFull, Error> {
-        let action = AddTrendMaterialization {
-            trend_materialization: self.as_minerva(),
-        };
+        let trend_materialization = self.as_minerva();
 
-        action.apply(client).await.map_err(|e| Error {
+        trend_materialization.create(transaction).await.map_err(|e| Error {
             code: 409,
             message: e.to_string(),
         })?;
@@ -341,7 +336,7 @@ impl TrendFunctionMaterializationData {
             "WHERE tsp.name = $1"
         );
 
-        let row = client
+        let row = transaction
             .query_one(
                 query,
                 &[&self.target_trend_store_part],
@@ -357,7 +352,7 @@ impl TrendFunctionMaterializationData {
             })?;
 
         let id: i32 = row.get(0);
-        let sources: Vec<TrendMaterializationSourceData> = client
+        let sources: Vec<TrendMaterializationSourceData> = transaction
             .query(
                 concat!(
                     "SELECT tsp.name, timestamp_mapping_func::text ",
@@ -407,8 +402,8 @@ impl TrendFunctionMaterializationData {
         Ok(materialization)
     }
 
-    pub async fn update(&self, client: &mut Transaction<'_>) -> Result<Success, Error> {
-        client
+    pub async fn update(&self, transaction: &mut Transaction<'_>) -> Result<Success, Error> {
+        transaction
             .query_one(
                 concat!(
                     "SELECT fm.id, m.id ",
@@ -429,13 +424,9 @@ impl TrendFunctionMaterializationData {
                 ),
             })?;
 
-        let action = UpdateTrendMaterialization {
-            trend_materialization: self.as_minerva(),
-        };
+        let trend_materialization = self.as_minerva();
 
-        action
-            .apply(client)
-            .await
+        trend_materialization.update(transaction).await
             .map_err(|e| Error {
                 code: 500,
                 message: format!("Update of materialization failed: {e}"),

@@ -7,7 +7,7 @@ use std::process::Command;
 use glob::glob;
 
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{Client, GenericClient};
+use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 

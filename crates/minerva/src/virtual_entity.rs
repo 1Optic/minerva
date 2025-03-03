@@ -3,7 +3,7 @@ use std::fmt;
 use std::{io::Read, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{Client, Transaction};
+use tokio_postgres::Client;
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error};

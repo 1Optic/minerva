@@ -2,7 +2,7 @@ use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
 use serde_json::Value;
 use std::fmt;
-use tokio_postgres::{Client, GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
 
@@ -534,7 +534,7 @@ async fn define_table_trends<T: GenericClient>(
     Ok(())
 }
 
-async fn create_trend_store_part<T: GenericClient>(
+pub async fn create_trend_store_part<T: GenericClient>(
     client: &mut T,
     trend_store: &TrendStore,
     trend_store_part: &TrendStorePart,

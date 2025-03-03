@@ -29,11 +29,7 @@ impl Cmd for RelationCreate {
 
         let change = AddRelation { relation };
 
-        let mut tx = client.transaction().await?;
-
-        let message = change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        let message = change.apply(&mut client).await?;
 
         println!("{message}");
 
@@ -58,11 +54,7 @@ impl Cmd for RelationUpdate {
 
         let change = UpdateRelation { relation };
 
-        let mut tx = client.transaction().await?;
-
-        let message = change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        let message = change.apply(&mut client).await?;
 
         println!("{message}");
 

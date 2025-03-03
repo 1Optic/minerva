@@ -11,7 +11,7 @@ use deadpool_postgres::Pool;
 use actix_web::{delete, get, post, put, web::Data, web::Path, HttpResponse};
 
 use serde_json::json;
-use tokio_postgres::{types::Type, Client, GenericClient, Transaction};
+use tokio_postgres::{types::Type, GenericClient, Transaction};
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::map_sql_to_plpgsql;
@@ -461,13 +461,11 @@ impl KpiImplementedData {
         Ok(Some(kpi))
     }
 
-    async fn create(&self, client: &mut Client) -> Result<String, Error> {
-        let mut transaction = client.transaction().await.unwrap();
-
+    async fn create(&self, transaction: &mut Transaction<'_>) -> Result<String, Error> {
         for granularity in GRANULARITIES.iter() {
-            if let Some(kpi) = self.get_kpi(&mut transaction, granularity.to_string()).await? {
+            if let Some(kpi) = self.get_kpi(transaction, granularity.to_string()).await? {
                 kpi.trend_store_part
-                    .create(client)
+                    .create(transaction)
                     .await
                     .map_err(|e| Error {
                         code: e.code,
@@ -475,7 +473,7 @@ impl KpiImplementedData {
                     })?;
 
                 kpi.materialization
-                    .create(&mut transaction)
+                    .create(transaction)
                     .await
                     .map_err(|e| Error {
                         code: e.code,
@@ -483,8 +481,6 @@ impl KpiImplementedData {
                     })?;
             }
         }
-
-        transaction.commit().await;
 
         Ok("KPI created".to_string())
     }

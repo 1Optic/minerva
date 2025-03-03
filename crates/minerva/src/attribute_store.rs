@@ -3,7 +3,7 @@ use std::boxed::Box;
 use std::fmt;
 use std::path::PathBuf;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{Client, GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
 

@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::{Send, Sync};
 use std::path::Path;
 use std::time::Duration;
-use tokio_postgres::{Client, GenericClient, Row, Transaction};
+use tokio_postgres::{Client, GenericClient, Row};
 
 use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
@@ -1551,7 +1551,7 @@ impl Change for RemoveTrendMaterialization {
                         &self.name, e
                     ),
                 })
-            });
+            })?;
 
         tx.commit().await?;
 

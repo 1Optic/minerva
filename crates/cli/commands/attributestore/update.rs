@@ -41,13 +41,10 @@ impl Cmd for AttributeStoreUpdate {
             println!("Updating attribute store");
 
             for change in changes {
-                let mut tx = client.transaction().await?;
-
-                let apply_result = change.apply(&mut tx).await;
+                let apply_result = change.apply(&mut client).await;
 
                 match apply_result {
                     Ok(_) => {
-                        tx.commit().await?;
                         println!("{}", &change);
                     }
                     Err(e) => {
