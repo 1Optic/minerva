@@ -47,26 +47,24 @@ mod tests {
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            let mut tx = client.transaction().await?;
-
             // Using this as a hack to make sure the entity type is created
-            add_trend_store.apply(&mut tx).await?;
+            add_trend_store.apply(&mut client).await?;
 
             let entities = vec!["panel_01".to_string(), "panel_02".to_string()];
 
-            tx.execute(
-                "INSERT INTO entity.pvpanel(name) SELECT unnest($1::text[])",
-                &[&entities],
-            )
-            .await?;
+            client
+                .execute(
+                    "INSERT INTO entity.pvpanel(name) SELECT unnest($1::text[])",
+                    &[&entities],
+                )
+                .await?;
 
-            tx.execute(
-                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-                &[],
-            )
-            .await?;
-
-            tx.commit().await?;
+            client
+                .execute(
+                    "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                    &[],
+                )
+                .await?;
         }
 
         {

@@ -79,24 +79,21 @@ mod tests {
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            let mut tx = client.transaction().await?;
-
-            add_trend_store.apply(&mut tx).await?;
+            add_trend_store.apply(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION_1D)
                 .map_err(|e| format!("Could not read trend store definition: {}", e))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            add_trend_store.apply(&mut tx).await?;
+            add_trend_store.apply(&mut client).await?;
 
-            tx.execute(
-                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-                &[],
-            )
-            .await?;
-
-            tx.commit().await?;
+            client
+                .execute(
+                    "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                    &[],
+                )
+                .await?;
         }
 
         let service_address = Ipv4Addr::new(127, 0, 0, 1);

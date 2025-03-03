@@ -139,11 +139,7 @@ mod tests {
                 trend_store: trend_store.clone(),
             };
 
-            let mut tx = client.transaction().await?;
-
-            add_trend_store.apply(&mut tx).await?;
-
-            tx.commit().await?;
+            add_trend_store.apply(&mut client).await?;
 
             let timestamp = chrono::DateTime::parse_from_rfc3339("2023-03-25T14:00:00+00:00")
                 .unwrap()

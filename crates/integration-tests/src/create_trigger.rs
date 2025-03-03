@@ -61,27 +61,24 @@ mod tests {
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            let mut tx = client.transaction().await?;
+            add_trend_store.apply(&mut client).await?;
 
-            add_trend_store.apply(&mut tx).await?;
-
-            let row = tx.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
+            let row = client.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
 
             let trigger_template_id: i32 = row.get(0);
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute(
-                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-                &[],
-            )
-            .await?;
-
-            tx.commit().await?;
+            client
+                .execute(
+                    "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                    &[],
+                )
+                .await?;
 
             trigger_template_id
         };

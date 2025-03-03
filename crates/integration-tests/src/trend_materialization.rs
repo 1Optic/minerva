@@ -144,22 +144,18 @@ description: {}
             trend_materialization: TrendMaterialization::Function(materialization),
         };
 
-        let mut tx = client.transaction().await?;
-
         let timestamp: DateTime<Utc> = DateTime::parse_from_rfc3339("2024-12-12T09:15:00+00:00")
             .unwrap()
             .to_utc();
 
-        add_trend_store.apply(&mut tx).await?;
-        add_target_trend_store.apply(&mut tx).await?;
-        add_materialization.apply(&mut tx).await?;
+        add_trend_store.apply(&mut client).await?;
+        add_target_trend_store.apply(&mut client).await?;
+        add_materialization.apply(&mut client).await?;
 
-        create_partitions_for_timestamp(&mut tx, timestamp).await?;
+        create_partitions_for_timestamp(&mut client, timestamp).await?;
 
-        tx.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (1, '2024-12-12T09:15:00+00:00', now(), 42, 4.5, 19.2, 34, 559)", &[]).await?;
-        tx.execute("INSERT INTO trend_directory.modified(trend_store_part_id, timestamp, first, last) SELECT id, '2024-12-12T09:15:00+00:00', '2024-12-12T09:21:33+00:00', '2024-12-12T09:26:56+00:00' FROM trend_directory.trend_store_part tsp WHERE tsp.name = 'hub_node_main_15m'", &[]).await?;
-
-        tx.commit().await?;
+        client.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (1, '2024-12-12T09:15:00+00:00', now(), 42, 4.5, 19.2, 34, 559)", &[]).await?;
+        client.execute("INSERT INTO trend_directory.modified(trend_store_part_id, timestamp, first, last) SELECT id, '2024-12-12T09:15:00+00:00', '2024-12-12T09:21:33+00:00', '2024-12-12T09:26:56+00:00' FROM trend_directory.trend_store_part tsp WHERE tsp.name = 'hub_node_main_15m'", &[]).await?;
 
         let executable_path = cargo_bin("minerva");
         let mut cmd = Command::new(executable_path.clone())

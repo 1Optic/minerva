@@ -70,9 +70,7 @@ attributes:
 
         let add_attribute_store = AddAttributeStore { attribute_store };
 
-        let mut tx = client.transaction().await?;
-
-        add_attribute_store.apply(&mut tx).await?;
+        add_attribute_store.apply(&mut client).await?;
 
         let batch_insert_query = r#"
 INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance, modified, name, equipment_type, equipment_serial) VALUES (1, '2024-11-01 02:00:00Z', '2024-11-01 02:33:03Z', '2024-11-01 02:33:03Z', 'n20003', 'HAL905', 'AE40030-334315');
@@ -94,9 +92,7 @@ INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance,
 INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance, modified, name, equipment_type, equipment_serial) VALUES (4, '2024-11-05 02:00:00Z', '2024-11-05 02:33:02Z', '2024-11-05 02:33:02Z', 'n20005', 'HAL905', 'AE40030-334344');
 "#;
 
-        tx.batch_execute(batch_insert_query).await?;
-
-        tx.commit().await?;
+        client.batch_execute(batch_insert_query).await?;
 
         let exit_code = run_compact_cmd(&cluster, &test_database.name).await?;
         assert_eq!(exit_code.code(), Some(0));
