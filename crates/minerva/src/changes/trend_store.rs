@@ -409,21 +409,6 @@ pub struct AddTrendStorePart {
 
 const BASE_TABLE_SCHEMA: &str = "trend";
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-fn trend_column_spec(trend: &Trend) -> String {
-    format!("{} {}", escape_identifier(&trend.name), trend.data_type)
-}
-
-fn generated_trend_column_spec(generated_trend: &GeneratedTrend) -> String {
-    format!(
-        "{} {} GENERATED ALWAYS AS ({}) STORED",
-        escape_identifier(&generated_trend.name),
-        generated_trend.data_type,
-        generated_trend.expression
-    )
-}
-
 fn trend_column_spec(trend: &Trend) -> String {
     format!("{} {}", escape_identifier(&trend.name), trend.data_type)
 }
