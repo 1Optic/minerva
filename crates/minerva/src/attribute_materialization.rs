@@ -341,18 +341,24 @@ impl Change for AddAttributeMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        self.attribute_materialization.create(&mut tx).await.map_err(|e|
-            Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error adding attribute materialization '{}': {}",
-                    &self.attribute_materialization, e
-                ),
-            })
-        )?;
+        self.attribute_materialization
+            .create(&mut tx)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error adding attribute materialization '{}': {}",
+                        &self.attribute_materialization, e
+                    ),
+                })
+            })?;
 
         tx.commit().await?;
 
-        Ok(format!("Added attribute materialization '{}'", &self.attribute_materialization))
+        Ok(format!(
+            "Added attribute materialization '{}'",
+            &self.attribute_materialization
+        ))
     }
 }
 

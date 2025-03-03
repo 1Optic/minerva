@@ -245,35 +245,28 @@ impl TrendStorePartCompleteData {
         }
     }
 
-    pub async fn create(
-        &self,
-        tx: &mut Transaction<'_>,
-    ) -> Result<TrendStorePartFull, Error> {
+    pub async fn create(&self, tx: &mut Transaction<'_>) -> Result<TrendStorePartFull, Error> {
         // first ensure the data source exists
-        tx
-            .execute(
-                "SELECT directory.name_to_data_source($1)",
-                &[&self.data_source],
-            )
-            .await.unwrap();
+        tx.execute(
+            "SELECT directory.name_to_data_source($1)",
+            &[&self.data_source],
+        )
+        .await
+        .unwrap();
 
-        let trend_store = self
-            .trend_store()
-            .as_minerva(tx)
-            .await
-            .map_err(|e| Error {
-                code: 409,
-                message: e,
-            })?;
+        let trend_store = self.trend_store().as_minerva(tx).await.map_err(|e| Error {
+            code: 409,
+            message: e,
+        })?;
 
         let trend_store_part = self.trend_store_part().as_minerva();
 
         create_trend_store_part(tx, &trend_store, &trend_store_part)
             .await
             .map_err(|e| Error {
-            code: 409,
-            message: format!("Creation of trendstorepart failed: {e}"),
-        })?;
+                code: 409,
+                message: format!("Creation of trendstorepart failed: {e}"),
+            })?;
 
         let (trend_store_part_id, trend_store_id): (i32, i32) = tx
             .query_one(

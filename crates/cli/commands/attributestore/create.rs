@@ -34,11 +34,9 @@ impl Cmd for AttributeStoreCreate {
 
                 Ok(())
             }
-            Err(e) => {
-                Err(Error::Runtime(RuntimeError {
-                    msg: format!("Error creating attribute store: {e}"),
-                }))
-            }
+            Err(e) => Err(Error::Runtime(RuntimeError {
+                msg: format!("Error creating attribute store: {e}"),
+            })),
         }
     }
 }

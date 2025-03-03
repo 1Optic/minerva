@@ -80,23 +80,20 @@ impl Change for AddAttributes {
         );
 
         for attribute in &self.attributes {
-            tx
-                .query_one(
-                    query,
-                    &[
-                        &attribute.name,
-                        &attribute.data_type.to_string(),
-                        &attribute.description,
-                        &self.attribute_store.data_source,
-                        &self.attribute_store.entity_type,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error adding attributes to attribute store: {e}"
-                    ))
-                })?;
+            tx.query_one(
+                query,
+                &[
+                    &attribute.name,
+                    &attribute.data_type.to_string(),
+                    &attribute.description,
+                    &self.attribute_store.data_source,
+                    &self.attribute_store.entity_type,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!("Error adding attributes to attribute store: {e}"))
+            })?;
         }
 
         tx.commit().await?;
@@ -143,7 +140,7 @@ impl fmt::Debug for RemoveAttributes {
 impl Change for RemoveAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
-        
+
         let query = concat!(
             "SELECT attribute_directory.drop_attribute(attribute_store, $1) ",
             "FROM attribute_directory.attribute_store ",
@@ -153,21 +150,20 @@ impl Change for RemoveAttributes {
         );
 
         for attribute in &self.attributes {
-            tx
-                .query(
-                    query,
-                    &[
-                        &attribute,
-                        &self.attribute_store.data_source,
-                        &self.attribute_store.entity_type,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error removing attribute '{attribute}' from attribute store: {e}"
-                    ))
-                })?;
+            tx.query(
+                query,
+                &[
+                    &attribute,
+                    &self.attribute_store.data_source,
+                    &self.attribute_store.entity_type,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error removing attribute '{attribute}' from attribute store: {e}"
+                ))
+            })?;
         }
 
         tx.commit().await?;
@@ -220,18 +216,17 @@ impl Change for ChangeAttribute {
             "AND attribute.name = $2 AND data_source.name = $3 AND entity_type.name = $4",
         );
 
-        tx
-            .execute(
-                query,
-                &[
-                    &self.attribute.data_type,
-                    &self.attribute.name,
-                    &self.attribute_store.data_source,
-                    &self.attribute_store.entity_type,
-                ],
-            )
-            .await
-            .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
+        tx.execute(
+            query,
+            &[
+                &self.attribute.data_type,
+                &self.attribute.name,
+                &self.attribute_store.data_source,
+                &self.attribute_store.entity_type,
+            ],
+        )
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
 
         tx.commit().await?;
 
@@ -353,22 +348,21 @@ impl Change for AddAttributeStore {
             ")"
         );
 
-        tx
-            .execute(
-                query,
-                &[
-                    &self.attribute_store.data_source,
-                    &self.attribute_store.entity_type,
-                    &self.attribute_store.attributes,
-                ],
-            )
-            .await
-            .map_err(|e| {
-                DatabaseError::from_msg(format!(
-                    "Error creating attribute store '{}': {e}",
-                    &self.attribute_store
-                ))
-            })?;
+        tx.execute(
+            query,
+            &[
+                &self.attribute_store.data_source,
+                &self.attribute_store.entity_type,
+                &self.attribute_store.attributes,
+            ],
+        )
+        .await
+        .map_err(|e| {
+            DatabaseError::from_msg(format!(
+                "Error creating attribute store '{}': {e}",
+                &self.attribute_store
+            ))
+        })?;
 
         tx.commit().await?;
 

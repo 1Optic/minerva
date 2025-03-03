@@ -63,8 +63,7 @@ impl Change for RemoveTrends {
         );
 
         for trend_name in &self.trends {
-            tx 
-                .query_one(query, &[&self.trend_store_part.name, &trend_name])
+            tx.query_one(query, &[&self.trend_store_part.name, &trend_name])
                 .await
                 .map_err(|e| {
                     DatabaseError::from_msg(format!(

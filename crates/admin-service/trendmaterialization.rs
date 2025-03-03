@@ -11,8 +11,8 @@ use utoipa::ToSchema;
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterialization,
-    TrendMaterializationFunction, TrendMaterializationSource, TrendViewMaterialization,
+    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction,
+    TrendMaterializationSource, TrendViewMaterialization,
 };
 use tokio_postgres::Transaction;
 
@@ -221,10 +221,13 @@ impl TrendViewMaterializationData {
     ) -> Result<TrendViewMaterializationFull, Error> {
         let trend_materialization = self.as_minerva();
 
-        trend_materialization.create(transaction).await.map_err(|e| Error {
-            code: 409,
-            message: e.to_string(),
-        })?;
+        trend_materialization
+            .create(transaction)
+            .await
+            .map_err(|e| Error {
+                code: 409,
+                message: e.to_string(),
+            })?;
 
         let row = transaction
             .query_one(
@@ -320,10 +323,13 @@ impl TrendFunctionMaterializationData {
     ) -> Result<TrendFunctionMaterializationFull, Error> {
         let trend_materialization = self.as_minerva();
 
-        trend_materialization.create(transaction).await.map_err(|e| Error {
-            code: 409,
-            message: e.to_string(),
-        })?;
+        trend_materialization
+            .create(transaction)
+            .await
+            .map_err(|e| Error {
+                code: 409,
+                message: e.to_string(),
+            })?;
 
         let query = concat!(
             "SELECT fm.id, m.id, src_function, tsp.name, processing_delay::text, stability_delay::text, reprocessing_period::text, ",
@@ -426,7 +432,9 @@ impl TrendFunctionMaterializationData {
 
         let trend_materialization = self.as_minerva();
 
-        trend_materialization.update(transaction).await
+        trend_materialization
+            .update(transaction)
+            .await
             .map_err(|e| Error {
                 code: 500,
                 message: format!("Update of materialization failed: {e}"),
