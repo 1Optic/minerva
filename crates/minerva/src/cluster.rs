@@ -259,6 +259,7 @@ pub struct MinervaClusterConfig {
     pub image_provider: Box<dyn ImageProvider + Sync + Send>,
     pub config_file: PathBuf,
     pub worker_count: u8,
+    pub prefix: String,
 }
 
 impl Default for MinervaClusterConfig {
@@ -267,6 +268,7 @@ impl Default for MinervaClusterConfig {
             image_provider: Box::new(FixedImageProvider::default()),
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
             worker_count: 3,
+            prefix: generate_name(6),
         }
     }
 }
@@ -295,8 +297,8 @@ impl WorkerNode {
 }
 
 pub struct MinervaCluster {
-    controller_container: ContainerAsync<GenericImage>,
-    workers: Vec<std::pin::Pin<Box<WorkerNode>>>,
+    pub controller_container: ContainerAsync<GenericImage>,
+    pub workers: Vec<std::pin::Pin<Box<WorkerNode>>>,
     pub controller_host: url::Host,
     pub controller_port: u16,
 }
@@ -305,7 +307,7 @@ impl MinervaCluster {
     pub async fn start(
         config: &MinervaClusterConfig,
     ) -> Result<MinervaCluster, crate::error::Error> {
-        let network_name = generate_name(6);
+        let network_name = config.prefix.clone();
 
         let image_ref = config.image_provider.image().await;
 
