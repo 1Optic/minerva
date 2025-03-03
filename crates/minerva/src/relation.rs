@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient, Transaction};
 
 use crate::change::ChangeResult;
 
@@ -74,10 +74,14 @@ impl fmt::Display for AddRelation {
 
 #[async_trait]
 impl Change for AddRelation {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        create_relation(client, &self.relation)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        create_relation(&mut tx, &self.relation)
             .await
             .map_err(|e| format!("Could not create relation '{}': {e}", self.relation.name))?;
+
+        tx.commit().await?;
 
         Ok(format!("Added relation '{}'", &self.relation))
     }
@@ -101,16 +105,19 @@ impl fmt::Display for UpdateRelation {
 
 #[async_trait]
 impl Change for UpdateRelation {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = format!(
             "CREATE OR REPLACE VIEW relation_def.\"{}\" AS {}",
             self.relation.name, self.relation.query
         );
 
-        client
-            .query(&query, &[])
+        tx.query(&query, &[])
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error updating relation view: {e}")))?;
+
+        tx.commit().await?;
 
         Ok(format!("Updated relation {}", &self.relation))
     }

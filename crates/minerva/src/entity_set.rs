@@ -276,34 +276,36 @@ impl fmt::Display for ChangeEntitySet {
 
 #[async_trait]
 impl Change for ChangeEntitySet {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let result = self.entity_set.update(client).await;
-        match result {
-            Ok(_) => Ok("Entity set updated".to_string()),
-            Err(EntitySetError::DatabaseError(err)) => Err(Error::Database(err)),
-            Err(EntitySetError::ExistingEntitySet(name, owner)) => {
-                Err(Error::Database(DatabaseError {
-                    msg: format!(
-                        "An entity set with name {} and owner {} already exists.",
-                        &name, &owner,
-                    ),
-                    kind: DatabaseErrorKind::UniqueViolation,
-                }))
-            }
-            Err(EntitySetError::EmptyEntitySet) => Err(Error::Runtime(RuntimeError::from_msg(
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.entity_set.update(&mut tx).await.map_err(|e| match e {
+            EntitySetError::DatabaseError(err) => Error::Database(err),
+            EntitySetError::ExistingEntitySet(name, owner) => Error::Database(DatabaseError {
+                msg: format!(
+                    "An entity set with name {} and owner {} already exists.",
+                    &name, &owner,
+                ),
+                kind: DatabaseErrorKind::UniqueViolation,
+            }),
+            EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
                 "Entity sets cannot be empty".to_string(),
-            ))),
-            Err(EntitySetError::MissingEntities(missing_entities)) => {
-                Err(Error::Runtime(RuntimeError::from_msg(format!(
+            )),
+            EntitySetError::MissingEntities(missing_entities) => {
+                Error::Runtime(RuntimeError::from_msg(format!(
                     "The following entities do not exist: {}",
                     missing_entities.join(", ")
-                ))))
+                )))
             }
-            Err(_) => Err(Error::Database(DatabaseError {
+            _ => Error::Database(DatabaseError {
                 msg: "Unexpected Error".to_string(),
                 kind: DatabaseErrorKind::Default,
-            })),
-        }
+            }),
+        })?;
+
+        tx.commit().await?;
+
+        Ok("Entity set updated".to_string())
     }
 }
 
@@ -397,35 +399,35 @@ impl fmt::Display for CreateEntitySet {
 
 #[async_trait]
 impl Change for CreateEntitySet {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        let result = self.entity_set.create(client).await;
-        match result {
-            Ok(entity_set) => Ok(format!("Entity set number {} created", &entity_set.id)),
-            Err(EntitySetError::DatabaseError(err)) => Err(Error::Database(err)),
-            Err(EntitySetError::ExistingEntitySet(name, owner)) => {
-                Err(Error::Database(DatabaseError {
-                    msg: format!(
-                        "An entity set with name {} and owner {} already exists.",
-                        &name, &owner,
-                    ),
-                    kind: DatabaseErrorKind::UniqueViolation,
-                }))
-            }
-            Err(EntitySetError::EmptyEntitySet) => Err(Error::Runtime(RuntimeError::from_msg(
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        let entity_set = self.entity_set.create(&mut tx).await.map_err(|e| match e {
+            EntitySetError::DatabaseError(err) => Error::Database(err),
+            EntitySetError::ExistingEntitySet(name, owner) => Error::Database(DatabaseError {
+                msg: format!(
+                    "An entity set with name {} and owner {} already exists.",
+                    &name, &owner,
+                ),
+                kind: DatabaseErrorKind::UniqueViolation,
+            }),
+            EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
                 "Entity sets cannot be empty".to_string(),
-            ))),
-            Err(EntitySetError::MissingEntities(missing_entities)) => {
-                Err(Error::Runtime(RuntimeError::from_msg(format!(
+            )),
+            EntitySetError::MissingEntities(missing_entities) => {
+                Error::Runtime(RuntimeError::from_msg(format!(
                     "The following entities do not exist: {}",
                     missing_entities.join(", ")
-                ))))
+                )))
             }
-            Err(EntitySetError::IncorrectEntityType(_)) => Err(Error::Runtime(
-                RuntimeError::from_msg("Entity set type does not exist".to_string()),
+            EntitySetError::IncorrectEntityType(_) => Error::Runtime(RuntimeError::from_msg(
+                "Entity set type does not exist".to_string(),
             )),
-            Err(_) => Err(Error::Runtime(RuntimeError::from_msg(
-                "Unexpected Error".to_string(),
-            ))),
-        }
+            _ => Error::Runtime(RuntimeError::from_msg("Unexpected Error".to_string())),
+        })?;
+
+        tx.commit().await?;
+
+        Ok(format!("Entity set number {} created", &entity_set.id))
     }
 }

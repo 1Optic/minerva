@@ -17,15 +17,11 @@ impl Cmd for TrendMaterializationRemove {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let mut transaction = client.transaction().await?;
-
         let change = RemoveTrendMaterialization {
             name: self.name.clone(),
         };
 
-        change.apply(&mut transaction).await?;
-
-        transaction.commit().await?;
+        change.apply(&mut client).await?;
 
         println!("Removed trend materialization '{}'", &self.name);
 

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{Client, GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
 
@@ -41,7 +41,9 @@ impl fmt::Display for AddAttributes {
 
 #[async_trait]
 impl Change for AddAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "with a as (",
             "insert into notification_directory.attribute(notification_store_id, name, data_type, description) ",
@@ -51,23 +53,24 @@ impl Change for AddAttributes {
         );
 
         for attribute in &self.attributes {
-            client
-                .execute(
-                    query,
-                    &[
-                        &attribute.name,
-                        &attribute.data_type,
-                        &attribute.description,
-                        &self.notification_store.data_source,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error adding attribute to notification store: {e}"
-                    ))
-                })?;
+            tx.execute(
+                query,
+                &[
+                    &attribute.name,
+                    &attribute.data_type,
+                    &attribute.description,
+                    &self.notification_store.data_source,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error adding attribute to notification store: {e}"
+                ))
+            })?;
         }
+
+        tx.commit().await?;
 
         Ok(format!(
             "Added attributes to notification store '{}'",
@@ -133,18 +136,21 @@ impl fmt::Display for AddNotificationStore {
 
 #[async_trait]
 impl Change for AddNotificationStore {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = format!(
             "SELECT notification_directory.create_notification_store($1::text, ARRAY[{}]::notification_directory.attr_def[])",
             self.notification_store.attributes.iter().map(|att| format!("('{}', '{}', '')", &att.name, &att.data_type)).collect::<Vec<String>>().join(",")
         );
 
-        client
-            .query_one(&query, &[&self.notification_store.data_source])
+        tx.query_one(&query, &[&self.notification_store.data_source])
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!("Error creating notification store: {e}"))
             })?;
+
+        tx.commit().await?;
 
         Ok(format!(
             "Created attribute store '{}'",

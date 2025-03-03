@@ -26,29 +26,17 @@ impl Cmd for AttributeStoreCreate {
 
         let change = AddAttributeStore { attribute_store };
 
-        let mut tx = client.transaction().await?;
-
-        tx.execute(
-            "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
-            &[],
-        )
-        .await?;
-
-        let result = change.apply(&mut tx).await;
+        let result = change.apply(&mut client).await;
 
         match result {
             Ok(_) => {
-                tx.commit().await?;
                 println!("Created attribute store");
 
                 Ok(())
             }
-            Err(e) => {
-                tx.rollback().await?;
-                Err(Error::Runtime(RuntimeError {
-                    msg: format!("Error creating attribute store: {e}"),
-                }))
-            }
+            Err(e) => Err(Error::Runtime(RuntimeError {
+                msg: format!("Error creating attribute store: {e}"),
+            })),
         }
     }
 }

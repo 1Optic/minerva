@@ -55,17 +55,13 @@ impl Cmd for TrendStoreUpdate {
                                 })
                             })?
                         {
-                            let mut tx = client.transaction().await?;
-
-                            let apply_result = change.apply(&mut tx).await;
+                            let apply_result = change.apply(&mut client).await;
 
                             match apply_result {
                                 Ok(_) => {
-                                    tx.commit().await?;
                                     println!("{}", &change);
                                 }
                                 Err(e) => {
-                                    tx.rollback().await?;
                                     println!("Error applying update: {e}");
                                 }
                             }

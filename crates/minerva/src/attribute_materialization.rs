@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use glob::glob;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient};
 
 use super::change::{Change, ChangeResult};
 use super::error::{Error, RuntimeError};
@@ -338,19 +338,27 @@ impl fmt::Display for AddAttributeMaterialization {
 
 #[async_trait]
 impl Change for AddAttributeMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.attribute_materialization.create(client).await {
-            Ok(_) => Ok(format!(
-                "Added attribute materialization '{}'",
-                &self.attribute_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error adding attribute materialization '{}': {}",
-                    &self.attribute_materialization, e
-                ),
-            })),
-        }
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.attribute_materialization
+            .create(&mut tx)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error adding attribute materialization '{}': {}",
+                        &self.attribute_materialization, e
+                    ),
+                })
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Added attribute materialization '{}'",
+            &self.attribute_materialization
+        ))
     }
 }
 

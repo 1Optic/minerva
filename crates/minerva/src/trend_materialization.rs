@@ -7,11 +7,11 @@ use std::fmt;
 use std::marker::{Send, Sync};
 use std::path::Path;
 use std::time::Duration;
-use tokio_postgres::{Row, Transaction};
+use tokio_postgres::{Client, GenericClient, Row};
 
 use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
-use tokio_postgres::{types::ToSql, types::Type, GenericClient};
+use tokio_postgres::{types::ToSql, types::Type};
 
 use humantime::format_duration;
 
@@ -324,10 +324,14 @@ pub struct UpdateTrendViewMaterializationAttributes {
 
 #[async_trait]
 impl Change for UpdateTrendViewMaterializationAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
         self.trend_view_materialization
-            .update_attributes(client)
+            .update_attributes(&mut tx)
             .await?;
+
+        tx.commit().await?;
 
         Ok("Updated attributes of view materialization".into())
     }
@@ -349,17 +353,21 @@ pub struct UpdateView {
 
 #[async_trait]
 impl Change for UpdateView {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
         drop_materialization_view(
-            client,
+            &mut tx,
             &self.trend_view_materialization.target_trend_store_part,
         )
         .await
         .unwrap();
         self.trend_view_materialization
-            .create_view(client)
+            .create_view(&mut tx)
             .await
             .unwrap();
+
+        tx.commit().await?;
 
         Ok(format!(
             "Updated view {}",
@@ -815,10 +823,22 @@ impl TrendMaterialization {
         match self {
             TrendMaterialization::View(m) => match other {
                 TrendMaterialization::View(other_m) => m.diff(other_m),
-                TrendMaterialization::Function(_) => panic!("Incompatible materialization types"),
+                TrendMaterialization::Function(_) => {
+                    println!(
+                        "Mismatching materialization type for materialization '{}'",
+                        self.name()
+                    );
+                    vec![]
+                }
             },
             TrendMaterialization::Function(m) => match other {
-                TrendMaterialization::View(_) => panic!("Incompatible materialization types"),
+                TrendMaterialization::View(_) => {
+                    println!(
+                        "Mismatching materialization type for materialization '{}'",
+                        self.name()
+                    );
+                    vec![]
+                }
                 TrendMaterialization::Function(other_m) => m.diff(other_m),
             },
         }
@@ -1475,19 +1495,27 @@ impl fmt::Display for AddTrendMaterialization {
 
 #[async_trait]
 impl Change for AddTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.trend_materialization.create(client).await {
-            Ok(_) => Ok(format!(
-                "Added trend materialization '{}'",
-                &self.trend_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error adding trend materialization '{}': {}",
-                    &self.trend_materialization, e
-                ),
-            })),
-        }
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.trend_materialization
+            .create(&mut tx)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error adding trend materialization '{}': {}",
+                        &self.trend_materialization, e
+                    ),
+                })
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Added trend materialization '{}'",
+            &self.trend_materialization
+        ))
     }
 }
 
@@ -1511,10 +1539,11 @@ impl fmt::Display for RemoveTrendMaterialization {
 
 #[async_trait]
 impl Change for RemoveTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        remove_trend_materialization(client, &self.name)
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        remove_trend_materialization(&mut tx, &self.name)
             .await
-            .map(|_| format!("Removed trend materialization '{}'", &self.name,))
             .map_err(|e| {
                 Error::Runtime(RuntimeError {
                     msg: format!(
@@ -1522,7 +1551,11 @@ impl Change for RemoveTrendMaterialization {
                         &self.name, e
                     ),
                 })
-            })
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!("Removed trend materialization '{}'", &self.name,))
     }
 }
 
@@ -1542,18 +1575,26 @@ impl fmt::Display for UpdateTrendMaterialization {
 
 #[async_trait]
 impl Change for UpdateTrendMaterialization {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
-        match self.trend_materialization.update(client).await {
-            Ok(_) => Ok(format!(
-                "Updated trend materialization '{}'",
-                &self.trend_materialization
-            )),
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error updating trend materialization '{}': {}",
-                    &self.trend_materialization, e
-                ),
-            })),
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        match self.trend_materialization.update(&mut tx).await {
+            Ok(_) => {
+                tx.commit().await?;
+                Ok(format!(
+                    "Updated trend materialization '{}'",
+                    &self.trend_materialization
+                ))
+            }
+            Err(e) => {
+                tx.rollback().await?;
+                Err(Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error updating trend materialization '{}': {}",
+                        &self.trend_materialization, e
+                    ),
+                }))
+            }
         }
     }
 }

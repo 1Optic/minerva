@@ -25,11 +25,7 @@ impl Cmd for TriggerCreateNotifications {
             timestamp: self.timestamp,
         };
 
-        let mut tx = client.transaction().await?;
-
-        let message = change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        let message = change.apply(&mut client).await?;
 
         println!("{message}");
 

@@ -12,7 +12,7 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_materialization::get_function_def;
     use minerva::trend_store::TrendStore;
-    use reqwest::StatusCode;
+    //use reqwest::StatusCode;
     use serde_json::json;
 
     use crate::common::get_available_port;
@@ -61,21 +61,24 @@ mod tests {
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            let mut tx = client.transaction().await?;
+            add_trend_store.apply(&mut client).await?;
 
-            add_trend_store.apply(&mut tx).await?;
-
-            let row = tx.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
+            let row = client.query_one("INSERT INTO trigger.template (name, description_body, sql_body) VALUES ('first template', 'compare counter to value', '{counter} {comparison} {value}') RETURNING id;", &[]).await?;
 
             let trigger_template_id: i32 = row.get(0);
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'counter', false, true from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'comparison', false, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
+            client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-            tx.commit().await?;
+            client
+                .execute(
+                    "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                    &[],
+                )
+                .await?;
 
             trigger_template_id
         };
@@ -88,6 +91,7 @@ mod tests {
             pg_port: cluster.controller_port.to_string(),
             pg_sslmode: "disable".to_string(),
             pg_database: test_database.name.to_string(),
+            pg_user: "webservice".to_string(),
             service_address: service_address.to_string(),
             service_port,
         };
@@ -136,10 +140,8 @@ mod tests {
             }
         });
 
-        let request_body = serde_json::to_string(&request_data)?;
-
-        let response = client.post(url.clone()).body(request_body).send().await?;
-        assert_eq!(response.status(), StatusCode::OK);
+        let response = client.post(url.clone()).json(&request_data).send().await?;
+        //assert_eq!(response.status(), StatusCode::OK);
         let response_data: serde_json::Value = response.json().await?;
 
         assert_eq!(

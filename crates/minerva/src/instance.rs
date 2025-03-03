@@ -7,7 +7,7 @@ use std::process::Command;
 use glob::glob;
 
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{Client, GenericClient};
+use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 
@@ -356,9 +356,9 @@ impl MinervaInstance {
         changes
     }
 
-    pub async fn update<T: GenericClient + Send + Sync>(
+    pub async fn update(
         &self,
-        client: &mut T,
+        client: &mut Client,
         other: &MinervaInstance,
         diff_options: DiffOptions,
     ) -> Result<(), Error> {
@@ -369,9 +369,7 @@ impl MinervaInstance {
         for change in changes {
             println!("* {change}");
 
-            let mut tx = client.transaction().await?;
-
-            match change.apply(&mut tx).await {
+            match change.apply(client).await {
                 Ok(message) => println!("> {}", &message),
                 Err(err) => println!("! Error applying change: {}", &err),
             }
@@ -443,21 +441,19 @@ async fn initialize_attribute_stores(
             attribute_store: attribute_store.clone(),
         };
 
-        let mut tx = client.transaction().await?;
+        //let mut tx = client.transaction().await?;
 
-        tx.execute(
-            "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
-            &[],
-        )
-        .await?;
+        //tx.execute(
+        //    "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
+        //    &[],
+        //)
+        //.await?;
 
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}");
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}");
             }
         }
@@ -496,15 +492,11 @@ async fn initialize_notification_stores(
             notification_store: notification_store.clone(),
         };
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}");
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("Error creating notification store: {e}");
             }
         }
@@ -549,21 +541,19 @@ async fn initialize_trend_stores(
             trend_store: trend_store.clone(),
         };
 
-        let mut tx = client.transaction().await?;
+        //let mut tx = client.transaction().await?;
 
-        tx.execute(
-            "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
-            &[],
-        )
-        .await?;
+        //tx.execute(
+        //    "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
+        //    &[],
+        //)
+        //.await?;
 
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}");
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}");
             }
         }
@@ -652,15 +642,11 @@ async fn initialize_virtual_entities(
     for virtual_entity in virtual_entities {
         let change: AddVirtualEntity = AddVirtualEntity::from(virtual_entity.clone());
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}")
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}")
             }
         }
@@ -673,15 +659,11 @@ async fn initialize_relations(client: &mut Client, relations: &Vec<Relation>) ->
     for relation in relations {
         let change: AddRelation = AddRelation::from(relation.clone());
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}")
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}")
             }
         }
@@ -697,15 +679,11 @@ async fn initialize_attribute_materializations(
     for materialization in attribute_materializations {
         let change = AddAttributeMaterialization::from(materialization.clone());
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}")
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}")
             }
         }
@@ -720,15 +698,11 @@ async fn initialize_trend_materializations(
     for materialization in trend_materializations {
         let change = AddTrendMaterialization::from(materialization.clone());
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}")
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("{e}")
             }
         }
@@ -744,15 +718,11 @@ async fn initialize_triggers(client: &mut Client, triggers: &Vec<Trigger>) -> Re
             verify: false,
         };
 
-        let mut tx = client.transaction().await?;
-
-        match change.apply(&mut tx).await {
+        match change.apply(client).await {
             Ok(message) => {
-                tx.commit().await?;
                 println!("{message}")
             }
             Err(e) => {
-                tx.rollback().await?;
                 println!("Error creating trigger '{}': {}", trigger.name, e)
             }
         }

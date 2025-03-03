@@ -43,11 +43,7 @@ impl Cmd for TriggerRename {
             old_name: self.old_name.clone(),
         };
 
-        let mut tx = client.transaction().await?;
-
-        let message = change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        let message = change.apply(&mut client).await?;
 
         println!("{message}");
 

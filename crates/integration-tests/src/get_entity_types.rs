@@ -65,11 +65,14 @@ mod tests {
 
             let add_trend_store = AddTrendStore { trend_store };
 
-            let mut tx = client.transaction().await?;
+            add_trend_store.apply(&mut client).await?;
 
-            add_trend_store.apply(&mut tx).await?;
-
-            tx.commit().await?;
+            client
+                .execute(
+                    "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
+                    &[],
+                )
+                .await?;
 
             let timestamp =
                 chrono::DateTime::parse_from_rfc3339("2023-03-25T14:00:00+00:00").unwrap();
@@ -85,6 +88,7 @@ mod tests {
                 pg_port: cluster.controller_port.to_string(),
                 pg_sslmode: "disable".to_string(),
                 pg_database: test_database.name.to_string(),
+                pg_user: "webservice".to_string(),
                 service_address: service_address.to_string(),
                 service_port,
             };

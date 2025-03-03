@@ -110,21 +110,11 @@ async fn update(
                     })
                 })?
         {
-            let mut tx = client.transaction().await?;
-
-            tx.execute(
-                "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'",
-                &[],
-            )
-            .await?;
-
-            match change.apply(&mut tx).await {
+            match change.apply(client).await {
                 Ok(message) => {
-                    tx.commit().await?;
                     println!("> {}", &message)
                 }
                 Err(err) => {
-                    tx.rollback().await?;
                     println!("! Error applying change: {}", &err)
                 }
             }

@@ -3,10 +3,9 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::{Parser, ValueHint};
 
-use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_materialization::{
-    check_trend_materialization, trend_materialization_from_config, AddTrendMaterialization,
+    check_trend_materialization, trend_materialization_from_config,
 };
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -33,11 +32,17 @@ impl Cmd for TrendMaterializationCreate {
 
         let mut transaction = client.transaction().await?;
 
-        let change = AddTrendMaterialization {
-            trend_materialization: trend_materialization.clone(),
-        };
-
-        change.apply(&mut transaction).await?;
+        trend_materialization
+            .create(&mut transaction)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error adding trend materialization '{}': {}",
+                        &trend_materialization, e
+                    ),
+                })
+            })?;
 
         let result = if self.verify {
             let report =

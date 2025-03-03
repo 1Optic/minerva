@@ -21,11 +21,7 @@ impl Cmd for TriggerDelete {
             trigger_name: self.name.clone(),
         };
 
-        let mut tx = client.transaction().await?;
-
-        change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        change.apply(&mut client).await?;
 
         println!("Deleted trigger '{}'", &self.name);
 

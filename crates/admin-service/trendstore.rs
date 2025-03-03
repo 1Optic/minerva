@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use minerva::trend_store::create::create_trend_store;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::time::Duration;
@@ -11,8 +12,7 @@ use actix_web::{get, post, web::Data, web::Path, web::Query, HttpResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use minerva::change::Change;
-use minerva::changes::trend_store::{AddTrendStore, AddTrendStorePart, AddTrends};
+use minerva::changes::trend_store::create_trend_store_part;
 use minerva::interval::parse_interval;
 use minerva::trend_store::{load_trend_store, GeneratedTrend, Trend, TrendStore, TrendStorePart};
 
@@ -203,11 +203,9 @@ impl TrendStoreBasicData {
                     partition_size: *PARTITION_SIZE.get(&self.granularity.clone()).unwrap(),
                     parts: vec![],
                 };
-                let result = AddTrendStore {
-                    trend_store: new_trend_store.clone(),
-                }
-                .apply(transaction)
-                .await;
+
+                let result = create_trend_store(transaction, &new_trend_store).await;
+
                 match result {
                     Ok(_) => Ok(new_trend_store),
                     Err(e) => Err(format!("Unable to find or create trend store: {e}")),
@@ -247,53 +245,28 @@ impl TrendStorePartCompleteData {
         }
     }
 
-    pub async fn create<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<TrendStorePartFull, Error> {
-        let mut tx = client.transaction().await.map_err(|_| Error {
-            code: 500,
-            message: "Could not create trend store".to_string(),
+    pub async fn create(&self, tx: &mut Transaction<'_>) -> Result<TrendStorePartFull, Error> {
+        // first ensure the data source exists
+        tx.execute(
+            "SELECT directory.name_to_data_source($1)",
+            &[&self.data_source],
+        )
+        .await
+        .unwrap();
+
+        let trend_store = self.trend_store().as_minerva(tx).await.map_err(|e| Error {
+            code: 409,
+            message: e,
         })?;
 
-        // first ensure the data source exists
-        _ = tx
-            .execute(
-                "SELECT directory.name_to_data_source($1)",
-                &[&self.data_source],
-            )
-            .await;
+        let trend_store_part = self.trend_store_part().as_minerva();
 
-        let trendstore = self
-            .trend_store()
-            .as_minerva(&mut tx)
+        create_trend_store_part(tx, &trend_store, &trend_store_part)
             .await
             .map_err(|e| Error {
                 code: 409,
-                message: e,
+                message: format!("Creation of trendstorepart failed: {e}"),
             })?;
-
-        let action = AddTrendStorePart {
-            trend_store: trendstore,
-            trend_store_part: self.trend_store_part().as_minerva(),
-        };
-
-        action.apply(&mut tx).await.map_err(|e| Error {
-            code: 409,
-            message: format!("Creation of trendstorepart failed: {e}"),
-        })?;
-
-        let action = AddTrends {
-            trend_store_part: self.trend_store_part().as_minerva(),
-            trends: self.trend_store_part().as_minerva().trends,
-        };
-
-        action.apply(&mut tx).await.map_err(|e| Error {
-            code: 409,
-            message: format!(
-                "Creation of trendstorepart succeeded, but inserting trends failed: {e}"
-            ),
-        })?;
 
         let (trend_store_part_id, trend_store_id): (i32, i32) = tx
             .query_one(
@@ -356,11 +329,6 @@ impl TrendStorePartCompleteData {
                 })
                 .collect()
             )?;
-
-        tx.commit().await.map_err(|e| Error {
-            code: 500,
-            message: e.to_string(),
-        })?;
 
         let trendstorepart = TrendStorePartFull {
             id: trend_store_part_id,

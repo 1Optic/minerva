@@ -73,11 +73,7 @@ mod tests {
                 attribute_store: attribute_store.clone(),
             };
 
-            let mut tx = client.transaction().await?;
-
-            add_trend_store.apply(&mut tx).await?;
-
-            tx.commit().await?;
+            add_trend_store.apply(&mut client).await?;
 
             let attributes = vec!["name".to_string()];
             let rows = (0..500)

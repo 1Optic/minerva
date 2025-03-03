@@ -21,11 +21,7 @@ impl Cmd for TriggerDisable {
             trigger_name: self.name.clone(),
         };
 
-        let mut tx = client.transaction().await?;
-
-        let message = change.apply(&mut tx).await?;
-
-        tx.commit().await?;
+        let message = change.apply(&mut client).await?;
 
         println!("{message}");
 

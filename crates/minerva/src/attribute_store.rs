@@ -3,7 +3,7 @@ use std::boxed::Box;
 use std::fmt;
 use std::path::PathBuf;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{GenericClient, Transaction};
+use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
 
@@ -68,7 +68,9 @@ impl fmt::Debug for AddAttributes {
 
 #[async_trait]
 impl Change for AddAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "SELECT attribute_directory.create_attribute(attribute_store, $1::name, $2::text, $3::text) ",
             "FROM attribute_directory.attribute_store ",
@@ -78,24 +80,23 @@ impl Change for AddAttributes {
         );
 
         for attribute in &self.attributes {
-            client
-                .query_one(
-                    query,
-                    &[
-                        &attribute.name,
-                        &attribute.data_type.to_string(),
-                        &attribute.description,
-                        &self.attribute_store.data_source,
-                        &self.attribute_store.entity_type,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error adding attributes to attribute store: {e}"
-                    ))
-                })?;
+            tx.query_one(
+                query,
+                &[
+                    &attribute.name,
+                    &attribute.data_type.to_string(),
+                    &attribute.description,
+                    &self.attribute_store.data_source,
+                    &self.attribute_store.entity_type,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!("Error adding attributes to attribute store: {e}"))
+            })?;
         }
+
+        tx.commit().await?;
 
         Ok(format!(
             "Added attributes to attribute store '{}'",
@@ -137,7 +138,9 @@ impl fmt::Debug for RemoveAttributes {
 
 #[async_trait]
 impl Change for RemoveAttributes {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "SELECT attribute_directory.drop_attribute(attribute_store, $1) ",
             "FROM attribute_directory.attribute_store ",
@@ -147,22 +150,23 @@ impl Change for RemoveAttributes {
         );
 
         for attribute in &self.attributes {
-            client
-                .query(
-                    query,
-                    &[
-                        &attribute,
-                        &self.attribute_store.data_source,
-                        &self.attribute_store.entity_type,
-                    ],
-                )
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error removing attribute '{attribute}' from attribute store: {e}"
-                    ))
-                })?;
+            tx.query(
+                query,
+                &[
+                    &attribute,
+                    &self.attribute_store.data_source,
+                    &self.attribute_store.entity_type,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error removing attribute '{attribute}' from attribute store: {e}"
+                ))
+            })?;
         }
+
+        tx.commit().await?;
 
         Ok(format!(
             "Removed {} attributes from attribute store '{}'",
@@ -199,7 +203,9 @@ impl fmt::Debug for ChangeAttribute {
 
 #[async_trait]
 impl Change for ChangeAttribute {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "UPDATE attribute_directory.attribute ",
             "SET data_type = $1 ",
@@ -210,18 +216,19 @@ impl Change for ChangeAttribute {
             "AND attribute.name = $2 AND data_source.name = $3 AND entity_type.name = $4",
         );
 
-        client
-            .execute(
-                query,
-                &[
-                    &self.attribute.data_type,
-                    &self.attribute.name,
-                    &self.attribute_store.data_source,
-                    &self.attribute_store.entity_type,
-                ],
-            )
-            .await
-            .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
+        tx.execute(
+            query,
+            &[
+                &self.attribute.data_type,
+                &self.attribute.name,
+                &self.attribute_store.data_source,
+                &self.attribute_store.entity_type,
+            ],
+        )
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
+
+        tx.commit().await?;
 
         Ok(format!(
             "Changed type of attribute '{}' in store '{}'",
@@ -331,7 +338,9 @@ impl fmt::Display for AddAttributeStore {
 
 #[async_trait]
 impl Change for AddAttributeStore {
-    async fn apply(&self, client: &mut Transaction) -> ChangeResult {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
         let query = concat!(
             "CALL attribute_directory.create_attribute_store(",
             "$1::text, $2::text, ",
@@ -339,22 +348,23 @@ impl Change for AddAttributeStore {
             ")"
         );
 
-        client
-            .execute(
-                query,
-                &[
-                    &self.attribute_store.data_source,
-                    &self.attribute_store.entity_type,
-                    &self.attribute_store.attributes,
-                ],
-            )
-            .await
-            .map_err(|e| {
-                DatabaseError::from_msg(format!(
-                    "Error creating attribute store '{}': {e}",
-                    &self.attribute_store
-                ))
-            })?;
+        tx.execute(
+            query,
+            &[
+                &self.attribute_store.data_source,
+                &self.attribute_store.entity_type,
+                &self.attribute_store.attributes,
+            ],
+        )
+        .await
+        .map_err(|e| {
+            DatabaseError::from_msg(format!(
+                "Error creating attribute store '{}': {e}",
+                &self.attribute_store
+            ))
+        })?;
+
+        tx.commit().await?;
 
         Ok(format!(
             "Created attribute store '{}'",
