@@ -259,7 +259,8 @@ impl EntitySet {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ChangeEntitySet {
     pub entity_set: EntitySet,
     pub entities: Vec<String>,
@@ -384,7 +385,8 @@ impl NewEntitySet {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct CreateEntitySet {
     pub entity_set: NewEntitySet,
 }

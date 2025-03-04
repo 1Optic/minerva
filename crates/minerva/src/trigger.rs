@@ -203,7 +203,8 @@ pub async fn list_triggers(conn: &mut Client) -> Result<Vec<TriggerRepr>, String
     triggers
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -871,7 +872,8 @@ async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
     ))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct DeleteTrigger {
     pub trigger_name: String,
 }
@@ -954,7 +956,8 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct UpdateTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -1021,7 +1024,8 @@ impl Change for UpdateTrigger {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct RenameTrigger {
     pub trigger: Trigger,
     pub verify: bool,
@@ -1114,7 +1118,8 @@ impl Change for RenameTrigger {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct VerifyTrigger {
     pub trigger_name: String,
 }
@@ -1138,7 +1143,8 @@ impl Change for VerifyTrigger {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct EnableTrigger {
     pub trigger_name: String,
 }
@@ -1162,7 +1168,8 @@ impl Change for EnableTrigger {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct DisableTrigger {
     pub trigger_name: String,
 }
@@ -1356,7 +1363,8 @@ where
     Ok(notifications)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct CreateNotifications {
     pub trigger_name: String,
     pub timestamp: DateTime<Utc>,

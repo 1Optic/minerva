@@ -13,6 +13,7 @@ use super::change::Change;
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
 pub struct Relation {
     pub name: String,
     pub query: String,
@@ -62,7 +63,8 @@ pub fn load_relation_from_file(path: &PathBuf) -> Result<Relation, Error> {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddRelation {
     pub relation: Relation,
 }
@@ -94,7 +96,8 @@ impl From<Relation> for AddRelation {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct UpdateRelation {
     pub relation: Relation,
 }

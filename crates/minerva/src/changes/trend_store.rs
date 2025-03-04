@@ -14,6 +14,7 @@ use crate::trend_store::create::create_trend_store;
 use crate::trend_store::{GeneratedTrend, Trend, TrendStore, TrendStorePart};
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct RemoveTrends {
     pub trend_store_part: TrendStorePart,
     pub trends: Vec<String>,
@@ -90,6 +91,7 @@ impl Change for RemoveTrends {
 ////////////
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddTrends {
     pub trend_store_part: TrendStorePart,
     pub trends: Vec<Trend>,
@@ -199,6 +201,7 @@ async fn initialize_table_trends<T: GenericClient>(
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ModifyTrendDataType {
     pub trend_name: String,
     pub from_type: DataType,
@@ -221,6 +224,7 @@ impl fmt::Display for ModifyTrendDataType {
 /// The change of data types for multiple trends in a trend store part is
 /// grouped into one operation for efficiency purposes.
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ModifyTrendDataTypes {
     pub trend_store_part: TrendStorePart,
     pub modifications: Vec<ModifyTrendDataType>,
@@ -356,6 +360,7 @@ impl Change for ModifyTrendDataTypes {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ModifyTrendExtraData {
     pub trend_name: String,
     pub trend_store_part_name: String,
@@ -409,6 +414,7 @@ impl Change for ModifyTrendExtraData {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddTrendStorePart {
     pub trend_store: TrendStore,
     pub trend_store_part: TrendStorePart,
@@ -618,6 +624,7 @@ impl fmt::Display for AddTrendStorePart {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddTrendStore {
     pub trend_store: TrendStore,
 }

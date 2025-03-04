@@ -24,7 +24,8 @@ fn default_empty_string() -> String {
     String::new()
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddAttributes {
     pub notification_store: NotificationStore,
     pub attributes: Vec<Attribute>,
@@ -125,7 +126,8 @@ impl fmt::Display for NotificationStore {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct AddNotificationStore {
     pub notification_store: NotificationStore,
 }
