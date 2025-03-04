@@ -1,7 +1,7 @@
 use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serde::{Serialize, Deserialize};
 use std::fmt;
 use tokio_postgres::{Client, GenericClient};
 

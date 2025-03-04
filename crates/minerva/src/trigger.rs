@@ -1384,9 +1384,12 @@ where
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        let message =
-            create_notifications(&mut transaction, &self.trigger_name, Some(self.timestamp.clone()))
-                .await?;
+        let message = create_notifications(
+            &mut transaction,
+            &self.trigger_name,
+            Some(self.timestamp.clone()),
+        )
+        .await?;
 
         transaction.commit().await?;
 
