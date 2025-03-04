@@ -8,6 +8,6 @@ use tokio_postgres::Client;
 pub type ChangeResult = Result<String, Error>;
 
 #[async_trait]
-pub trait Change: fmt::Display + Send + Sync {
+pub trait Change: fmt::Display + Send + Sync + erased_serde::Serialize {
     async fn apply(&self, client: &mut Client) -> ChangeResult;
 }

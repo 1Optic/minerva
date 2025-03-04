@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.23.0] - 2025-03-04
+
+### Added
+
+- CLI: Add option for formatting diff as JSON
+
 ## [9.22.0] - 2025-03-03
 
 ### Changed
@@ -344,4 +350,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.21.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.0...9.21.1
 [9.21.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.1...9.21.2
 [9.21.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.2...9.21.3
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.3...HEAD
+[9.22.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.3...9.22.0
+[9.23.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.22.0...9.23.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.23.0...HEAD

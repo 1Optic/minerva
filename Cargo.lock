@@ -1222,6 +1222,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "erased-serde"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24e2389d65ab4fab27dc2a5de7b191e1f6617d1f1c8855c0dc569c94a4cbb18d"
+dependencies = [
+ "serde",
+ "typeid",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1945,7 +1955,7 @@ dependencies = [
 
 [[package]]
 name = "integration-tests"
-version = "9.22.0"
+version = "9.23.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2058,7 +2068,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -2157,7 +2167,7 @@ dependencies = [
 
 [[package]]
 name = "minerva"
-version = "9.22.0"
+version = "9.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2167,6 +2177,7 @@ dependencies = [
  "chrono",
  "csv",
  "env_logger",
+ "erased-serde",
  "futures-util",
  "glob",
  "humantime",
@@ -2195,7 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-cli"
-version = "9.22.0"
+version = "9.23.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2211,6 +2222,7 @@ dependencies = [
  "deadpool-postgres",
  "dialoguer",
  "env_logger",
+ "erased-serde",
  "futures",
  "glob",
  "humantime",
@@ -2239,7 +2251,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-event-service"
-version = "9.22.0"
+version = "9.23.0"
 dependencies = [
  "chrono",
  "deadpool-postgres",
@@ -2261,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-service"
-version = "9.22.0"
+version = "9.23.0"
 dependencies = [
  "actix-cors",
  "actix-web",
@@ -3999,6 +4011,12 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "typeid"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e13db2e0ccd5e14a544e8a246ba2312cd25223f616442d7f2cb0e3db614236e"
 
 [[package]]
 name = "typenum"
