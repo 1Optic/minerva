@@ -1387,7 +1387,7 @@ where
         let message = create_notifications(
             &mut transaction,
             &self.trigger_name,
-            Some(self.timestamp.clone()),
+            Some(self.timestamp),
         )
         .await?;
 
