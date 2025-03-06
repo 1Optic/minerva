@@ -3,6 +3,7 @@ mod tests {
     use std::net::Ipv4Addr;
     use std::path::PathBuf;
 
+    use chrono::{TimeZone, Utc};
     use log::debug;
 
     use minerva::change::Change;
@@ -12,6 +13,7 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_materialization::get_function_def;
     use minerva::trend_store::TrendStore;
+    use minerva::trigger::create_notifications;
     //use reqwest::StatusCode;
     use serde_json::json;
 
@@ -173,13 +175,15 @@ mod tests {
 
         assert_eq!(response_data, expected_response);
 
-        let (_, src): (String, String) = {
-            let mut client = test_database.connect().await?;
+        let mut client = test_database.connect().await?;
 
-            get_function_def(&mut client, "low_temperature")
-                .await
-                .unwrap()
-        };
+        let message = create_notifications(&mut client, "low_temperature", Some(Utc.with_ymd_and_hms(2025, 3, 5, 12, 0, 0).unwrap())).await.unwrap();
+
+        assert_eq!(message, "Created 0 notifications for trigger 'low_temperature'");
+
+        let (_, src): (String, String) = get_function_def(&mut client, "low_temperature")
+            .await
+            .unwrap();
 
         assert_eq!(
             src.trim(),
