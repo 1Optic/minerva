@@ -109,11 +109,16 @@ impl Cmd for RelationMaterialize {
         }
 
         if error_count > 0 {
-            return Err(minerva::error::Error::Runtime(
-                minerva::error::RuntimeError::from_msg(format!(
-                    "{error_count} relations failed to materialize"
-                )),
-            ));
+            match &self.name {
+                Some(_) => {
+                    return Err(minerva::error::Error::Runtime(
+                        minerva::error::RuntimeError::from_msg(format!(
+                            "{error_count} relations failed to materialize"
+                        )),
+                    ))
+                }
+                None => println!("WARNING: {error_count} relation(s) failed to materialize"),
+            }
         }
 
         Ok(())
