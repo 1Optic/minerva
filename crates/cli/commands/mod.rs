@@ -14,3 +14,4 @@ pub mod trendstore;
 pub mod trigger;
 pub mod update;
 pub mod virtualentity;
+pub mod graph;

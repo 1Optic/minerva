@@ -21,6 +21,7 @@ use crate::commands::trendstore::TrendStoreOpt;
 use crate::commands::trigger::TriggerOpt;
 use crate::commands::update::UpdateOpt;
 use crate::commands::virtualentity::VirtualEntityOpt;
+use crate::commands::graph::GraphOpt;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, name = "minerva", arg_required_else_help = true)]
@@ -39,6 +40,8 @@ enum Commands {
     Dump(DumpOpt),
     #[command(about = "Create a diff between Minerva instance definitions")]
     Diff(DiffOpt),
+    #[command(about = "Create a graph of a Minerva instance")]
+    Graph(GraphOpt),
     #[command(about = "Update a Minerva database from an instance definition")]
     Update(UpdateOpt),
     #[command(about = "Initialize a complete Minerva instance")]
@@ -86,6 +89,7 @@ async fn main() -> ExitCode {
         Some(Commands::Schema(schema)) => schema.run().await,
         Some(Commands::Dump(dump)) => dump.run().await,
         Some(Commands::Diff(diff)) => diff.run().await,
+        Some(Commands::Graph(graph)) => graph.run().await,
         Some(Commands::Update(update)) => update.run().await,
         Some(Commands::Initialize(initialize)) => initialize.run().await,
         Some(Commands::TrendStore(trend_store)) => trend_store.run().await,
