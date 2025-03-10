@@ -288,10 +288,10 @@ async fn connect_db() -> Result<Pool, Error> {
 
     info!("Connecting to database: {}", &config_repr);
 
-    make_db_pool(&config).await
+    make_db_pool(&config)
 }
 
-async fn make_db_pool(config: &Config) -> Result<Pool, Error> {
+fn make_db_pool(config: &Config) -> Result<Pool, Error> {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
     };

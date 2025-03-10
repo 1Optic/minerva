@@ -80,8 +80,7 @@ impl Cmd for TrendMaterializationService {
 
                     if !keep {
                         println!(
-                            "Dropping connection due to age ({:?} > {:?})",
-                            age, max_connection_age
+                            "Dropping connection due to age ({age:?} > {max_connection_age:?})",
                         );
                     }
 

@@ -173,10 +173,10 @@ async fn connect_db() -> Result<Pool, String> {
 
     info!("Connecting to database: {}", &config_repr);
 
-    make_db_pool(&config).await
+    make_db_pool(&config)
 }
 
-async fn make_db_pool(config: &TokioConfig) -> Result<Pool, String> {
+fn make_db_pool(config: &TokioConfig) -> Result<Pool, String> {
     let mut roots = rustls::RootCertStore::empty();
 
     for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
@@ -260,7 +260,12 @@ async fn main() {
 
         let mut missed_notification = -1;
 
-        if !result.is_empty() {
+        if result.is_empty() {
+            info!(
+                "{}: no new notifications received.",
+                Local::now().format("%Y-%m-%d %H:%M:%S")
+            );
+        } else {
             info!(
                 "{}: {} notifications received.",
                 Local::now().format("%Y-%m-%d %H:%M:%S"),
@@ -307,12 +312,8 @@ async fn main() {
                     }
                 }
             }
-        } else {
-            info!(
-                "{}: no new notifications received.",
-                Local::now().format("%Y-%m-%d %H:%M:%S")
-            )
         }
+
         if missed_notification > -1 && missed_notification <= last_notification {
             last_notification = missed_notification - 1;
         }

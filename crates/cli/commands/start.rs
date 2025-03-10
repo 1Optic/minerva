@@ -173,7 +173,7 @@ fn write_env_file(file_path: &str, env: &[(String, String)]) {
 
     for (name, value) in env {
         env_buf_writer
-            .write_fmt(format_args!("{}={}\n", name, value))
+            .write_fmt(format_args!("{name}={value}\n"))
             .unwrap();
     }
 }

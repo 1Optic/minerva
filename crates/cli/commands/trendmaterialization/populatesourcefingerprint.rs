@@ -17,23 +17,22 @@ impl Cmd for TrendMaterializationPopulateSourceFingerprint {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let result = populate_source_fingerprint(&mut client, &self.materialization).await;
+        populate_source_fingerprint(&mut client, &self.materialization)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error populating state for trend materialization '{}': {e}",
+                        &self.materialization
+                    ),
+                })
+            })?;
 
-        match result {
-            Ok(_) => {
-                println!(
-                    "Populated state for trend materialization '{}'",
-                    &self.materialization
-                );
+        println!(
+            "Populated state for trend materialization '{}'",
+            &self.materialization
+        );
 
-                Ok(())
-            }
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Error populating state for trend materialization '{}': {e}",
-                    &self.materialization
-                ),
-            })),
-        }
+        Ok(())
     }
 }

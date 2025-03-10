@@ -12,6 +12,7 @@ use clap::Subcommand;
 use minerva::trend_store::{
     columnarize_partitions, create_partitions, create_partitions_for_timestamp,
 };
+use postgres_protocol::escape::escape_identifier;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -92,20 +93,19 @@ impl Cmd for TrendStorePartitionRemove {
 
             if self.pretend {
                 println!(
-                    "Would have removed partition '{}' ({} - {})",
-                    partition_name, data_from, data_to
+                    "Would have removed partition '{partition_name}' ({data_from} - {data_to})",
                 );
             } else {
-                let drop_query = format!("DROP TABLE trend_partition.\"{}\"", partition_name);
+                let drop_query = format!(
+                    "DROP TABLE trend_partition.{}",
+                    escape_identifier(partition_name)
+                );
                 client.execute(&drop_query, &[]).await?;
 
                 let remove_entry_query = "DELETE FROM trend_directory.partition WHERE id = $1";
                 client.execute(remove_entry_query, &[&partition_id]).await?;
 
-                println!(
-                    "Removed partition '{}' ({} - {})",
-                    partition_name, data_from, data_to
-                );
+                println!("Removed partition '{partition_name}' ({data_from} - {data_to})",);
             }
         }
 

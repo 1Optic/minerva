@@ -341,7 +341,7 @@ pub(super) async fn delete_entity_set(pool: Data<Pool>, id: Path<i32>) -> impl R
             HttpResponse::InternalServerError().json(messages)
         }
         Ok(mut manager) => {
-            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+            let client: &mut tokio_postgres::Client = &mut **manager;
             let preresult = load_entity_set(client, &es_id).await;
             match preresult {
                 Ok(_) => {

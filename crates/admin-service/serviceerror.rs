@@ -48,8 +48,8 @@ impl Display for ServiceError {
 impl Display for ExtendedServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut message_description: Vec<String> = vec![];
-        for m in self.messages.iter() {
-            message_description.push(format!("{}: {}", m.0, m.1))
+        for m in &self.messages {
+            message_description.push(format!("{}: {}", m.0, m.1));
         }
         write!(f, "({}) {}", self.kind, message_description.join(", "))
     }

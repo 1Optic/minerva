@@ -39,8 +39,7 @@ impl Cmd for AttributeStoreMaterialize {
                 .await
                 .map_err(|e| {
                     format!(
-                        "Could not materialize attribute data for '{}': {e}",
-                        attribute_materialization
+                        "Could not materialize attribute data for '{attribute_materialization}': {e}",
                     )
                 })?;
 

@@ -13,6 +13,7 @@ use super::common::{
 };
 
 #[derive(Debug, Parser, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct DiffOpt {
     #[arg(
         long = "with-dir",
@@ -49,22 +50,19 @@ impl Cmd for DiffOpt {
 
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
 
-        let other_instance = match &self.with_dir {
-            Some(with_dir) => {
-                to_instance_descr = format!("dir('{}')", with_dir.to_string_lossy());
-                MinervaInstance::load_from(with_dir)?
-            }
-            None => {
-                let db_config = get_db_config()?;
+        let other_instance = if let Some(with_dir) = &self.with_dir {
+            to_instance_descr = format!("dir('{}')", with_dir.to_string_lossy());
+            MinervaInstance::load_from(with_dir)?
+        } else {
+            let db_config = get_db_config()?;
 
-                let db_config_text = show_db_config(&db_config);
+            let db_config_text = show_db_config(&db_config);
 
-                to_instance_descr = format!("database('{db_config_text}')");
+            to_instance_descr = format!("database('{db_config_text}')");
 
-                let mut client = connect_to_db(&db_config).await?;
+            let mut client = connect_to_db(&db_config).await?;
 
-                MinervaInstance::load_from_db(&mut client).await?
-            }
+            MinervaInstance::load_from_db(&mut client).await?
         };
 
         let diff_options = DiffOptions {
@@ -75,7 +73,9 @@ impl Cmd for DiffOpt {
 
         let changes = other_instance.diff(&instance_def, diff_options);
 
-        if !changes.is_empty() {
+        if changes.is_empty() {
+            println!("Database is up-to-date");
+        } else {
             if !self.json {
                 println!("Differences {from_instance_descr} -> {to_instance_descr}");
             }
@@ -89,8 +89,6 @@ impl Cmd for DiffOpt {
                     println!("* {}", &change);
                 }
             }
-        } else {
-            println!("Database is up-to-date");
         }
 
         Ok(())

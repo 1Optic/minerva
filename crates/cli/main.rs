@@ -76,7 +76,7 @@ async fn main() -> ExitCode {
     if let Some(generator) = cli.generator {
         let mut cmd = Cli::command();
 
-        print_completions(generator, &mut cmd)
+        print_completions(generator, &mut cmd);
     }
 
     let result = match cli.command {

@@ -51,6 +51,9 @@ pub enum TrendMaterializationOptCommand {
 }
 
 impl TrendMaterializationOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             Some(TrendMaterializationOptCommand::Create(trend_materialization_create)) => {

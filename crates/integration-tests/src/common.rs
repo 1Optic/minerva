@@ -99,7 +99,7 @@ impl MinervaService {
                         panic!("Service prematurely exited with code: {status}");
                     }
 
-                    tokio::time::sleep(timeout).await
+                    tokio::time::sleep(timeout).await;
                 }
             }
         }
@@ -117,7 +117,7 @@ impl Drop for MinervaService {
     fn drop(&mut self) {
         match self.proc_handle.kill() {
             Err(e) => error!("Could not stop web service: {e}"),
-            Ok(_) => debug!("Stopped web service"),
+            Ok(()) => debug!("Stopped web service"),
         }
     }
 }

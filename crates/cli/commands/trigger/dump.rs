@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use clap::Parser;
 
-use minerva::trigger::{dump_trigger, load_trigger};
+use minerva::trigger::{dump_trigger, load_trigger, TriggerError};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -18,7 +18,7 @@ impl Cmd for TriggerDump {
 
         let trigger = load_trigger(&mut client, &self.name)
             .await
-            .map_err(|e| e.to_database_error())?;
+            .map_err(TriggerError::to_database_error)?;
 
         let trigger_definition = dump_trigger(&trigger);
 

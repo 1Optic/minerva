@@ -67,7 +67,7 @@ impl Cmd for AttributeStoreCompact {
                 );
 
                 if !loop_until_done || result.record_count == 0 {
-                    done = true
+                    done = true;
                 }
             }
         } else if self.all_modified {
@@ -104,8 +104,7 @@ async fn compact_all_attribute_stores(
             .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
 
         println!(
-            "Compacting attribute store '{}'({})",
-            attribute_store_name, id
+            "Compacting attribute store '{attribute_store_name}'({id})"
         );
 
         let result = compact_attribute_store_by_id(&transaction, id, limit).await?;
@@ -113,8 +112,7 @@ async fn compact_all_attribute_stores(
         // When any attribute data is compacted, also update the curr-ptr data
         if result.record_count > 0 {
             println!(
-                "Materializing curr-ptr table for attribute store '{}'",
-                attribute_store_name
+                "Materializing curr-ptr table for attribute store '{attribute_store_name}'"
             );
 
             let result = materialize_curr_ptr(&transaction, id).await?;

@@ -41,7 +41,7 @@ impl Cmd for LoadDataOpt {
             },
             Some(path) => {
                 let config_file = std::fs::File::open(path)
-                    .map_err(|e| ConfigurationError::from_msg(format!("{}", e)))?;
+                    .map_err(|e| ConfigurationError::from_msg(format!("{e}")))?;
                 serde_json::from_reader(config_file).unwrap()
             }
         };
@@ -68,11 +68,11 @@ impl Cmd for LoadDataOpt {
                     e
                 );
             }
-            Ok(_) => {
+            Ok(()) => {
                 println!(
                     "Finished processing file '{}'",
                     &self.file.as_path().to_string_lossy()
-                )
+                );
             }
         }
 

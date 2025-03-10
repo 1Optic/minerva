@@ -24,7 +24,7 @@ impl Cmd for TrendMaterializationCheck {
             } else {
                 println!("'{}':", &materialization);
                 for issue in issues {
-                    println!(" - {}", issue);
+                    println!(" - {issue}");
                 }
             }
         }

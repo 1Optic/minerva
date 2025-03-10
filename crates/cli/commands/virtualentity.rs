@@ -22,6 +22,9 @@ pub enum VirtualEntityOptCommands {
 }
 
 impl VirtualEntityOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             VirtualEntityOptCommands::Materialize(materialize) => materialize.run().await,

@@ -8,7 +8,7 @@ use tokio_postgres::{config::SslMode, Config};
 use tokio_postgres::{Client, NoTls};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
-use minerva::error::{ConfigurationError, Error};
+use minerva::error::{ConfigurationError, Error, RuntimeError};
 
 pub type CmdResult = Result<(), Error>;
 
@@ -99,12 +99,26 @@ pub async fn connect_db() -> Result<Client, Error> {
 }
 
 pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
-    let client = if config.get_ssl_mode() != SslMode::Disable {
+    let client = if config.get_ssl_mode() == SslMode::Disable {
+        let (client, connection) = config.connect(NoTls).await?;
+
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {e}");
+            }
+        });
+
+        client
+    } else {
         let mut roots = rustls::RootCertStore::empty();
 
         for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
         {
-            roots.add(cert).unwrap();
+            roots.add(cert).map_err(|e| {
+                Error::Runtime(RuntimeError::from_msg(format!(
+                    "Could not add certificate to certificate store: {e}"
+                )))
+            })?;
         }
 
         let tls_config = RustlsClientConfig::builder()
@@ -118,16 +132,6 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
                 &config, e
             ))
         })?;
-
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {e}");
-            }
-        });
-
-        client
-    } else {
-        let (client, connection) = config.connect(NoTls).await?;
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {

@@ -23,7 +23,7 @@ impl Cmd for TrendMaterializationDump {
             if materialization_name == self.materialization {
                 let definition = materialization.dump().unwrap();
 
-                println!("{}", definition);
+                println!("{definition}");
             }
         }
 
