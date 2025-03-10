@@ -40,7 +40,7 @@ bollard-stubs = "=1.47.1-rc.27.3.1"
 erased-serde = "0.4.5"
 
 [dev-dependencies]
-env_logger = { version = "=0.11.6" }
+env_logger = { version = "=0.11.7" }
 
 [features]
 test-containers = ["dep:url", "dep:rand", "dep:testcontainers"]
