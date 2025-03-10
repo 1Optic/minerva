@@ -34,7 +34,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
     entity_type: node
     granularity: 15m
     partition_size: 1d
-    retention_period: 6mon
+    retention_period: 6 months
     parts:
       - name: hub_node_main_15m
         trends:
