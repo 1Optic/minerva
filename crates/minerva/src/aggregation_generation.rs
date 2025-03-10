@@ -276,8 +276,31 @@ fn write_time_aggregations(
 
     static PARTITION_SIZE_MAPPING: OnceLock<HashMap<Duration, Duration>> = OnceLock::new();
 
-    let partition_size_mapping: &HashMap<Duration, Duration> =
-        PARTITION_SIZE_MAPPING.get_or_init(|| {
+    let partition_size_mapping: &HashMap<Duration, Duration> = PARTITION_SIZE_MAPPING.get_or_init(|| {
+            vec![
+                (Duration::from_secs(900), Duration::from_secs(86400)),
+                (Duration::from_secs(1800), Duration::from_secs(86400 * 2)),
+                (Duration::from_secs(3600), Duration::from_secs(86400 * 4)),
+                (
+                    Duration::from_secs(86400),
+                    humantime::parse_duration("3month").unwrap(),
+                ),
+                (
+                    humantime::parse_duration("1w").unwrap(),
+                    humantime::parse_duration("1y").unwrap(),
+                ),
+                (
+                    humantime::parse_duration("1month").unwrap(),
+                    humantime::parse_duration("5y").unwrap(),
+                ),
+            ]
+            .into_iter()
+            .collect()
+        });
+
+    static RETENTION_PERIOD_MAPPING: OnceLock<HashMap<Duration, Duration>> = OnceLock::new();
+
+    let retention_period_mapping: &HashMap<Duration, Duration> = RETENTION_PERIOD_MAPPING.get_or_init(|| {
             vec![
                 (Duration::from_secs(900), Duration::from_secs(86400)),
                 (Duration::from_secs(1800), Duration::from_secs(86400 * 2)),
@@ -307,7 +330,9 @@ fn write_time_aggregations(
         partition_size: *partition_size_mapping
             .get(&aggregation.granularity)
             .unwrap(),
-        retention_period: Duration::from_secs(86400 * 365),
+        retention_period: *retention_period_mapping
+            .get(&aggregation.granularity)
+            .unwrap(),
         parts: target_trend_store_parts,
     })
 }
