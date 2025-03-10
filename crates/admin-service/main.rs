@@ -130,6 +130,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             (name = "Trend Materialization", description = "Trend materialization management endpoints.")
         ),
     )]
+    #[allow(clippy::items_after_statements)]
     struct ApiDoc;
 
     let service_address: String = env::var(ENV_ADDRESS).unwrap_or(DEFAULT_ADDRESS.to_string());
@@ -145,7 +146,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
         Ok(value) => value,
     };
 
-    let pool = connect_db().await.map_err(|e| {
+    let pool = connect_db().map_err(|e| {
         serviceerror::ServiceError::from(format!("Could not connect to database: {e}"))
     })?;
 
@@ -211,39 +212,36 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
 }
 
 fn get_db_config() -> Result<Config, Error> {
-    let config = match env::var(ENV_DB_CONN) {
-        Ok(value) => Config::new().options(&value).clone(),
-        Err(_) => {
-            // No single environment variable set, let's check for psql settings
-            let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
-            let mut config = Config::new();
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) { Config::new().options(&value).clone() } else {
+        // No single environment variable set, let's check for psql settings
+        let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
+        let mut config = Config::new();
 
-            let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
+        let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
 
-            let sslmode = match env_sslmode.to_lowercase().as_str() {
-                "disable" => SslMode::Disable,
-                "prefer" => SslMode::Prefer,
-                "require" => SslMode::Require,
-                _ => {
-                    return Err(Error::Configuration(ConfigurationError {
-                        msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                    }))
-                }
-            };
-
-            let config = config
-                .host(env::var("PGHOST").unwrap_or("localhost".into()))
-                .port(port)
-                .user(env::var("PGUSER").unwrap_or("postgres".into()))
-                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
-                .ssl_mode(sslmode);
-
-            let pg_password = env::var("PGPASSWORD");
-
-            match pg_password {
-                Ok(password) => config.password(password).clone(),
-                Err(_) => config.clone(),
+        let sslmode = match env_sslmode.to_lowercase().as_str() {
+            "disable" => SslMode::Disable,
+            "prefer" => SslMode::Prefer,
+            "require" => SslMode::Require,
+            _ => {
+                return Err(Error::Configuration(ConfigurationError {
+                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                }))
             }
+        };
+
+        let config = config
+            .host(env::var("PGHOST").unwrap_or("localhost".into()))
+            .port(port)
+            .user(env::var("PGUSER").unwrap_or("postgres".into()))
+            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
+            .ssl_mode(sslmode);
+
+        let pg_password = env::var("PGPASSWORD");
+
+        match pg_password {
+            Ok(password) => config.password(password).clone(),
+            Err(_) => config.clone(),
         }
     };
 
@@ -281,7 +279,7 @@ fn show_config(config: &Config) -> String {
     )
 }
 
-async fn connect_db() -> Result<Pool, Error> {
+fn connect_db() -> Result<Pool, Error> {
     let config = get_db_config()?;
 
     let config_repr = show_config(&config);

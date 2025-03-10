@@ -9,14 +9,17 @@ use rand::distr::{Alphanumeric, SampleString};
 
 use tokio::io::AsyncBufReadExt;
 
+#[must_use]
 pub fn generate_name(len: usize) -> String {
     Alphanumeric.sample_string(&mut rand::rng(), len)
 }
 
+#[must_use]
 pub fn get_available_port(ip_addr: Ipv4Addr) -> Option<u16> {
     (1000..50000).find(|port| port_available(SocketAddr::V4(SocketAddrV4::new(ip_addr, *port))))
 }
 
+#[must_use]
 fn port_available(addr: SocketAddr) -> bool {
     TcpListener::bind(addr).is_ok()
 }

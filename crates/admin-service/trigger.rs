@@ -1,6 +1,5 @@
 use deadpool_postgres::Pool;
 use log::{debug, trace};
-use std::ops::DerefMut;
 use std::time::Duration;
 
 use actix_web::{get, post, put, web::Data, web::Path, HttpResponse, Responder};
@@ -163,7 +162,7 @@ async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServi
         }
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
     let triggerdata = list_triggers(client).await.map_err(|e| {
         let mut messages = Map::new();
         messages.insert("general".to_string(), e.to_string().into());
@@ -175,7 +174,7 @@ async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServi
 
     let mut result: Vec<TriggerData> = [].to_vec();
 
-    for trigger in triggerdata.iter() {
+    for trigger in &triggerdata {
         let thresholds = load_thresholds_with_client(client, &trigger.name)
             .await
             .map_err(|e| {
@@ -191,8 +190,8 @@ async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServi
             name: trigger.name.clone(),
             enabled: trigger.enabled,
             description: trigger.description.clone(),
-            thresholds: thresholds.into_iter().map(|t| t.into()).collect(),
-        })
+            thresholds: thresholds.into_iter().map(std::convert::Into::into).collect(),
+        });
     }
 
     Ok(HttpResponse::Ok().json(result))
@@ -241,7 +240,7 @@ async fn change_thresholds_fn(
         }
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await.map_err(|e| {
         let mut messages = Map::new();
@@ -312,7 +311,7 @@ async fn change_thresholds_fn(
             if !reports.is_empty() {
                 Ok(HttpResponse::Conflict().json(reports))
             } else {
-                trigger.thresholds = data.thresholds.into_iter().map(|t| t.into()).collect();
+                trigger.thresholds = data.thresholds.into_iter().map(std::convert::Into::into).collect();
                 trigger.enabled = data.enabled;
                 trigger.description = data.description;
 
@@ -383,7 +382,7 @@ pub(super) async fn get_templates(pool: Data<Pool>) -> impl Responder {
 
     match try_manager {
         Ok(mut manager) => {
-            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+            let client: &mut tokio_postgres::Client = &mut manager;
             let result = list_templates(client);
             match result.await {
                 Ok(res) => HttpResponse::Ok().json(
@@ -427,7 +426,7 @@ pub(super) async fn get_template(pool: Data<Pool>, id: Path<i32>) -> impl Respon
 
     match try_manager {
         Ok(mut manager) => {
-            let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+            let client: &mut tokio_postgres::Client = &mut manager;
             let result = get_bare_template(client, trigger_id);
             match result.await {
                 Ok(template) => HttpResponse::Ok().json(TemplateData::from(template)),
@@ -472,7 +471,7 @@ async fn create_trigger_fn(
             messages,
         }
     })?;
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
     trace!("Created client");
 
     let template = get_template_from_id(client, data.template_instance.template_id)
@@ -595,7 +594,7 @@ async fn create_trigger_fn(
                 let mut messages = Map::new();
                 messages.insert(
                     "name".to_string(),
-                    format!("A trigger named {} already exists", name).into(),
+                    format!("A trigger named {name} already exists").into(),
                 );
                 ExtendedServiceError {
                     kind: ServiceErrorKind::Conflict,
@@ -606,7 +605,7 @@ async fn create_trigger_fn(
                 let mut messages = Map::new();
                 messages.insert(
                     "parameters".to_string(),
-                    format!("Counter {} does not exist", counter).into(),
+                    format!("Counter {counter} does not exist").into(),
                 );
                 ExtendedServiceError {
                     kind: ServiceErrorKind::NotFound,
@@ -617,7 +616,7 @@ async fn create_trigger_fn(
                 let mut messages = Map::new();
                 messages.insert(
                     "parameters".to_string(),
-                    format!("Counter {} cannot be uniquely identified", counter).into(),
+                    format!("Counter {counter} cannot be uniquely identified").into(),
                 );
                 ExtendedServiceError {
                     kind: ServiceErrorKind::NotFound,

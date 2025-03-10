@@ -27,7 +27,7 @@ pub struct DataSource {
 pub(super) async fn get_data_sources(pool: Data<Pool>) -> Result<HttpResponse, ServiceError> {
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let data_sources: Vec<DataSource> = client
@@ -71,7 +71,7 @@ pub(super) async fn get_data_source(
 
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let data_source = client

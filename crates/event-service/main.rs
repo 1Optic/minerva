@@ -166,7 +166,7 @@ fn show_config(config: &TokioConfig) -> String {
     )
 }
 
-async fn connect_db() -> Result<Pool, String> {
+fn connect_db() -> Result<Pool, String> {
     let config = get_db_config()?;
 
     let config_repr = show_config(&config);
@@ -227,7 +227,7 @@ async fn main() {
         .install_default()
         .expect("Failed to install rustls crypto provider");
     let config = get_config();
-    let pool = connect_db().await.unwrap();
+    let pool = connect_db().unwrap();
     let mut client = pool.get().await.unwrap();
     let httpclient = Client::new();
     let transaction = client.transaction().await.unwrap();

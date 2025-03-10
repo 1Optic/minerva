@@ -50,7 +50,7 @@ pub(super) async fn get_entity_types(pool: Data<Pool>) -> impl Responder {
                             name: row.get(1),
                             description: row.get(2),
                         };
-                        m.push(entitytype)
+                        m.push(entitytype);
                     }
                     HttpResponse::Ok().json(m)
                 }

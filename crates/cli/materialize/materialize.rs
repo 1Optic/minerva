@@ -483,7 +483,7 @@ impl MaterializationFetcher {
                     );
                 }
                 Err(e) => {
-                    println!("Error retrieving materializations: {}", e);
+                    println!("Error retrieving materializations: {e}");
                 }
             }
         }
@@ -523,14 +523,14 @@ async fn materialize(
                     }
                 }
                 Err(e) => {
-                    println!("Error checking Minerva version: {}", e)
+                    println!("Error checking Minerva version: {e}")
                 }
             }
             if check_statistics {
                 let check_result = materialization.check_statistics(&client).await;
 
                 if let Err(e) = check_result {
-                    println!("Error checking statistics: {}", e);
+                    println!("Error checking statistics: {e}");
                 }
             }
 

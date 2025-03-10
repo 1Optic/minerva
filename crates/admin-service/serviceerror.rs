@@ -63,9 +63,8 @@ impl ResponseError for ServiceError {
     fn status_code(&self) -> StatusCode {
         match self.kind {
             ServiceErrorKind::NotFound => StatusCode::NOT_FOUND,
-            ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::PoolError | ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
-            ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
@@ -84,9 +83,8 @@ impl ResponseError for ExtendedServiceError {
     fn status_code(&self) -> StatusCode {
         match self.kind {
             ServiceErrorKind::NotFound => StatusCode::NOT_FOUND,
-            ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::PoolError | ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
-            ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }

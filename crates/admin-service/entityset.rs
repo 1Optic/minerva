@@ -1,7 +1,6 @@
 use deadpool_postgres::Pool;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::ops::DerefMut;
 use utoipa::ToSchema;
 
 use actix_web::{delete, get, post, put, web::Data, web::Json, web::Path, HttpResponse, Responder};
@@ -54,7 +53,7 @@ impl EntitySetDataFull {
             entity_type: self.entity_type.to_string(),
             owner: self.owner.to_string(),
             description: self.description.to_string(),
-            entities: self.entities.to_vec(),
+            entities: self.entities.clone(),
             created: self.created.unwrap_or(Utc::now()),
             modified: self.modified.unwrap_or(Utc::now()),
         }
@@ -64,15 +63,15 @@ impl EntitySetDataFull {
 impl EntitySetData {
     fn entity_set(&self) -> NewEntitySet {
         let group = match &self.group {
-            None => "".to_string(),
+            None => String::new(),
             Some(value) => value.to_string(),
         };
         let entity_type = match &self.entity_type {
-            None => "".to_string(),
+            None => String::new(),
             Some(value) => value.to_string(),
         };
         let description = match &self.description {
-            None => "".to_string(),
+            None => String::new(),
             Some(value) => value.to_string(),
         };
         NewEntitySet {
@@ -81,7 +80,7 @@ impl EntitySetData {
             entity_type,
             owner: self.owner.to_string(),
             description,
-            entities: self.entities.to_vec(),
+            entities: self.entities.clone(),
         }
     }
 }
@@ -98,10 +97,10 @@ impl EntitySetData {
 pub(super) async fn get_entity_sets(pool: Data<Pool>) -> Result<HttpResponse, ServiceError> {
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let data = load_entity_sets(client).await.map_err(|e| Error {
         code: 500,
