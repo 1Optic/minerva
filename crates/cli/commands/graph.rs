@@ -4,18 +4,17 @@ use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::instance::MinervaInstance;
+use petgraph::{prelude::GraphMap, visit::{DfsPostOrder, Walker}};
+use petgraph::data::ElementIterator;
 
-use super::common::{
-    connect_to_db, get_db_config, show_db_config, Cmd, CmdResult,
-};
+use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct GraphOpt {
-    #[arg(
-        long = "from-dir",
-        help = "load Minerva instance from directory"
-    )]
+    #[arg(long = "from-dir", help = "load Minerva instance from directory")]
     from_dir: Option<PathBuf>,
+    #[arg(long, help = "focus on specific node")]
+    focus_on: Option<String>,
     #[arg(long)]
     dependency_order: bool,
 }
@@ -24,13 +23,9 @@ pub struct GraphOpt {
 impl Cmd for GraphOpt {
     async fn run(&self) -> CmdResult {
         let instance = match &self.from_dir {
-            Some(with_dir) => {
-                MinervaInstance::load_from(with_dir)?
-            }
+            Some(with_dir) => MinervaInstance::load_from(with_dir)?,
             None => {
                 let db_config = get_db_config()?;
-
-                let db_config_text = show_db_config(&db_config);
 
                 let mut client = connect_to_db(&db_config).await?;
 
@@ -38,21 +33,31 @@ impl Cmd for GraphOpt {
             }
         };
 
-        let graph = instance.dependency_graph();
+        match &self.focus_on {
+            None => {
+                let graph = instance.dependency_graph();
+                let dot =
+                    petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
 
-        if self.dependency_order {
-            for i in graph.externals(petgraph::Direction::Incoming) {
-                let mut dfs = petgraph::visit::DfsPostOrder::new(&graph, i);
-                while let Some(nx) = dfs.next(&graph) {
-                    let node = graph[nx].clone();
-                    println!("- {}", node);
-                }
+                println!("{}", dot);
             }
-        } else {
-            let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
+            Some(node_ref) => {
+                let graph = instance.dependency_graph();
 
-            println!("{}", dot);
-        }
+                let index = graph.node_indices().find(|i| graph[*i].to_string().eq(node_ref)).unwrap();
+
+                let mut dfs = DfsPostOrder::new(&graph, index);
+
+                let graph_map = GraphMap::from_iter(dfs.iter(&graph));
+
+                let dot = petgraph::dot::Dot::with_config(
+                    &graph_map,
+                    &[petgraph::dot::Config::EdgeNoLabel],
+                );
+
+                println!("{}", dot);
+            }
+        };
 
         Ok(())
     }

@@ -130,12 +130,18 @@ pub enum GraphNode {
     TrendMaterialization(String),
 }
 
+impl GraphNode {
+    pub fn matches_ref(&self, node_ref: &str) -> bool { 
+        self.to_string().eq(node_ref)
+    }
+}
+
 impl Display for GraphNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             GraphNode::TrendStorePart(name) => {
                 write!(f, "TrendStorePart({})", name)
-            },
+            }
             GraphNode::TrendMaterialization(name) => {
                 write!(f, "TrendMaterialization({})", name)
             }
@@ -312,11 +318,12 @@ impl MinervaInstance {
 
         Ok(())
     }
-    
-    pub fn dependency_graph(&self) -> petgraph::Graph::<GraphNode, String> {
+
+    pub fn dependency_graph(&self) -> petgraph::Graph<GraphNode, String> {
         let mut graph = petgraph::Graph::new();
 
-        let mut trend_store_part_node_map: HashMap<&str, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut trend_store_part_node_map: HashMap<&str, petgraph::graph::NodeIndex> =
+            HashMap::new();
 
         for trend_store in &self.trend_stores {
             for trend_store_part in &trend_store.parts {
@@ -326,32 +333,44 @@ impl MinervaInstance {
                 trend_store_part_node_map.insert(&trend_store_part.name, node_idx);
             }
         }
-        
+
         for trend_materialization in &self.trend_materializations {
             match trend_materialization {
                 TrendMaterialization::View(m) => {
-                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(m.target_trend_store_part.clone()));
-                    let source_index = trend_store_part_node_map.get(m.target_trend_store_part.as_str()).unwrap();
+                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
+                        m.target_trend_store_part.clone(),
+                    ));
+                    let source_index = trend_store_part_node_map
+                        .get(m.target_trend_store_part.as_str())
+                        .unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map.get(source.trend_store_part.as_str()).unwrap();
+                        let target_index = trend_store_part_node_map
+                            .get(source.trend_store_part.as_str())
+                            .unwrap();
                         graph.add_edge(materialization_node_idx, *target_index, "".to_string());
                     }
-                },
+                }
                 TrendMaterialization::Function(m) => {
-                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(m.target_trend_store_part.clone()));
-                    let source_index = trend_store_part_node_map.get(m.target_trend_store_part.as_str()).unwrap();
+                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
+                        m.target_trend_store_part.clone(),
+                    ));
+                    let source_index = trend_store_part_node_map
+                        .get(m.target_trend_store_part.as_str())
+                        .unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map.get(source.trend_store_part.as_str()).unwrap();
+                        let target_index = trend_store_part_node_map
+                            .get(source.trend_store_part.as_str())
+                            .unwrap();
                         graph.add_edge(materialization_node_idx, *target_index, "".to_string());
                     }
                 }
             }
         }
-        
+
         graph
     }
 
