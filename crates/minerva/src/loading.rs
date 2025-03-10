@@ -48,7 +48,7 @@ pub async fn load_data<P: AsRef<Path>>(
 ) -> Result<(), Error> {
     let description = json!({"csv-load": file_path.as_ref().to_string_lossy()});
 
-    let f = File::open(file_path).map_err(|e| format!("{}", e))?;
+    let f = File::open(file_path).map_err(|e| format!("{e}"))?;
 
     let reader = BufReader::new(f);
 

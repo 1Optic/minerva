@@ -37,7 +37,7 @@ impl From<DatabaseError> for TriggerError {
 }
 
 impl TriggerError {
-    pub fn to_database_error(self) -> DatabaseError {
+    #[must_use] pub fn to_database_error(self) -> DatabaseError {
         match self {
             TriggerError::DatabaseError(e) => e,
             TriggerError::NotFound(e) => e,
@@ -193,7 +193,7 @@ pub async fn list_triggers(conn: &mut Client) -> Result<Vec<TriggerRepr>, String
                 notification_store: notification_store.unwrap_or("UNDEFINED".into()),
                 granularity: granularity.unwrap_or("UNDEFINED".into()),
                 default_interval: default_interval.unwrap_or("UNDEFINED".into()),
-                description: description.unwrap_or("".to_string()),
+                description: description.unwrap_or_default(),
                 enabled,
             };
             Ok(trigger_row)
@@ -340,8 +340,8 @@ async fn create_type<T: GenericClient + Sync + Send>(
         ),
     ];
 
-    for data_column in trigger.kpi_data.iter() {
-        cols.push((data_column.name.clone(), data_column.data_type.clone()))
+    for data_column in &trigger.kpi_data {
+        cols.push((data_column.name.clone(), data_column.data_type.clone()));
     }
 
     let column_spec = cols
@@ -640,7 +640,7 @@ async fn create_mapping_functions<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> ChangeResult {
-    for mapping_function in trigger.mapping_functions.iter() {
+    for mapping_function in &trigger.mapping_functions {
         let query = format!(
             "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS SETOF timestamp with time zone AS $${}$$ LANGUAGE sql STABLE",
             escape_identifier(&mapping_function.name),
@@ -662,7 +662,7 @@ async fn link_trend_stores<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> ChangeResult {
-    for trend_store_link in trigger.trend_store_links.iter() {
+    for trend_store_link in &trigger.trend_store_links {
         let mapping_function = format!(
             "trend.{}(timestamp with time zone)",
             escape_identifier(&trend_store_link.mapping_function),
@@ -1302,7 +1302,7 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
         thresholds,
         trend_store_links,
         weight: weight_function_source,
-        description: description.unwrap_or("".to_string()),
+        description: description.unwrap_or_default(),
         enabled,
     })
 }
@@ -1340,7 +1340,7 @@ where
     T: GenericClient + Send + Sync,
     Ts: ToSql + Send + Sync,
 {
-    let query = format!("SELECT entity_id, timestamp::text, weight, details, data::text FROM trigger_rule.\"{}_create_notification\"($1::timestamptz)", name);
+    let query = format!("SELECT entity_id, timestamp::text, weight, details, data::text FROM trigger_rule.\"{name}_create_notification\"($1::timestamptz)");
 
     let query_args = [&timestamp as &(dyn ToSql + Sync)];
 
@@ -1630,7 +1630,7 @@ pub async fn load_thresholds_with_client(
     Ok(thresholds)
 }
 
-pub fn dump_trigger(trigger: &Trigger) -> String {
+#[must_use] pub fn dump_trigger(trigger: &Trigger) -> String {
     serde_json::to_string_pretty(trigger).unwrap()
 }
 

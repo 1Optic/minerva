@@ -31,8 +31,7 @@ impl fmt::Display for RemoveTrends {
                 .trends
                 .iter()
                 .map(|t| format!(" - {}\n", &t))
-                .collect::<Vec<String>>()
-                .join("")
+                .collect::<String>()
         )
     }
 }
@@ -108,8 +107,7 @@ impl fmt::Display for AddTrends {
                 .trends
                 .iter()
                 .map(|t| format!(" - {}: {}\n", &t.name, &t.data_type))
-                .collect::<Vec<String>>()
-                .join("")
+                .collect::<String>()
         )
     }
 }
@@ -240,8 +238,7 @@ impl fmt::Display for ModifyTrendDataTypes {
             self.modifications
                 .iter()
                 .map(|m| format!(" - {}: {} -> {}\n", m.trend_name, m.from_type, m.to_type))
-                .collect::<Vec<String>>()
-                .join(""),
+                .collect::<String>(),
         )
     }
 }
@@ -640,8 +637,7 @@ impl fmt::Display for AddTrendStore {
                 .parts
                 .iter()
                 .map(|part| format!(" - {}\n", &part.name))
-                .collect::<Vec<String>>()
-                .join("")
+                .collect::<String>()
         )
     }
 }

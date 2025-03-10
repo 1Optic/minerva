@@ -15,7 +15,7 @@ mod tests {
     use crate::common::get_available_port;
     use crate::common::{MinervaService, MinervaServiceConfig};
 
-    const TREND_STORE_DEFINITION_15M: &str = r###"
+    const TREND_STORE_DEFINITION_15M: &str = r"
     title: Raw node data
     data_source: hub
     entity_type: node
@@ -33,9 +33,9 @@ mod tests {
             data_type: numeric
           - name: freq_power
             data_type: numeric
-    "###;
+    ";
 
-    const TREND_STORE_DEFINITION_1D: &str = r###"
+    const TREND_STORE_DEFINITION_1D: &str = r"
     title: Raw node data
     data_source: hub
     entity_type: node
@@ -53,7 +53,7 @@ mod tests {
             data_type: numeric
           - name: freq_power
             data_type: numeric
-    "###;
+    ";
 
     #[tokio::test]
     async fn create_kpi() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,14 +77,14 @@ mod tests {
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION_15M)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 
             add_trend_store.apply(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION_1D)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 

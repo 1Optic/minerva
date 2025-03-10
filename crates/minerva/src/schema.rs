@@ -65,7 +65,7 @@ pub async fn migrate(client: &mut Client) -> Result<(), String> {
         println!("Already up-to-date");
     } else {
         for m in migrations {
-            println!("Applied: {}", m);
+            println!("Applied: {m}");
         }
     }
 

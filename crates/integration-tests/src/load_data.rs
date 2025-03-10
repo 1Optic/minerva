@@ -17,18 +17,18 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
-    const TEST_CSV_DATA: &str = r###"
+    const TEST_CSV_DATA: &str = r"
 node,timestamp,outside_temp,inside_temp,power_kwh,freq_power
 hillside14,2023-03-25T14:00:00Z,14.4,32.4,55.8,212.4
 hillside15,2023-03-25T14:00:00Z,14.5,32.5,55.9,212.5
-"###;
+";
 
-    const TEST_CSV_DATA_UPDATE_PARTIAL: &str = r###"
+    const TEST_CSV_DATA_UPDATE_PARTIAL: &str = r"
 node,timestamp,power_kwh,freq_power
 hillside15,2023-03-25T14:00:00Z,55.9,200.0
-"###;
+";
 
-    const TREND_STORE_DEFINITION: &str = r###"
+    const TREND_STORE_DEFINITION: &str = r"
     title: Raw node data
     data_source: hub
     entity_type: node
@@ -52,7 +52,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             description: test
             expression: power_kwh / 1000
 
-    "###;
+    ";
 
     #[tokio::test]
     async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
@@ -76,7 +76,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 
@@ -141,7 +141,7 @@ hillside15,2023-03-25T14:00:00Z,55.9,200.0
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 

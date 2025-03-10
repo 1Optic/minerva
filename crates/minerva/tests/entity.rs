@@ -60,7 +60,7 @@ mod tests {
             (start.elapsed(), entity_ids.len())
         };
 
-        println!("Duration: {:?}", elapsed);
+        println!("Duration: {elapsed:?}");
 
         assert_eq!(stored_count, 4);
 

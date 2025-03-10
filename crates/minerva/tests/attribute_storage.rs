@@ -14,7 +14,7 @@ mod tests {
     use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
 
-    const ATTRIBUTE_STORE_DEFINITION: &str = r###"
+    const ATTRIBUTE_STORE_DEFINITION: &str = r"
         data_source: hub
         entity_type: node
         attributes:
@@ -43,7 +43,7 @@ mod tests {
           unit: null
           description: Coordinate of equipment location
           extra_data: null
-        "###;
+        ";
 
     #[tokio::test]
     async fn load_attribute_data() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,7 +67,7 @@ mod tests {
             create_schema(&mut client).await?;
 
             let attribute_store: AttributeStore = serde_yaml::from_str(ATTRIBUTE_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddAttributeStore {
                 attribute_store: attribute_store.clone(),
@@ -79,8 +79,8 @@ mod tests {
             let rows = (0..500)
                 .map(|num| AttributeDataRow {
                     timestamp: Utc::now(),
-                    entity_name: format!("node_{}", num),
-                    values: vec![Some(format!("node_{}", num))],
+                    entity_name: format!("node_{num}"),
+                    values: vec![Some(format!("node_{num}"))],
                 })
                 .collect();
 
@@ -95,7 +95,7 @@ mod tests {
             (start.elapsed(), stored_count)
         };
 
-        println!("Duration: {:?}", elapsed);
+        println!("Duration: {elapsed:?}");
 
         assert_eq!(stored_count, 500);
 

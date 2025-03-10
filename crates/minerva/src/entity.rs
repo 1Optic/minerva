@@ -82,7 +82,7 @@ pub struct CachingEntityMapping {
 }
 
 impl CachingEntityMapping {
-    pub fn new(size: usize) -> Self {
+    #[must_use] pub fn new(size: usize) -> Self {
         CachingEntityMapping {
             cache: Cache::new(size),
         }

@@ -52,8 +52,7 @@ impl fmt::Display for AddAttributes {
             self.attributes
                 .iter()
                 .map(|att| format!(" - {}: {}\n", att.name, att.data_type))
-                .collect::<Vec<String>>()
-                .join(""),
+                .collect::<String>(),
         )
     }
 }
@@ -124,8 +123,7 @@ impl fmt::Display for RemoveAttributes {
             self.attributes
                 .iter()
                 .map(|att| format!(" - {att}\n"))
-                .collect::<Vec<String>>()
-                .join(""),
+                .collect::<String>(),
         )
     }
 }
@@ -256,7 +254,7 @@ pub struct AttributeStore {
 }
 
 impl AttributeStore {
-    pub fn diff(
+    #[must_use] pub fn diff(
         &self,
         other: &AttributeStore,
         options: AttributeStoreDiffOptions,
@@ -276,7 +274,7 @@ impl AttributeStore {
                         changes.push(Box::new(ChangeAttribute {
                             attribute_store: self.clone(),
                             attribute: other_attribute.clone(),
-                        }))
+                        }));
                     }
                 }
                 None => {
@@ -315,7 +313,7 @@ impl AttributeStore {
             changes.push(Box::new(RemoveAttributes {
                 attribute_store: self.clone(),
                 attributes: removed_attributes,
-            }))
+            }));
         }
 
         changes
@@ -462,7 +460,7 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
         attributes.push(Attribute {
             name: String::from(attribute_name),
             data_type: DataType::from(attribute_data_type),
-            description: attribute_description.unwrap_or(String::from("")),
+            description: attribute_description.unwrap_or_default(),
         });
     }
 

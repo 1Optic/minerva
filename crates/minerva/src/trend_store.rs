@@ -144,7 +144,7 @@ impl fmt::Display for Trend {
 }
 
 impl Trend {
-    pub fn sql_type(&self) -> Type {
+    #[must_use] pub fn sql_type(&self) -> Type {
         match self.data_type {
             DataType::Int2 => Type::INT2,
             DataType::Integer => Type::INT4,
@@ -157,7 +157,7 @@ impl Trend {
         }
     }
 
-    pub fn none_value(&self) -> MeasValue {
+    #[must_use] pub fn none_value(&self) -> MeasValue {
         match self.data_type {
             DataType::Int2 => MeasValue::Int2(None),
             DataType::Integer => MeasValue::Integer(None),
@@ -166,7 +166,7 @@ impl Trend {
             DataType::Real => MeasValue::Real(None),
             DataType::Double => MeasValue::Double(None),
             DataType::Timestamp => MeasValue::Timestamp(DateTime::default()),
-            _ => MeasValue::Text("".to_string()),
+            _ => MeasValue::Text(String::new()),
         }
     }
 
@@ -231,7 +231,7 @@ impl Trend {
                     Ok(MeasValue::Double(Some(f64::from_str(value).map_err(|e| Error::Runtime(RuntimeError { msg: format!("Could not parse floating point measurement value '{value}': {e}") }))?)))
                 }
             }
-            _ => Ok(MeasValue::Text("".to_string())),
+            _ => Ok(MeasValue::Text(String::new())),
         }
     }
 }
@@ -295,7 +295,7 @@ fn insert_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> String 
         .join(", ");
 
     let values_placeholders = (1..(trends.len() + 5))
-        .map(|i| format!("${}", i))
+        .map(|i| format!("${i}"))
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -499,7 +499,7 @@ impl MeasurementStore for TrendStorePart {
         U: DataPackage + std::marker::Sync,
     {
         match self.store_copy_from_package(client, data_package).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => match e {
                 Error::Database(dbe) => match dbe.kind {
                     DatabaseErrorKind::UniqueViolation => {
@@ -625,7 +625,7 @@ impl TrendStorePart {
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
 
         // Filter trends that match the trend store parts trends and add corresponding types
-        for t in self.trends.iter() {
+        for t in &self.trends {
             let index = trends.iter().position(|trend_name| trend_name == &t.name);
 
             if index.is_some() {
@@ -653,8 +653,7 @@ impl TrendStorePart {
 
         let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
             Error::Database(DatabaseError::from_msg(format!(
-                "Error starting COPY command: {}",
-                e
+                "Error starting COPY command: {e}"
             )))
         })?;
 
@@ -727,7 +726,7 @@ impl TrendStorePart {
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
 
         // Filter trends that match the trend store parts trends and add corresponding types
-        for t in self.trends.iter() {
+        for t in &self.trends {
             let index = data_package
                 .trends()
                 .iter()
@@ -755,8 +754,7 @@ impl TrendStorePart {
 
         let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
             Error::Database(DatabaseError::from_msg(format!(
-                "Error starting COPY command: {}",
-                e
+                "Error starting COPY command: {e}"
             )))
         })?;
 
@@ -809,7 +807,7 @@ impl TrendStorePart {
         let mut matched_trends: Vec<&Trend> = Vec::new();
 
         // Filter trends that match the trend store parts trends
-        for t in self.trends.iter() {
+        for t in &self.trends {
             let index = trends.iter().position(|trend_name| trend_name == &t.name);
 
             if index.is_some() {
@@ -838,8 +836,7 @@ impl TrendStorePart {
                             None => {
                                 // This should not be possible
                                 return Err(Error::Runtime(RuntimeError::from_msg(format!(
-                                    "Expected value not found at index {}",
-                                    index
+                                    "Expected value not found at index {index}"
                                 ))));
                             }
                         };
@@ -876,7 +873,7 @@ impl TrendStorePart {
         let mut values: Vec<(usize, DataType)> = Vec::new();
 
         // Filter trends that match the trend store parts trends
-        for t in self.trends.iter() {
+        for t in &self.trends {
             let index = data_package
                 .trends()
                 .iter()
@@ -908,7 +905,7 @@ impl TrendStorePart {
         Ok(())
     }
 
-    pub fn diff(
+    #[must_use] pub fn diff(
         &self,
         other: &TrendStorePart,
         options: TrendStorePartDiffOptions,
@@ -980,7 +977,7 @@ impl TrendStorePart {
             changes.push(Box::new(RemoveTrends {
                 trend_store_part: self.clone(),
                 trends: removed_trends,
-            }))
+            }));
         }
 
         if !alter_trend_data_types.is_empty() {
@@ -1008,7 +1005,7 @@ pub struct TrendStoreDiffOptions {
 }
 
 impl TrendStoreDiffOptions {
-    pub fn part_diff_options(&self) -> TrendStorePartDiffOptions {
+    #[must_use] pub fn part_diff_options(&self) -> TrendStorePartDiffOptions {
         TrendStorePartDiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
@@ -1032,7 +1029,7 @@ pub struct TrendStore {
 }
 
 impl TrendStore {
-    pub fn diff(
+    #[must_use] pub fn diff(
         &self,
         other: &TrendStore,
         options: TrendStoreDiffOptions,
@@ -1237,7 +1234,7 @@ async fn load_trend_store_parts<T: GenericClient>(
                 entity_aggregation: String::from(trend_entity_aggregation),
                 time_aggregation: String::from(trend_time_aggregation),
                 extra_data: trend_extra_data,
-            })
+            });
         }
 
         parts.push(TrendStorePart {

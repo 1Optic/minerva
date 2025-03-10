@@ -160,7 +160,7 @@ impl TrendViewMaterialization {
         Ok(())
     }
 
-    pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use] pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         // Comparing a view from the database with a view definition is not
@@ -275,11 +275,11 @@ pub async fn drop_materialization_view<T: GenericClient + Send + Sync>(
 }
 
 fn materialization_view_name(materialization_name: &str) -> String {
-    format!("_{}", materialization_name)
+    format!("_{materialization_name}")
 }
 
 fn fingerprint_function_name(materialization_name: &str) -> String {
-    format!("{}_fingerprint", materialization_name)
+    format!("{materialization_name}_fingerprint")
 }
 
 async fn create_fingerprint_function<T: GenericClient + Send + Sync>(
@@ -526,7 +526,7 @@ impl TrendFunctionMaterialization {
         .await?;
         self.define_materialization(client).await?;
         if self.enabled {
-            self.do_enable(client).await?
+            self.do_enable(client).await?;
         };
         self.connect_sources(client).await?;
 
@@ -579,7 +579,7 @@ impl TrendFunctionMaterialization {
         }
     }
 
-    pub fn diff(&self, _other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use] pub fn diff(&self, _other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
         Vec::new()
     }
 
@@ -688,7 +688,7 @@ impl fmt::Display for TrendMaterialization {
 }
 
 impl TrendMaterialization {
-    pub fn name(&self) -> &str {
+    #[must_use] pub fn name(&self) -> &str {
         match self {
             TrendMaterialization::View(m) => &m.target_trend_store_part,
             TrendMaterialization::Function(m) => &m.target_trend_store_part,
@@ -823,7 +823,7 @@ impl TrendMaterialization {
         }
     }
 
-    pub fn diff(&self, other: &TrendMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use] pub fn diff(&self, other: &TrendMaterialization) -> Vec<Box<dyn Change + Send>> {
         match self {
             TrendMaterialization::View(m) => match other {
                 TrendMaterialization::View(other_m) => m.diff(other_m),
@@ -890,7 +890,7 @@ pub fn load_materializations_from(
         })
 }
 
-pub fn map_sql_to_plpgsql(src: String) -> String {
+#[must_use] pub fn map_sql_to_plpgsql(src: String) -> String {
     [
         "BEGIN\n".into(),
         "RETURN QUERY EXECUTE $query$\n".into(),
@@ -933,8 +933,7 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
 
     if result.is_empty() {
         return Err(Error::Configuration(ConfigurationError::from_msg(format!(
-            "No materialization that matches name '{}'",
-            name
+            "No materialization that matches name '{name}'"
         ))));
     }
 
@@ -1480,7 +1479,7 @@ pub async fn get_function_return_type<T: GenericClient + Send + Sync>(
         .collect::<Vec<String>>()
         .join(",\n");
 
-    Some(format!("TABLE (\n{}\n)\n", columns_part))
+    Some(format!("TABLE (\n{columns_part}\n)\n"))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1589,7 +1588,7 @@ impl Change for UpdateTrendMaterialization {
         let mut tx = client.transaction().await?;
 
         match self.trend_materialization.update(&mut tx).await {
-            Ok(_) => {
+            Ok(()) => {
                 tx.commit().await?;
                 Ok(format!(
                     "Updated trend materialization '{}'",
@@ -1655,7 +1654,7 @@ pub async fn populate_source_fingerprint<T: GenericClient + Send + Sync>(
 
         let cte_name = format!("source_{}", index + 1);
 
-        let cte = format!("{} AS ({})", cte_name, query);
+        let cte = format!("{cte_name} AS ({query})");
 
         ctes.push(cte);
 
@@ -1820,7 +1819,7 @@ pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
     } else if deleted == 0 {
         return Err("No materializations deleted".to_string());
     } else {
-        return Err(format!("More than 1 materialization deleted ({})", deleted));
+        return Err(format!("More than 1 materialization deleted ({deleted})"));
     };
 
     drop_materialization_view(client, name)

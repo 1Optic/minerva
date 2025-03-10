@@ -19,7 +19,7 @@ mod tests {
         create_partitions_for_timestamp, DataPackage, MeasurementStore, TrendStore,
     };
 
-    const TREND_STORE_DEFINITION: &str = r###"
+    const TREND_STORE_DEFINITION: &str = r"
     title: Raw node data
     data_source: hub
     entity_type: node
@@ -43,7 +43,7 @@ mod tests {
             description: test
             expression: power_kwh / 1000
 
-    "###;
+    ";
 
     pub struct RefinedDataPackage {
         timestamp: DateTime<Utc>,
@@ -101,7 +101,7 @@ mod tests {
 
                 let row = self.rows.get(row_index).unwrap();
 
-                for (index, _data_type) in values.iter() {
+                for (index, _data_type) in values {
                     let v = row.get(*index).unwrap();
                     sql_values.push(v);
                 }
@@ -134,7 +134,7 @@ mod tests {
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore {
                 trend_store: trend_store.clone(),

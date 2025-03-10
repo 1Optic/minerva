@@ -89,7 +89,7 @@ pub struct NotificationStore {
 }
 
 impl NotificationStore {
-    pub fn diff(&self, other: &NotificationStore) -> Vec<Box<dyn Change + Send>> {
+    #[must_use] pub fn diff(&self, other: &NotificationStore) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         let mut new_attributes: Vec<Attribute> = Vec::new();
@@ -235,7 +235,7 @@ async fn load_attributes(conn: &mut Client, notification_store_id: i32) -> Vec<A
             Attribute {
                 name: String::from(attribute_name),
                 data_type: String::from(attribute_data_type),
-                description: attribute_description.unwrap_or(String::from("")),
+                description: attribute_description.unwrap_or_default(),
             }
         })
         .collect()

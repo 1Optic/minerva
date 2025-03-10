@@ -131,7 +131,7 @@ impl MinervaInstance {
 
         let triggers = load_triggers(client)
             .await
-            .map_err(|e| e.to_database_error())?;
+            .map_err(super::trigger::TriggerError::to_database_error)?;
 
         let entity_sets = load_entity_sets(client).await?;
 
@@ -187,7 +187,7 @@ impl MinervaInstance {
                 &format!("{}/custom/pre-init/**/*", instance_root.to_string_lossy()),
                 env,
             )
-            .await
+            .await;
         }
 
         initialize_attribute_stores(client, &self.attribute_stores).await?;
@@ -203,7 +203,7 @@ impl MinervaInstance {
                 ),
                 env,
             )
-            .await
+            .await;
         }
 
         initialize_notification_stores(client, &self.notification_stores).await?;
@@ -219,7 +219,7 @@ impl MinervaInstance {
                 ),
                 env,
             )
-            .await
+            .await;
         }
 
         initialize_relations(client, &self.relations).await?;
@@ -233,7 +233,7 @@ impl MinervaInstance {
                 ),
                 env,
             )
-            .await
+            .await;
         }
 
         initialize_trend_materializations(client, &self.trend_materializations).await?;
@@ -249,7 +249,7 @@ impl MinervaInstance {
                 ),
                 env,
             )
-            .await
+            .await;
         }
 
         initialize_triggers(client, &self.triggers).await?;
@@ -260,13 +260,13 @@ impl MinervaInstance {
                 &format!("{}/custom/post-init/**/*", instance_root.to_string_lossy()),
                 env,
             )
-            .await
+            .await;
         }
 
         Ok(())
     }
 
-    pub fn diff(
+    #[must_use] pub fn diff(
         &self,
         other: &MinervaInstance,
         options: DiffOptions,
@@ -644,10 +644,10 @@ async fn initialize_virtual_entities(
 
         match change.apply(client).await {
             Ok(message) => {
-                println!("{message}")
+                println!("{message}");
             }
             Err(e) => {
-                println!("{e}")
+                println!("{e}");
             }
         }
     }
@@ -661,10 +661,10 @@ async fn initialize_relations(client: &mut Client, relations: &Vec<Relation>) ->
 
         match change.apply(client).await {
             Ok(message) => {
-                println!("{message}")
+                println!("{message}");
             }
             Err(e) => {
-                println!("{e}")
+                println!("{e}");
             }
         }
     }
@@ -681,10 +681,10 @@ async fn initialize_attribute_materializations(
 
         match change.apply(client).await {
             Ok(message) => {
-                println!("{message}")
+                println!("{message}");
             }
             Err(e) => {
-                println!("{e}")
+                println!("{e}");
             }
         }
     }
@@ -700,10 +700,10 @@ async fn initialize_trend_materializations(
 
         match change.apply(client).await {
             Ok(message) => {
-                println!("{message}")
+                println!("{message}");
             }
             Err(e) => {
-                println!("{e}")
+                println!("{e}");
             }
         }
     }
@@ -720,10 +720,10 @@ async fn initialize_triggers(client: &mut Client, triggers: &Vec<Trigger>) -> Re
 
         match change.apply(client).await {
             Ok(message) => {
-                println!("{message}")
+                println!("{message}");
             }
             Err(e) => {
-                println!("Error creating trigger '{}': {}", trigger.name, e)
+                println!("Error creating trigger '{}': {}", trigger.name, e);
             }
         }
     }
@@ -827,13 +827,13 @@ where
                             let ext_str = ext.to_str().unwrap_or("");
                             match ext_str {
                                 "sql" => match load_sql(client, &path).await {
-                                    Ok(_) => println!("Executed sql '{}'", &path.to_string_lossy()),
+                                    Ok(()) => println!("Executed sql '{}'", &path.to_string_lossy()),
                                     Err(e) => {
                                         println!(
                                             "Error executing sql '{}': {}",
                                             &path.to_string_lossy(),
                                             e
-                                        )
+                                        );
                                     }
                                 },
                                 "psql" => match load_psql(&path) {
@@ -842,14 +842,14 @@ where
                                             "Executed '{}' with psql: {}",
                                             &path.to_string_lossy(),
                                             msg
-                                        )
+                                        );
                                     }
                                     Err(e) => {
                                         println!(
                                             "Error executing '{}' with psql: {}",
                                             &path.to_string_lossy(),
                                             e
-                                        )
+                                        );
                                     }
                                 },
                                 _ => {
@@ -861,7 +861,7 @@ where
                                                 "Error retrieving meta data for '{}': {}",
                                                 &path.to_string_lossy(),
                                                 e
-                                            )
+                                            );
                                         }
                                         Ok(metadata) => {
                                             if (metadata.permissions().mode() & 0o111) != 0 {
@@ -875,14 +875,14 @@ where
                                                             "Executed '{}': {}",
                                                             &path.to_string_lossy(),
                                                             msg
-                                                        )
+                                                        );
                                                     }
                                                     Err(e) => {
                                                         println!(
                                                             "Error executing '{}': {}",
                                                             &path.to_string_lossy(),
                                                             e
-                                                        )
+                                                        );
                                                     }
                                                 }
                                             } else {
@@ -899,7 +899,7 @@ where
                         None => {
                             println!(
                                 "A file without an extension should not have matched the glob patterns",
-                            )
+                            );
                         }
                     }
                 }

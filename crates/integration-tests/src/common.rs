@@ -90,25 +90,22 @@ impl MinervaService {
 
             debug!("Trying to connect to service at {}", ipv4_addr);
 
-            match result {
-                Ok(_) => return Ok(()),
-                Err(_) => {
-                    // Check if process is still running
-                    let wait_result = self.proc_handle.try_wait().map_err(|e| {
-                        RuntimeError::from_msg(format!("Could not wait for service exit: {e}"))
-                    })?;
+            if let Ok(_) = result { return Ok(()) } else {
+                // Check if process is still running
+                let wait_result = self.proc_handle.try_wait().map_err(|e| {
+                    RuntimeError::from_msg(format!("Could not wait for service exit: {e}"))
+                })?;
 
-                    if let Some(status) = wait_result {
-                        panic!("Service prematurely exited with code: {status}");
-                    }
-
-                    tokio::time::sleep(timeout).await;
+                if let Some(status) = wait_result {
+                    panic!("Service prematurely exited with code: {status}");
                 }
+
+                tokio::time::sleep(timeout).await;
             }
         }
     }
 
-    pub fn base_url(&self) -> String {
+    #[must_use] pub fn base_url(&self) -> String {
         format!(
             "http://{}:{}",
             self.conf.service_address, self.conf.service_port
@@ -118,9 +115,6 @@ impl MinervaService {
 
 impl Drop for MinervaService {
     fn drop(&mut self) {
-        match self.proc_handle.kill() {
-            Err(e) => error!("Could not stop web service: {e}"),
-            Ok(()) => debug!("Stopped web service"),
-        }
+        if let Err(e) = self.proc_handle.kill() { error!("Could not stop web service: {e}") } else { debug!("Stopped web service") }
     }
 }

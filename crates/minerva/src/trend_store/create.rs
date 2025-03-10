@@ -263,8 +263,7 @@ pub async fn create_base_table<T: GenericClient>(
     client.execute(&create_table_query, &[]).await?;
 
     let alter_table_add_primary_key_query = format!(
-        "ALTER TABLE {}.{} ADD PRIMARY KEY (entity_id, \"timestamp\")",
-        base_table_schema, base_table_name,
+        "ALTER TABLE {base_table_schema}.{base_table_name} ADD PRIMARY KEY (entity_id, \"timestamp\")",
     );
 
     client
@@ -272,22 +271,19 @@ pub async fn create_base_table<T: GenericClient>(
         .await?;
 
     let create_job_id_index_query = format!(
-        "CREATE INDEX ON {}.{} USING btree (job_id)",
-        base_table_schema, base_table_name,
+        "CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (job_id)",
     );
 
     client.execute(&create_job_id_index_query, &[]).await?;
 
     let create_timestamp_index_query = format!(
-        "CREATE INDEX ON {}.{} USING btree (timestamp)",
-        base_table_schema, base_table_name,
+        "CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (timestamp)",
     );
 
     client.execute(&create_timestamp_index_query, &[]).await?;
 
     let create_distributed_table_query = format!(
-        "SELECT create_distributed_table('{}.{}', 'entity_id')",
-        base_table_schema, base_table_name,
+        "SELECT create_distributed_table('{base_table_schema}.{base_table_name}', 'entity_id')",
     );
 
     client.execute(&create_distributed_table_query, &[]).await?;
@@ -311,17 +307,13 @@ pub async fn create_staging_table<T: GenericClient>(
     let columns_part = column_specs.join(",");
 
     let create_table_query = format!(
-        "CREATE UNLOGGED TABLE {}.{}(entity_id integer, \"timestamp\" timestamp with time zone, created timestamp with time zone, job_id bigint, {})",
-        staging_table_schema,
-        staging_table_name,
-        columns_part,
+        "CREATE UNLOGGED TABLE {staging_table_schema}.{staging_table_name}(entity_id integer, \"timestamp\" timestamp with time zone, created timestamp with time zone, job_id bigint, {columns_part})",
     );
 
     client.execute(&create_table_query, &[]).await?;
 
     let add_primary_key_query = format!(
-        "ALTER TABLE ONLY {}.{} ADD PRIMARY KEY (entity_id, \"timestamp\")",
-        staging_table_schema, staging_table_name,
+        "ALTER TABLE ONLY {staging_table_schema}.{staging_table_name} ADD PRIMARY KEY (entity_id, \"timestamp\")",
     );
 
     client.execute(&add_primary_key_query, &[]).await?;

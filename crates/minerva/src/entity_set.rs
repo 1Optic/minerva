@@ -106,11 +106,11 @@ pub async fn load_entity_sets(conn: &mut Client) -> Result<Vec<EntitySet>, Strin
             group: row.get(1),
             entity_type: row.get(2),
             owner: row.get(3),
-            description: row.try_get(4).unwrap_or("".into()),
+            description: row.try_get(4).unwrap_or(String::new()),
             entities,
             created: row.get(6),
             modified: row.get(7),
-        })
+        });
     }
 
     Ok(entity_sets)
@@ -142,7 +142,7 @@ pub async fn load_entity_set(conn: &mut Client, id: &i32) -> Result<EntitySet, S
         group: row.get(1),
         entity_type: row.get(2),
         owner: row.get(3),
-        description: row.try_get(4).unwrap_or("".into()),
+        description: row.try_get(4).unwrap_or(String::new()),
         entities: entitydata.get(0),
         created: row.get(5),
         modified: row.get(6),
@@ -168,92 +168,87 @@ impl EntitySet {
         if self.entity_type != foundentitytype {
             incorrect_fields.push("entity_type".to_string());
             Err(EntitySetError::UnchangeableFields(incorrect_fields))
-        } else {
-            match self.entities.len() {
-                0 => Err(EntitySetError::EmptyEntitySet),
-                _ => {
-                    let entitieslist = self.entities.join("', '");
+        } else if self.entities.is_empty() { Err(EntitySetError::EmptyEntitySet) } else {
+            let entitieslist = self.entities.join("', '");
 
-                    let query = format!(
-                        concat!("SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])"),
-                        self.id.to_string(),
-                        entitieslist
-                    );
-                    println!("{}", query);
-                    let row = conn.query_one(&query, &[]).await.map_err(|e| {
-                        EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
-                    })?;
+            let query = format!(
+                concat!("SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])"),
+                self.id.to_string(),
+                entitieslist
+            );
+            println!("{query}");
+            let row = conn.query_one(&query, &[]).await.map_err(|e| {
+                EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+            })?;
 
-                    let missing_entities: Vec<String> = row.get(0);
-                    if missing_entities.is_empty() {
-                        let query = "SELECT attribute_directory.transfer_staged(at) FROM attribute_directory.attribute_store at WHERE at::text = 'minerva_entity_set'";
-                        println!("{}", query);
-                        conn.execute(query, &[]).await.map_err(|e| {
-                            EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
-                        })?;
+            let missing_entities: Vec<String> = row.get(0);
+            if missing_entities.is_empty() {
+                let query = "SELECT attribute_directory.transfer_staged(at) FROM attribute_directory.attribute_store at WHERE at::text = 'minerva_entity_set'";
+                println!("{query}");
+                conn.execute(query, &[]).await.map_err(|e| {
+                    EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                })?;
 
-                        let query = concat!(
-                            "WITH data AS (SELECT max(id) AS lastid FROM attribute_history.minerva_entity_set WHERE entity_id = $1) ",
-                            "UPDATE attribute_history.minerva_entity_set ",
-                            "SET name = $2, fullname = $3, \"group\" = $4, owner = $5, description = $6 ",
-                            "FROM data WHERE id = lastid",
-                        );
+                let query = concat!(
+                    "WITH data AS (SELECT max(id) AS lastid FROM attribute_history.minerva_entity_set WHERE entity_id = $1) ",
+                    "UPDATE attribute_history.minerva_entity_set ",
+                    "SET name = $2, fullname = $3, \"group\" = $4, owner = $5, description = $6 ",
+                    "FROM data WHERE id = lastid",
+                );
 
-                        if !self.owner.is_empty() {
-                            owner = self.owner.to_string()
-                        };
-                        if !self.description.is_empty() {
-                            description = self.description.to_string()
-                        }
-
-                        conn.execute(
-                            query,
-                            &[
-                                &self.id,
-                                &self.name,
-                                &format!("{}__{}", &self.name, &self.owner),
-                                &self.group,
-                                &owner,
-                                &description,
-                            ],
-                        )
-                        .await
-                        .map_err(|e| {
-                            EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
-                        })?;
-
-                        let query = "SELECT attribute_directory.materialize_curr_ptr(at) FROM attribute_directory.attribute_store at WHERE at::text = 'minerva_entity_set'";
-                        println!("{}", query);
-                        conn.execute(query, &[]).await.map_err(|e| {
-                            EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
-                        })?;
-
-                        println!(
-                            "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE entity_id = {}",
-                            &self.id,
-                        );
-
-                        let newdata = conn.query_one(
-                            "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE entity_id = $1",
-                                &[&self.id,])
-                            .await
-                            .map_err(|e| EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
-                        let changed_entity_set = EntitySet {
-                            id: self.id,
-                            name: newdata.get(0),
-                            group: newdata.get(1),
-                            entity_type: newdata.get(2),
-                            owner: newdata.get(3),
-                            description: newdata.get(4),
-                            entities: self.entities.to_vec(),
-                            created: newdata.get(5),
-                            modified: newdata.get(5),
-                        };
-                        Ok(changed_entity_set)
-                    } else {
-                        Err(EntitySetError::MissingEntities(missing_entities))
-                    }
+                if !self.owner.is_empty() {
+                    owner = self.owner.to_string();
+                };
+                if !self.description.is_empty() {
+                    description = self.description.to_string();
                 }
+
+                conn.execute(
+                    query,
+                    &[
+                        &self.id,
+                        &self.name,
+                        &format!("{}__{}", &self.name, &self.owner),
+                        &self.group,
+                        &owner,
+                        &description,
+                    ],
+                )
+                .await
+                .map_err(|e| {
+                    EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                })?;
+
+                let query = "SELECT attribute_directory.materialize_curr_ptr(at) FROM attribute_directory.attribute_store at WHERE at::text = 'minerva_entity_set'";
+                println!("{query}");
+                conn.execute(query, &[]).await.map_err(|e| {
+                    EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string()))
+                })?;
+
+                println!(
+                    "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE entity_id = {}",
+                    &self.id,
+                );
+
+                let newdata = conn.query_one(
+                    "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE entity_id = $1",
+                        &[&self.id,])
+                    .await
+                    .map_err(|e| EntitySetError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
+                let changed_entity_set = EntitySet {
+                    id: self.id,
+                    name: newdata.get(0),
+                    group: newdata.get(1),
+                    entity_type: newdata.get(2),
+                    owner: newdata.get(3),
+                    description: newdata.get(4),
+                    entities: self.entities.clone(),
+                    created: newdata.get(5),
+                    modified: newdata.get(5),
+                };
+                Ok(changed_entity_set)
+            } else {
+                Err(EntitySetError::MissingEntities(missing_entities))
             }
         }
     }
@@ -374,7 +369,7 @@ impl NewEntitySet {
                 entity_type: self.entity_type.clone(),
                 owner: self.owner.clone(),
                 description: self.description.clone(),
-                entities: self.entities.to_vec(),
+                entities: self.entities.clone(),
                 created: iddata.get(1),
                 modified: iddata.get(2),
             };

@@ -28,41 +28,38 @@ pub struct ClusterConfig {
 }
 
 pub fn get_db_config() -> Result<Config, Error> {
-    let config = match env::var(ENV_DB_CONN) {
-        Ok(value) => Config::new().options(&value).clone(),
-        Err(_) => {
-            // No single environment variable set, let's check for psql settings
-            let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
-            let mut config = Config::new();
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) { Config::new().options(&value).clone() } else {
+        // No single environment variable set, let's check for psql settings
+        let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
+        let mut config = Config::new();
 
-            let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
+        let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
 
-            let sslmode = match env_sslmode.to_lowercase().as_str() {
-                "disable" => SslMode::Disable,
-                "prefer" => SslMode::Prefer,
-                "require" => SslMode::Require,
-                _ => {
-                    return Err(Error::Configuration(ConfigurationError {
-                        msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                    }))
-                }
-            };
-
-            let default_user_name = env::var("USER").unwrap_or("postgres".into());
-
-            let config = config
-                .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
-                .port(port)
-                .user(env::var("PGUSER").unwrap_or(default_user_name))
-                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
-                .ssl_mode(sslmode);
-
-            let pg_password = env::var("PGPASSWORD");
-
-            match pg_password {
-                Ok(password) => config.password(password).clone(),
-                Err(_) => config.clone(),
+        let sslmode = match env_sslmode.to_lowercase().as_str() {
+            "disable" => SslMode::Disable,
+            "prefer" => SslMode::Prefer,
+            "require" => SslMode::Require,
+            _ => {
+                return Err(Error::Configuration(ConfigurationError {
+                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                }))
             }
+        };
+
+        let default_user_name = env::var("USER").unwrap_or("postgres".into());
+
+        let config = config
+            .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
+            .port(port)
+            .user(env::var("PGUSER").unwrap_or(default_user_name))
+            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
+            .ssl_mode(sslmode);
+
+        let pg_password = env::var("PGPASSWORD");
+
+        match pg_password {
+            Ok(password) => config.password(password).clone(),
+            Err(_) => config.clone(),
         }
     };
 

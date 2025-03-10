@@ -142,7 +142,7 @@ impl MaterializationChunk {
                 .partition_statistics(client, &self.timestamp)
                 .await
             {
-                Ok(partition_stats) => if let Some(_) = partition_stats.stats {} else {
+                Ok(partition_stats) => if partition_stats.stats.is_some() {} else {
                     let result = partition_stats.analyze_timestamp(client).await;
 
                     match result {
