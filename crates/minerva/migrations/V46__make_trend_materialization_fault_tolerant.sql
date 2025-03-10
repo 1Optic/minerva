@@ -21,3 +21,11 @@ JOIN trend_store_part_columns AS t ON t.name = f.name
 $$ LANGUAGE sql STABLE;
 
 COMMENT ON FUNCTION "trend_directory"."function_materialization_columns"("materialization_id" integer) IS 'Return the names of column that are both in the target trend store part and materialization function to be used in queries';
+
+CREATE OR REPLACE FUNCTION "trend_directory"."function_materialization_columns_part"("materialization_id" integer)
+    RETURNS text
+AS $$
+SELECT
+  array_to_string(array_agg(quote_ident(name)), ', ')
+FROM trend_directory.function_materialization_columns($1);
+$$ LANGUAGE sql STABLE;
