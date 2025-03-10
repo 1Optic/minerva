@@ -1026,6 +1026,8 @@ pub struct TrendStore {
     pub granularity: Duration,
     #[serde(with = "humantime_serde")]
     pub partition_size: Duration,
+    #[serde(with = "humantime_serde")]
+    pub retention_period: Duration,
     pub parts: Vec<TrendStorePart>,
 }
 
@@ -1158,7 +1160,7 @@ pub async fn load_trend_store<T: GenericClient>(
     granularity: &Duration,
 ) -> Result<TrendStore, Error> {
     let query = concat!(
-        "SELECT trend_store.id, partition_size::text ",
+        "SELECT trend_store.id, partition_size::text, retention_period::text ",
         "FROM trend_directory.trend_store ",
         "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
         "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
@@ -1175,6 +1177,8 @@ pub async fn load_trend_store<T: GenericClient>(
 
     let partition_size_str = result.get::<usize, String>(1);
     let partition_size = parse_interval(&partition_size_str).unwrap();
+    let retention_period_str = result.get::<usize, String>(2);
+    let retention_period = parse_interval(&retention_period_str).unwrap();
 
     Ok(TrendStore {
         title: None,
@@ -1182,6 +1186,7 @@ pub async fn load_trend_store<T: GenericClient>(
         entity_type: String::from(entity_type),
         granularity: *granularity,
         partition_size,
+        retention_period,
         parts,
     })
 }
@@ -1249,7 +1254,7 @@ pub async fn load_trend_stores(conn: &mut Client) -> Result<Vec<TrendStore>, Err
     let mut trend_stores: Vec<TrendStore> = Vec::new();
 
     let query = concat!(
-        "SELECT trend_store.id, data_source.name, entity_type.name, granularity::text, partition_size::text ",
+        "SELECT trend_store.id, data_source.name, entity_type.name, granularity::text, partition_size::text, retention_period::text ",
         "FROM trend_directory.trend_store ",
         "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
         "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id"
@@ -1263,6 +1268,7 @@ pub async fn load_trend_stores(conn: &mut Client) -> Result<Vec<TrendStore>, Err
         let entity_type: &str = row.get(2);
         let granularity_str: String = row.get(3);
         let partition_size_str: String = row.get(4);
+        let retention_period_str: String = row.get(5);
         let parts = load_trend_store_parts(conn, trend_store_id).await;
 
         // Hack for humankind parsing compatibility with PostgreSQL interval
@@ -1281,12 +1287,20 @@ pub async fn load_trend_stores(conn: &mut Client) -> Result<Vec<TrendStore>, Err
             ))
         })?;
 
+        let retention_period = parse_interval(&retention_period_str).map_err(|e| {
+            RuntimeError::from_msg(format!(
+                "Error parsing retention period '{}': {}",
+                &retention_period_str, e
+            ))
+        })?;
+
         trend_stores.push(TrendStore {
             title: None,
             data_source: String::from(data_source),
             entity_type: String::from(entity_type),
             granularity,
             partition_size,
+            retention_period,
             parts,
         });
     }

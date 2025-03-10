@@ -24,6 +24,7 @@ data_source: hub
 entity_type: node
 granularity: 15m
 partition_size: 1d
+retention_period: 10y
 parts:
   - name: hub_node_main_15m
     trends:
@@ -42,6 +43,7 @@ data_source: hub
 entity_type: node
 granularity: 1h
 partition_size: 1d
+retention_period: 10y
 parts:
   - name: hub_node_main_1h
     trends:
@@ -60,7 +62,7 @@ target_trend_store_part: hub_node_main_1h
 enabled: true
 processing_delay: 30m
 stability_delay: 5m
-reprocessing_period: 3 days
+reprocessing_period: 10 years
 sources:
 - trend_store_part: hub_node_main_15m
   mapping_function: trend.mapping_15m->1h
@@ -72,7 +74,6 @@ function:
       samples smallint,
       "outside_temp" numeric,
       "inside_temp" numeric,
-      "power_kwh" numeric,
       "freq_power" numeric
     )
   src: |
@@ -84,7 +85,6 @@ function:
           (count(*))::smallint AS samples,
           SUM(t."outside_temp")::numeric AS "outside_temp",
           SUM(t."inside_temp")::numeric AS "inside_temp",
-          SUM(t."power_kwh")::numeric AS "power_kwh",
           SUM(t."freq_power")::numeric AS "freq_power"
         FROM trend."hub_node_main_15m" AS t
         WHERE $1 < timestamp AND timestamp <= $2
@@ -156,11 +156,12 @@ description: {}
 
         client.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (1, '2024-12-12T09:15:00+00:00', now(), 42, 4.5, 19.2, 34, 559)", &[]).await?;
         client.execute("INSERT INTO trend_directory.modified(trend_store_part_id, timestamp, first, last) SELECT id, '2024-12-12T09:15:00+00:00', '2024-12-12T09:21:33+00:00', '2024-12-12T09:26:56+00:00' FROM trend_directory.trend_store_part tsp WHERE tsp.name = 'hub_node_main_15m'", &[]).await?;
+        client.execute("SELECT * FROM trend_directory.process_modified_log()", &[]).await?;
 
         let executable_path = cargo_bin("minerva");
         let mut cmd = Command::new(executable_path.clone())
             .stdout(std::process::Stdio::piped())
-            .env("RUST_LOG", "debug")
+            .env("RUST_LOG", "info")
             .env("PGSSLMODE", "disable")
             .env("PGUSER", "postgres")
             .env("PGHOST", cluster.controller_host.to_string())
@@ -191,7 +192,7 @@ description: {}
             _ = tokio::time::sleep(Duration::from_millis(15000)) => { "Timeout".to_string() },
         };
 
-        println!("Done running service: {:?}", check_result);
+        assert!(check_result.contains("Ok"));
 
         Ok(())
     }
