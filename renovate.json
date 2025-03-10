@@ -3,6 +3,7 @@
   "extends": [
     "config:best-practices"
   ],
+  "labels": ["dependency"],
   "packageRules": [
     {
       "matchDatasources": [
