@@ -43,13 +43,14 @@ pub async fn create_trend_store<T: GenericClient>(
 
     let insert_trend_store_query = concat!(
         "INSERT INTO trend_directory.trend_store (",
-        "data_source_id, entity_type_id, granularity, partition_size) ",
-        "VALUES ($1, $2, $3::text::interval, $4::text::interval) ",
+        "data_source_id, entity_type_id, granularity, partition_size, retention_period) ",
+        "VALUES ($1, $2, $3::text::interval, $4::text::interval, $5::text::interval) ",
         "RETURNING id"
     );
 
     let granularity_str: String = format_duration(trend_store.granularity).to_string();
     let partition_size_str = format_duration(trend_store.partition_size).to_string();
+    let retention_period_str = format_duration(trend_store.retention_period).to_string();
 
     let rows = client
         .query(
@@ -59,6 +60,7 @@ pub async fn create_trend_store<T: GenericClient>(
                 &entity_type_id,
                 &granularity_str,
                 &partition_size_str,
+                &retention_period_str,
             ],
         )
         .await?;

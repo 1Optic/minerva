@@ -42,6 +42,7 @@ mod tests {
                 entity_type: "pvpanel".to_string(),
                 granularity: Duration::from_secs(300),
                 partition_size: Duration::from_secs(86400),
+                retention_period: Duration::from_secs(86400 * 365),
                 parts: [].to_vec(),
             };
 

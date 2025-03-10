@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.24.0] - 2025-03-10
+
+### Changed
+
+- Library: Added retention_period to the trend store definition instead of
+  always using a default.
+- DB Schema: Made trend function materialization more robust by only
+  materializing columns that are defined in the materialization logic.
+
 ## [9.23.0] - 2025-03-04
 
 ### Added
@@ -352,4 +361,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.21.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.2...9.21.3
 [9.22.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.3...9.22.0
 [9.23.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.22.0...9.23.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.23.0...HEAD
+[9.24.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.23.0...9.24.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.24.0...HEAD

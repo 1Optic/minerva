@@ -3,6 +3,7 @@ data_source: hub
 entity_type: node
 granularity: 1w
 partition_size: 1y
+retention_period: 2years 
 parts:
 - name: hub_node_main_1w
   trends:
