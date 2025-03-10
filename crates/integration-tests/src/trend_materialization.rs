@@ -156,7 +156,9 @@ description: {}
 
         client.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (1, '2024-12-12T09:15:00+00:00', now(), 42, 4.5, 19.2, 34, 559)", &[]).await?;
         client.execute("INSERT INTO trend_directory.modified(trend_store_part_id, timestamp, first, last) SELECT id, '2024-12-12T09:15:00+00:00', '2024-12-12T09:21:33+00:00', '2024-12-12T09:26:56+00:00' FROM trend_directory.trend_store_part tsp WHERE tsp.name = 'hub_node_main_15m'", &[]).await?;
-        client.execute("SELECT * FROM trend_directory.process_modified_log()", &[]).await?;
+        client
+            .execute("SELECT * FROM trend_directory.process_modified_log()", &[])
+            .await?;
 
         let executable_path = cargo_bin("minerva");
         let mut cmd = Command::new(executable_path.clone())
