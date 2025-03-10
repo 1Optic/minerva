@@ -25,6 +25,7 @@ mod tests {
     entity_type: node
     granularity: 15m
     partition_size: 1d
+    retention_period: 6mon
     parts:
       - name: hub_node_main_15m
         trends:
