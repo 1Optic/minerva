@@ -76,8 +76,8 @@ CREATE TEMP TABLE compact_info (
     client.execute(create_tmp_table_query, &[]).await.unwrap();
 
     let insert_count = if let Some(max_records) = limit {
-                let query = format!(
-                    r#"
+        let query = format!(
+            r#"
     INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
     SELECT
         id, first_id, last_id, timestamp, modified
@@ -116,15 +116,15 @@ CREATE TEMP TABLE compact_info (
         ) runs
     ) to_compact WHERE run_length > 1
     "#
-                );
+        );
 
-                client
-                    .execute(&query, &[&(max_records as i64)])
-                    .await
-                    .unwrap()
-            } else {
-                let query = format!(
-                    r#"
+        client
+            .execute(&query, &[&(max_records as i64)])
+            .await
+            .unwrap()
+    } else {
+        let query = format!(
+            r#"
     INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
     SELECT
         id, first_id, last_id, timestamp, modified
@@ -162,14 +162,12 @@ CREATE TEMP TABLE compact_info (
         ) runs
     ) to_compact WHERE run_length > 1
     "#
-                );
+        );
 
-                client.execute(&query, &[]).await.unwrap()
-            };
+        client.execute(&query, &[]).await.unwrap()
+    };
 
-    println!(
-        "Inserted {insert_count} records to compact into temporary table"
-    );
+    println!("Inserted {insert_count} records to compact into temporary table");
 
     let update_history_query = format!(
         r#"
@@ -184,9 +182,7 @@ WHERE compact_info.first_id = history.id AND compact_info.id = compact_info.last
 
     let history_table = format!("attribute_history.\"{attribute_store_name}\"");
 
-    println!(
-        "Updated {updated_count} records in history table '{history_table}'"
-    );
+    println!("Updated {updated_count} records in history table '{history_table}'");
 
     let delete_query = format!(
         r"
@@ -199,9 +195,7 @@ AND compact_info.id <> compact_info.first_id",
 
     let delete_count = client.execute(&delete_query, &[]).await.unwrap();
 
-    println!(
-        "Deleted {delete_count} records from history table '{history_table}'"
-    );
+    println!("Deleted {delete_count} records from history table '{history_table}'");
 
     if updated_count > 0 || delete_count > 0 {
         mark_attribute_store_modified(client, attribute_store_id)

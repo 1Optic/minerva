@@ -21,7 +21,8 @@ pub trait Cmd {
     async fn run(&self) -> CmdResult;
 }
 
-#[must_use] pub fn show_db_config(config: &Config) -> String {
+#[must_use]
+pub fn show_db_config(config: &Config) -> String {
     let hosts = config.get_hosts();
 
     let host = match &hosts[0] {
@@ -53,7 +54,9 @@ pub trait Cmd {
 }
 
 pub fn get_db_config() -> Result<Config, Error> {
-    let config = if let Ok(value) = env::var(ENV_DB_CONN) { Config::new().options(&value).clone() } else {
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) {
+        Config::new().options(&value).clone()
+    } else {
         // No single environment variable set, let's check for psql settings
         let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
         let mut config = Config::new();

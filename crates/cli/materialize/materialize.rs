@@ -142,21 +142,24 @@ impl MaterializationChunk {
                 .partition_statistics(client, &self.timestamp)
                 .await
             {
-                Ok(partition_stats) => if partition_stats.stats.is_some() {} else {
-                    let result = partition_stats.analyze_timestamp(client).await;
+                Ok(partition_stats) => {
+                    if partition_stats.stats.is_some() {
+                    } else {
+                        let result = partition_stats.analyze_timestamp(client).await;
 
-                    match result {
-                        Ok(_) => {
-                            println!("Updated statistics of '{}'", &partition_stats.name);
-                        }
-                        Err(e) => {
-                            println!(
-                                "Error updating statistics of '{}': {}",
-                                &partition_stats.name, e
-                            );
+                        match result {
+                            Ok(_) => {
+                                println!("Updated statistics of '{}'", &partition_stats.name);
+                            }
+                            Err(e) => {
+                                println!(
+                                    "Error updating statistics of '{}': {}",
+                                    &partition_stats.name, e
+                                );
+                            }
                         }
                     }
-                },
+                }
                 Err(e) => println!(
                     "Could not fetch or create statistics of {} - {}: {}",
                     &materialization_source, &self.timestamp, e

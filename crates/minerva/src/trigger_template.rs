@@ -103,7 +103,8 @@ impl From<Template> for BareTemplate {
 }
 
 impl Template {
-    #[must_use] pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
+    #[must_use]
+    pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
         self.parameters
             .into_iter()
             .find(|p| p.name == parameter_name)
@@ -157,7 +158,8 @@ impl TemplatedTrigger {
         Ok(())
     }
 
-    #[must_use] pub fn adapted_parameter_name(&self, parameter: &ParameterValue) -> String {
+    #[must_use]
+    pub fn adapted_parameter_name(&self, parameter: &ParameterValue) -> String {
         match self
             .template
             .parameters
@@ -311,7 +313,9 @@ impl TemplatedTrigger {
             escape_identifier(&self.entity_type)
         ));
 
-        let description = if let Some(value) = &self.description { value.to_string() } else {
+        let description = if let Some(value) = &self.description {
+            value.to_string()
+        } else {
             let mut description_from_template = self.template.description.clone();
             for parameter in &self.parameters {
                 description_from_template = description_from_template

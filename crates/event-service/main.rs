@@ -101,7 +101,9 @@ impl fmt::Display for Notification {
 }
 
 fn get_db_config() -> Result<TokioConfig, String> {
-    let config = if let Ok(value) = env::var(ENV_DB_CONN) { TokioConfig::new().options(&value).clone() } else {
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) {
+        TokioConfig::new().options(&value).clone()
+    } else {
         // No single environment variable set, let's check for psql settings
         let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
         let mut config = TokioConfig::new();

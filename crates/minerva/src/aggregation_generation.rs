@@ -498,9 +498,8 @@ fn generate_time_aggregation(
         &source_granularity_suffix,
     )?;
 
-    let mapping_function = format!(
-        "trend.mapping_{source_granularity_suffix}->{target_granularity_suffix}"
-    );
+    let mapping_function =
+        format!("trend.mapping_{source_granularity_suffix}->{target_granularity_suffix}");
 
     let parts: Vec<AggregationPart> = trend_store
         .parts

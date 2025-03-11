@@ -22,7 +22,8 @@ fn map_error_kind(sql_state: &SqlState) -> DatabaseErrorKind {
 }
 
 impl DatabaseError {
-    #[must_use] pub fn from_msg(msg: String) -> DatabaseError {
+    #[must_use]
+    pub fn from_msg(msg: String) -> DatabaseError {
         DatabaseError {
             msg,
             kind: DatabaseErrorKind::Default,
@@ -47,7 +48,8 @@ pub struct ConfigurationError {
 }
 
 impl ConfigurationError {
-    #[must_use] pub fn from_msg(msg: String) -> ConfigurationError {
+    #[must_use]
+    pub fn from_msg(msg: String) -> ConfigurationError {
         ConfigurationError { msg }
     }
 }
@@ -58,7 +60,8 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    #[must_use] pub fn from_msg(msg: String) -> RuntimeError {
+    #[must_use]
+    pub fn from_msg(msg: String) -> RuntimeError {
         RuntimeError { msg }
     }
 }

@@ -191,7 +191,9 @@ impl TrendStoreBasicData {
         )
         .await;
 
-        if let Ok(trendstore) = result { Ok(trendstore) } else {
+        if let Ok(trendstore) = result {
+            Ok(trendstore)
+        } else {
             let new_trend_store = TrendStore {
                 title: None,
                 data_source: self.data_source.clone(),

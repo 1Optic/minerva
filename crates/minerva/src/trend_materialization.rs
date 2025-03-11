@@ -160,7 +160,8 @@ impl TrendViewMaterialization {
         Ok(())
     }
 
-    #[must_use] pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use]
+    pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         // Comparing a view from the database with a view definition is not
@@ -579,7 +580,8 @@ impl TrendFunctionMaterialization {
         }
     }
 
-    #[must_use] pub fn diff(&self, _other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use]
+    pub fn diff(&self, _other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
         Vec::new()
     }
 
@@ -688,7 +690,8 @@ impl fmt::Display for TrendMaterialization {
 }
 
 impl TrendMaterialization {
-    #[must_use] pub fn name(&self) -> &str {
+    #[must_use]
+    pub fn name(&self) -> &str {
         match self {
             TrendMaterialization::View(m) => &m.target_trend_store_part,
             TrendMaterialization::Function(m) => &m.target_trend_store_part,
@@ -823,7 +826,8 @@ impl TrendMaterialization {
         }
     }
 
-    #[must_use] pub fn diff(&self, other: &TrendMaterialization) -> Vec<Box<dyn Change + Send>> {
+    #[must_use]
+    pub fn diff(&self, other: &TrendMaterialization) -> Vec<Box<dyn Change + Send>> {
         match self {
             TrendMaterialization::View(m) => match other {
                 TrendMaterialization::View(other_m) => m.diff(other_m),
@@ -890,7 +894,8 @@ pub fn load_materializations_from(
         })
 }
 
-#[must_use] pub fn map_sql_to_plpgsql(src: String) -> String {
+#[must_use]
+pub fn map_sql_to_plpgsql(src: String) -> String {
     [
         "BEGIN\n".into(),
         "RETURN QUERY EXECUTE $query$\n".into(),

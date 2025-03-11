@@ -168,7 +168,9 @@ impl EntitySet {
         if self.entity_type != foundentitytype {
             incorrect_fields.push("entity_type".to_string());
             Err(EntitySetError::UnchangeableFields(incorrect_fields))
-        } else if self.entities.is_empty() { Err(EntitySetError::EmptyEntitySet) } else {
+        } else if self.entities.is_empty() {
+            Err(EntitySetError::EmptyEntitySet)
+        } else {
             let entitieslist = self.entities.join("', '");
 
             let query = format!(

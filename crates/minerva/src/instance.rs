@@ -266,7 +266,8 @@ impl MinervaInstance {
         Ok(())
     }
 
-    #[must_use] pub fn diff(
+    #[must_use]
+    pub fn diff(
         &self,
         other: &MinervaInstance,
         options: DiffOptions,
@@ -827,7 +828,9 @@ where
                             let ext_str = ext.to_str().unwrap_or("");
                             match ext_str {
                                 "sql" => match load_sql(client, &path).await {
-                                    Ok(()) => println!("Executed sql '{}'", &path.to_string_lossy()),
+                                    Ok(()) => {
+                                        println!("Executed sql '{}'", &path.to_string_lossy())
+                                    }
                                     Err(e) => {
                                         println!(
                                             "Error executing sql '{}': {}",

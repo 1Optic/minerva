@@ -144,7 +144,8 @@ impl fmt::Display for Trend {
 }
 
 impl Trend {
-    #[must_use] pub fn sql_type(&self) -> Type {
+    #[must_use]
+    pub fn sql_type(&self) -> Type {
         match self.data_type {
             DataType::Int2 => Type::INT2,
             DataType::Integer => Type::INT4,
@@ -157,7 +158,8 @@ impl Trend {
         }
     }
 
-    #[must_use] pub fn none_value(&self) -> MeasValue {
+    #[must_use]
+    pub fn none_value(&self) -> MeasValue {
         match self.data_type {
             DataType::Int2 => MeasValue::Int2(None),
             DataType::Integer => MeasValue::Integer(None),
@@ -905,7 +907,8 @@ impl TrendStorePart {
         Ok(())
     }
 
-    #[must_use] pub fn diff(
+    #[must_use]
+    pub fn diff(
         &self,
         other: &TrendStorePart,
         options: TrendStorePartDiffOptions,
@@ -1005,7 +1008,8 @@ pub struct TrendStoreDiffOptions {
 }
 
 impl TrendStoreDiffOptions {
-    #[must_use] pub fn part_diff_options(&self) -> TrendStorePartDiffOptions {
+    #[must_use]
+    pub fn part_diff_options(&self) -> TrendStorePartDiffOptions {
         TrendStorePartDiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
@@ -1029,7 +1033,8 @@ pub struct TrendStore {
 }
 
 impl TrendStore {
-    #[must_use] pub fn diff(
+    #[must_use]
+    pub fn diff(
         &self,
         other: &TrendStore,
         options: TrendStoreDiffOptions,

@@ -37,8 +37,10 @@ impl TrendMaterializationSourceData {
 }
 
 fn as_minerva(sources: &[TrendMaterializationSourceData]) -> Vec<TrendMaterializationSource> {
-    let result: Vec<TrendMaterializationSource> =
-        sources.iter().map(TrendMaterializationSourceData::as_minerva).collect();
+    let result: Vec<TrendMaterializationSource> = sources
+        .iter()
+        .map(TrendMaterializationSourceData::as_minerva)
+        .collect();
 
     result
 }
@@ -1109,10 +1111,12 @@ pub(super) async fn delete_trend_view_materialization(
                             &[&vm_id],
                         )
                         .await;
-                    if let Err(e) = result { HttpResponse::InternalServerError().json(Error {
-                        code: 500,
-                        message: "Deletion failed: ".to_owned() + &e.to_string(),
-                    }) } else {
+                    if let Err(e) = result {
+                        HttpResponse::InternalServerError().json(Error {
+                            code: 500,
+                            message: "Deletion failed: ".to_owned() + &e.to_string(),
+                        })
+                    } else {
                         let result = client
                             .execute(
                                 "DELETE FROM trend_directory.materialization WHERE id = $1",
@@ -1122,8 +1126,7 @@ pub(super) async fn delete_trend_view_materialization(
                         match result {
                             Err(e) => HttpResponse::InternalServerError().json(Error {
                                 code: 500,
-                                message: "Deletion partially failed: ".to_owned()
-                                    + &e.to_string(),
+                                message: "Deletion partially failed: ".to_owned() + &e.to_string(),
                             }),
                             Ok(_) => HttpResponse::Ok().json(Success {
                                 code: 200,
@@ -1179,10 +1182,12 @@ pub(super) async fn delete_trend_function_materialization(
                             &[&fm_id],
                         )
                         .await;
-                    if let Err(e) = result { HttpResponse::InternalServerError().json(Error {
-                        code: 500,
-                        message: "Deletion failed: ".to_owned() + &e.to_string(),
-                    }) } else {
+                    if let Err(e) = result {
+                        HttpResponse::InternalServerError().json(Error {
+                            code: 500,
+                            message: "Deletion failed: ".to_owned() + &e.to_string(),
+                        })
+                    } else {
                         let result = client
                             .execute(
                                 "DELETE FROM trend_directory.materialization WHERE id = $1",
@@ -1192,8 +1197,7 @@ pub(super) async fn delete_trend_function_materialization(
                         match result {
                             Err(e) => HttpResponse::InternalServerError().json(Error {
                                 code: 500,
-                                message: "Deletion partially failed: ".to_owned()
-                                    + &e.to_string(),
+                                message: "Deletion partially failed: ".to_owned() + &e.to_string(),
                             }),
                             Ok(_) => HttpResponse::Ok().json(Success {
                                 code: 200,

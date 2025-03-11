@@ -50,7 +50,8 @@ impl AttributeMaterialization {
         Ok(())
     }
 
-    #[must_use] pub fn view_name(&self) -> String {
+    #[must_use]
+    pub fn view_name(&self) -> String {
         attribute_materialization_view_name(&self.attribute_store)
     }
 
@@ -178,7 +179,8 @@ impl AttributeMaterialization {
     }
 }
 
-#[must_use] pub fn attribute_materialization_view_name(
+#[must_use]
+pub fn attribute_materialization_view_name(
     target_attribute_store: &AttributeMaterializationTarget,
 ) -> String {
     format!("_{target_attribute_store}")

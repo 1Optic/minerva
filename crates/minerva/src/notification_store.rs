@@ -89,7 +89,8 @@ pub struct NotificationStore {
 }
 
 impl NotificationStore {
-    #[must_use] pub fn diff(&self, other: &NotificationStore) -> Vec<Box<dyn Change + Send>> {
+    #[must_use]
+    pub fn diff(&self, other: &NotificationStore) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         let mut new_attributes: Vec<Attribute> = Vec::new();

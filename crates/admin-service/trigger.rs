@@ -190,7 +190,10 @@ async fn get_triggers_fn(pool: Data<Pool>) -> Result<HttpResponse, ExtendedServi
             name: trigger.name.clone(),
             enabled: trigger.enabled,
             description: trigger.description.clone(),
-            thresholds: thresholds.into_iter().map(std::convert::Into::into).collect(),
+            thresholds: thresholds
+                .into_iter()
+                .map(std::convert::Into::into)
+                .collect(),
         });
     }
 
@@ -311,7 +314,11 @@ async fn change_thresholds_fn(
             if !reports.is_empty() {
                 Ok(HttpResponse::Conflict().json(reports))
             } else {
-                trigger.thresholds = data.thresholds.into_iter().map(std::convert::Into::into).collect();
+                trigger.thresholds = data
+                    .thresholds
+                    .into_iter()
+                    .map(std::convert::Into::into)
+                    .collect();
                 trigger.enabled = data.enabled;
                 trigger.description = data.description;
 

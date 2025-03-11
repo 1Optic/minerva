@@ -254,7 +254,8 @@ pub struct AttributeStore {
 }
 
 impl AttributeStore {
-    #[must_use] pub fn diff(
+    #[must_use]
+    pub fn diff(
         &self,
         other: &AttributeStore,
         options: AttributeStoreDiffOptions,

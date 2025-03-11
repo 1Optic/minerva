@@ -117,7 +117,8 @@ pub enum MeasValue {
     Numeric(Option<Decimal>),
 }
 
-#[must_use] pub fn parse_meas_value(data_type: DataType, value: &str) -> MeasValue {
+#[must_use]
+pub fn parse_meas_value(data_type: DataType, value: &str) -> MeasValue {
     match data_type {
         DataType::Int2 => {
             let value: Option<i16> = value.parse().ok();
@@ -239,7 +240,8 @@ pub fn map_numeric(
 }
 
 impl MeasValue {
-    #[must_use] pub fn null_value_of_type(data_type: DataType) -> MeasValue {
+    #[must_use]
+    pub fn null_value_of_type(data_type: DataType) -> MeasValue {
         match data_type {
             DataType::Int2 => MeasValue::Int2(None),
             DataType::Integer => MeasValue::Integer(None),

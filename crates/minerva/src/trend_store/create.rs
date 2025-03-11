@@ -270,15 +270,13 @@ pub async fn create_base_table<T: GenericClient>(
         .execute(&alter_table_add_primary_key_query, &[])
         .await?;
 
-    let create_job_id_index_query = format!(
-        "CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (job_id)",
-    );
+    let create_job_id_index_query =
+        format!("CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (job_id)",);
 
     client.execute(&create_job_id_index_query, &[]).await?;
 
-    let create_timestamp_index_query = format!(
-        "CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (timestamp)",
-    );
+    let create_timestamp_index_query =
+        format!("CREATE INDEX ON {base_table_schema}.{base_table_name} USING btree (timestamp)",);
 
     client.execute(&create_timestamp_index_query, &[]).await?;
 

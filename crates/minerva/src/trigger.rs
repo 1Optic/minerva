@@ -37,7 +37,8 @@ impl From<DatabaseError> for TriggerError {
 }
 
 impl TriggerError {
-    #[must_use] pub fn to_database_error(self) -> DatabaseError {
+    #[must_use]
+    pub fn to_database_error(self) -> DatabaseError {
         match self {
             TriggerError::DatabaseError(e) => e,
             TriggerError::NotFound(e) => e,
@@ -1630,7 +1631,8 @@ pub async fn load_thresholds_with_client(
     Ok(thresholds)
 }
 
-#[must_use] pub fn dump_trigger(trigger: &Trigger) -> String {
+#[must_use]
+pub fn dump_trigger(trigger: &Trigger) -> String {
     serde_json::to_string_pretty(trigger).unwrap()
 }
 
