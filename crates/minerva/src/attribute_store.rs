@@ -1,3 +1,4 @@
+use postgres_protocol::message::frontend::execute;
 use serde::{Deserialize, Serialize};
 use std::boxed::Box;
 use std::fmt;
@@ -73,6 +74,8 @@ impl fmt::Debug for AddAttributes {
 impl Change for AddAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
+
+        tx.execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[]).await?;
 
         let query = concat!(
             "SELECT attribute_directory.create_attribute(attribute_store, $1::name, $2::text, $3::text) ",
@@ -351,6 +354,8 @@ impl fmt::Display for AddAttributeStore {
 impl Change for AddAttributeStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
+
+        tx.execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[]).await?;
 
         let query = concat!(
             "CALL attribute_directory.create_attribute_store(",
