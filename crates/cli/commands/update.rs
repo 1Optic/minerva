@@ -16,6 +16,7 @@ use minerva::instance::MinervaInstance;
 use super::common::{connect_db, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT};
 
 #[derive(Debug, Parser, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct UpdateOpt {
     #[arg(short, long)]
     non_interactive: bool,
@@ -112,10 +113,10 @@ async fn update(
         {
             match change.apply(client).await {
                 Ok(message) => {
-                    println!("> {}", &message)
+                    println!("> {}", &message);
                 }
                 Err(err) => {
-                    println!("! Error applying change: {}", &err)
+                    println!("! Error applying change: {}", &err);
                 }
             }
         }

@@ -58,6 +58,9 @@ pub enum TrendStoreOptCommands {
 }
 
 impl TrendStoreOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             TrendStoreOptCommands::List(list) => list.run().await,

@@ -22,10 +22,7 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
         let client = connect_db().await?;
 
         if let Some(id) = self.id {
-            println!(
-                "Materializing curr-ptr table for attribute store with Id {}",
-                id
-            );
+            println!("Materializing curr-ptr table for attribute store with Id {id}");
 
             let result = materialize_curr_ptr(&client, id).await?;
 
@@ -34,10 +31,7 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 id, result.record_count
             );
         } else if let Some(name) = &self.name {
-            println!(
-                "Materializing curr-ptr table for attribute store '{}'",
-                name
-            );
+            println!("Materializing curr-ptr table for attribute store '{name}'");
 
             let result = materialize_curr_ptr_by_name(&client, name).await?;
 
@@ -54,10 +48,7 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
                 let id: i32 = row.get(0);
                 let name: &str = row.get(1);
 
-                println!(
-                    "Materializing curr-ptr table for attribute store '{}'",
-                    name
-                );
+                println!("Materializing curr-ptr table for attribute store '{name}'");
 
                 let result = materialize_curr_ptr(&client, id).await?;
 

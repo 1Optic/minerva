@@ -19,7 +19,7 @@ mod tests {
     use minerva::schema::create_schema;
     use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
-    const TREND_STORE_DEFINITION: &str = r###"title: Raw node data
+    const TREND_STORE_DEFINITION: &str = r"title: Raw node data
 data_source: hub
 entity_type: node
 granularity: 15m
@@ -36,9 +36,9 @@ parts:
         data_type: numeric
       - name: freq_power
         data_type: numeric
-"###;
+";
 
-    const TARGET_TREND_STORE_DEFINITION: &str = r###"title: Raw node data
+    const TARGET_TREND_STORE_DEFINITION: &str = r"title: Raw node data
 data_source: hub
 entity_type: node
 granularity: 1h
@@ -55,9 +55,9 @@ parts:
         data_type: numeric
       - name: freq_power
         data_type: numeric
-"###;
+";
 
-    const MATERIALIZATION: &str = r###"
+    const MATERIALIZATION: &str = r#"
 target_trend_store_part: hub_node_main_1h
 enabled: true
 processing_delay: 30m
@@ -102,7 +102,7 @@ fingerprint_function: |
     WHERE part.name = 'hub_node_main_15m'
   ) modified ON modified.timestamp = t;
 description: {}
-"###;
+"#;
 
     #[tokio::test]
     async fn materialize_service() -> Result<(), Box<dyn std::error::Error>> {
@@ -123,14 +123,14 @@ description: {}
         create_schema(&mut client).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-            .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+            .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
         let add_trend_store = AddTrendStore {
             trend_store: trend_store.clone(),
         };
 
         let target_trend_store: TrendStore = serde_yaml::from_str(TARGET_TREND_STORE_DEFINITION)
-            .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+            .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
         let add_target_trend_store = AddTrendStore {
             trend_store: target_trend_store.clone(),
@@ -138,7 +138,7 @@ description: {}
 
         let materialization: TrendFunctionMaterialization =
             serde_yaml::from_str(MATERIALIZATION)
-                .map_err(|e| format!("Could not read materialization definition: {}", e))?;
+                .map_err(|e| format!("Could not read materialization definition: {e}"))?;
 
         let add_materialization = AddTrendMaterialization {
             trend_materialization: TrendMaterialization::Function(materialization),
@@ -191,7 +191,7 @@ description: {}
 
         let check_result = tokio::select! {
             _ = output_check_handle => { "Ok".to_string() },
-            _ = tokio::time::sleep(Duration::from_millis(15000)) => { "Timeout".to_string() },
+            () = tokio::time::sleep(Duration::from_millis(15000)) => { "Timeout".to_string() },
         };
 
         assert!(check_result.contains("Ok"));

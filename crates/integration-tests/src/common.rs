@@ -9,14 +9,17 @@ use rand::distr::{Alphanumeric, SampleString};
 
 use tokio::io::AsyncBufReadExt;
 
+#[must_use]
 pub fn generate_name(len: usize) -> String {
     Alphanumeric.sample_string(&mut rand::rng(), len)
 }
 
+#[must_use]
 pub fn get_available_port(ip_addr: Ipv4Addr) -> Option<u16> {
     (1000..50000).find(|port| port_available(SocketAddr::V4(SocketAddrV4::new(ip_addr, *port))))
 }
 
+#[must_use]
 fn port_available(addr: SocketAddr) -> bool {
     TcpListener::bind(addr).is_ok()
 }
@@ -87,24 +90,24 @@ impl MinervaService {
 
             debug!("Trying to connect to service at {}", ipv4_addr);
 
-            match result {
-                Ok(_) => return Ok(()),
-                Err(_) => {
-                    // Check if process is still running
-                    let wait_result = self.proc_handle.try_wait().map_err(|e| {
-                        RuntimeError::from_msg(format!("Could not wait for service exit: {e}"))
-                    })?;
+            if result.is_ok() {
+                return Ok(());
+            } else {
+                // Check if process is still running
+                let wait_result = self.proc_handle.try_wait().map_err(|e| {
+                    RuntimeError::from_msg(format!("Could not wait for service exit: {e}"))
+                })?;
 
-                    if let Some(status) = wait_result {
-                        panic!("Service prematurely exited with code: {status}");
-                    }
-
-                    tokio::time::sleep(timeout).await
+                if let Some(status) = wait_result {
+                    panic!("Service prematurely exited with code: {status}");
                 }
+
+                tokio::time::sleep(timeout).await;
             }
         }
     }
 
+    #[must_use]
     pub fn base_url(&self) -> String {
         format!(
             "http://{}:{}",
@@ -115,9 +118,10 @@ impl MinervaService {
 
 impl Drop for MinervaService {
     fn drop(&mut self) {
-        match self.proc_handle.kill() {
-            Err(e) => error!("Could not stop web service: {e}"),
-            Ok(_) => debug!("Stopped web service"),
+        if let Err(e) = self.proc_handle.kill() {
+            error!("Could not stop web service: {e}")
+        } else {
+            debug!("Stopped web service")
         }
     }
 }

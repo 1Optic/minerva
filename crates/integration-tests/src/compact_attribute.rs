@@ -16,7 +16,7 @@ mod tests {
     use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
     use minerva::schema::create_schema;
 
-    const ATTRIBUTE_STORE_DEFINITION: &str = r###"
+    const ATTRIBUTE_STORE_DEFINITION: &str = r"
 data_source: hub
 entity_type: node
 attributes:
@@ -45,7 +45,7 @@ attributes:
   unit: null
   description: Coordinate of equipment location
   extra_data: null
-    "###;
+    ";
 
     #[tokio::test]
     async fn compact_attribute() -> Result<(), Box<dyn std::error::Error>> {
@@ -66,7 +66,7 @@ attributes:
         create_schema(&mut client).await?;
 
         let attribute_store: AttributeStore = serde_yaml::from_str(ATTRIBUTE_STORE_DEFINITION)
-            .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+            .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
         let add_attribute_store = AddAttributeStore { attribute_store };
 

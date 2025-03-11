@@ -48,8 +48,8 @@ impl Display for ServiceError {
 impl Display for ExtendedServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut message_description: Vec<String> = vec![];
-        for m in self.messages.iter() {
-            message_description.push(format!("{}: {}", m.0, m.1))
+        for m in &self.messages {
+            message_description.push(format!("{}: {}", m.0, m.1));
         }
         write!(f, "({}) {}", self.kind, message_description.join(", "))
     }
@@ -63,9 +63,10 @@ impl ResponseError for ServiceError {
     fn status_code(&self) -> StatusCode {
         match self.kind {
             ServiceErrorKind::NotFound => StatusCode::NOT_FOUND,
-            ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::PoolError | ServiceErrorKind::InternalError => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
-            ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }
@@ -84,9 +85,10 @@ impl ResponseError for ExtendedServiceError {
     fn status_code(&self) -> StatusCode {
         match self.kind {
             ServiceErrorKind::NotFound => StatusCode::NOT_FOUND,
-            ServiceErrorKind::PoolError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceErrorKind::PoolError | ServiceErrorKind::InternalError => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
             ServiceErrorKind::BadRequest => StatusCode::BAD_REQUEST,
-            ServiceErrorKind::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceErrorKind::Conflict => StatusCode::CONFLICT,
         }
     }

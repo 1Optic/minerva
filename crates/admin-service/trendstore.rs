@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 use minerva::trend_store::create::create_trend_store;
 use std::collections::HashMap;
-use std::ops::DerefMut;
 use std::time::Duration;
 
 use deadpool_postgres::Pool;
@@ -144,12 +143,12 @@ pub struct TrendStorePartData {
 
 impl TrendStorePartData {
     fn as_minerva(&self) -> TrendStorePart {
-        let trends: Vec<Trend> = self.trends.iter().map(|trend| trend.as_minerva()).collect();
+        let trends: Vec<Trend> = self.trends.iter().map(TrendData::as_minerva).collect();
 
         let generated_trends: Vec<GeneratedTrend> = self
             .generated_trends
             .iter()
-            .map(|generated_trend| generated_trend.as_minerva())
+            .map(GeneratedTrendData::as_minerva)
             .collect();
 
         TrendStorePart {
@@ -192,25 +191,24 @@ impl TrendStoreBasicData {
         )
         .await;
 
-        match result {
-            Ok(trendstore) => Ok(trendstore),
-            Err(_) => {
-                let new_trend_store = TrendStore {
-                    title: None,
-                    data_source: self.data_source.clone(),
-                    entity_type: self.entity_type.clone(),
-                    granularity: self.granularity,
-                    partition_size: *PARTITION_SIZE.get(&self.granularity.clone()).unwrap(),
-                    retention_period: Duration::from_secs(86400 * 365),
-                    parts: vec![],
-                };
+        if let Ok(trendstore) = result {
+            Ok(trendstore)
+        } else {
+            let new_trend_store = TrendStore {
+                title: None,
+                data_source: self.data_source.clone(),
+                entity_type: self.entity_type.clone(),
+                granularity: self.granularity,
+                partition_size: *PARTITION_SIZE.get(&self.granularity.clone()).unwrap(),
+                retention_period: Duration::from_secs(86400 * 365),
+                parts: vec![],
+            };
 
-                let result = create_trend_store(transaction, &new_trend_store).await;
+            let result = create_trend_store(transaction, &new_trend_store).await;
 
-                match result {
-                    Ok(_) => Ok(new_trend_store),
-                    Err(e) => Err(format!("Unable to find or create trend store: {e}")),
-                }
+            match result {
+                Ok(()) => Ok(new_trend_store),
+                Err(e) => Err(format!("Unable to find or create trend store: {e}")),
             }
         }
     }
@@ -355,7 +353,7 @@ impl TrendStorePartCompleteData {
 pub(super) async fn get_trend_store_parts(pool: Data<Pool>) -> Result<HttpResponse, ServiceError> {
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let trends: Vec<TrendFull> = client
@@ -472,7 +470,7 @@ pub(super) async fn get_trend_store_part(
 
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let trends: Vec<TrendFull> = client
@@ -570,7 +568,7 @@ pub(super) async fn find_trend_store_part(
 
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let (trend_store_part_id, trend_store_id): (i32, i32) = client
@@ -664,7 +662,7 @@ pub(super) async fn find_trend_store_part(
 pub(super) async fn get_trend_stores(pool: Data<Pool>) -> Result<HttpResponse, ServiceError> {
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let trends: Vec<TrendFull> = client
@@ -814,7 +812,7 @@ pub(super) async fn get_trend_store(
 
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let trends: Vec<TrendFull> = client
@@ -968,10 +966,10 @@ pub(super) async fn post_trend_store_part(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await?;
 
@@ -994,7 +992,7 @@ pub(super) async fn post_trend_store_part(
 pub(super) async fn get_trends(pool: Data<Pool>) -> Result<HttpResponse, ServiceError> {
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let table_trends: Vec<TrendDataWithTrendStorePart> = client
@@ -1076,10 +1074,10 @@ pub(super) async fn get_trends_by_entity_type(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await?;
 

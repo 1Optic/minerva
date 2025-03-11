@@ -20,7 +20,7 @@ impl Cmd for SchemaMigrate {
             let pending = get_pending_migrations(&mut client).await?;
 
             for (version, name) in pending {
-                println!("{} - {}", version, name);
+                println!("{version} - {name}");
             }
         } else {
             let query = "SET citus.multi_shard_modify_mode TO 'sequential'";
@@ -65,6 +65,9 @@ pub enum SchemaOptCommands {
 }
 
 impl SchemaOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             SchemaOptCommands::Migrate(migrate) => migrate.run().await,

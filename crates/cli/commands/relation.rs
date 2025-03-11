@@ -137,6 +137,9 @@ pub enum RelationOptCommands {
 }
 
 impl RelationOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             RelationOptCommands::Create(create) => create.run().await,

@@ -3,6 +3,7 @@ use chrono::FixedOffset;
 
 use async_trait::async_trait;
 use clap::Parser;
+use postgres_protocol::escape::escape_identifier;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -27,10 +28,10 @@ impl Cmd for TrendStoreDeleteTimestamp {
 
         for row in client.query("SELECT name FROM trend_directory.trend_store_part tsp JOIN trend_directory.trend_store ts ON ts.id = tsp.trend_store_id WHERE ts.granularity = $1::text::interval", &[&self.granularity]).await? {
             let table_name: &str = row.get(0);
-            let query = format!("DELETE FROM trend.\"{}\" WHERE timestamp = $1", table_name);
+            let query = format!("DELETE FROM trend.{} WHERE timestamp = $1", escape_identifier(table_name));
             client.query(&query, &[&self.timestamp]).await?;
 
-            println!("Delete data in: '{}'", table_name);
+            println!("Delete data in: '{table_name}'");
         }
 
         Ok(())

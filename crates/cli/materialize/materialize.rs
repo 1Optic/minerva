@@ -142,9 +142,9 @@ impl MaterializationChunk {
                 .partition_statistics(client, &self.timestamp)
                 .await
             {
-                Ok(partition_stats) => match partition_stats.stats {
-                    Some(_) => {}
-                    None => {
+                Ok(partition_stats) => {
+                    if partition_stats.stats.is_some() {
+                    } else {
                         let result = partition_stats.analyze_timestamp(client).await;
 
                         match result {
@@ -159,7 +159,7 @@ impl MaterializationChunk {
                             }
                         }
                     }
-                },
+                }
                 Err(e) => println!(
                     "Could not fetch or create statistics of {} - {}: {}",
                     &materialization_source, &self.timestamp, e
@@ -346,11 +346,11 @@ async fn load_materialization_chunks(
         let comparison = format!(
             "tag.name = ANY('{{{}}}'::text[])",
             t.iter()
-                .map(|tag| tag.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<String>>()
                 .join(",")
         );
-        query_parts.push(format!("AND {}", comparison));
+        query_parts.push(format!("AND {comparison}"));
     }
 
     let order = match config.oldest_first {
@@ -359,8 +359,7 @@ async fn load_materialization_chunks(
     };
 
     query_parts.push(format!(
-        "ORDER BY ms.timestamp {}, ts.granularity ASC LIMIT $1",
-        order
+        "ORDER BY ms.timestamp {order}, ts.granularity ASC LIMIT $1"
     ));
 
     let query = query_parts.join(" ");
@@ -471,19 +470,18 @@ impl MaterializationFetcher {
                                     "Could not queue materialization chunk {}: {}",
                                     &message, e
                                 ),
-                                Ok(_) => new += 1,
+                                Ok(()) => new += 1,
                             }
                         }
                     }
 
                     let in_progress_count = guard.len();
                     println!(
-                        "Loaded {} materialization chunks, queued {} new, queue size: {}",
-                        row_count, new, in_progress_count
+                        "Loaded {row_count} materialization chunks, queued {new} new, queue size: {in_progress_count}"
                     );
                 }
                 Err(e) => {
-                    println!("Error retrieving materializations: {}", e);
+                    println!("Error retrieving materializations: {e}");
                 }
             }
         }
@@ -523,14 +521,14 @@ async fn materialize(
                     }
                 }
                 Err(e) => {
-                    println!("Error checking Minerva version: {}", e)
+                    println!("Error checking Minerva version: {e}");
                 }
             }
             if check_statistics {
                 let check_result = materialization.check_statistics(&client).await;
 
                 if let Err(e) = check_result {
-                    println!("Error checking statistics: {}", e);
+                    println!("Error checking statistics: {e}");
                 }
             }
 
@@ -570,7 +568,7 @@ impl MaterializationExecutor {
             .buffer_unordered(self.concurrency);
 
         materializations
-            .for_each(|_| async {
+            .for_each(|()| async {
                 // Todo: move result reporting here.
             })
             .await;

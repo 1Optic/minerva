@@ -39,7 +39,7 @@ pub enum CompactError {
 
 impl From<CompactError> for Error {
     fn from(value: CompactError) -> Self {
-        Error::Runtime(format!("Could not compact attribute data: {}", value).into())
+        Error::Runtime(format!("Could not compact attribute data: {value}").into())
     }
 }
 
@@ -64,40 +64,31 @@ pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
 
     let attribute_store_name = row.get(0);
 
-    let create_tmp_table_query = r#"
+    let create_tmp_table_query = r"
 CREATE TEMP TABLE compact_info (
     id integer,
     first_id integer,
     last_id integer,
     timestamp timestamptz,
     modified timestamptz
-) ON COMMIT DROP"#;
+) ON COMMIT DROP";
 
     client.execute(create_tmp_table_query, &[]).await.unwrap();
 
-    let insert_count = match limit {
-        Some(max_records) => {
-            let query = format!(
-                r#"
-INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
-SELECT
-    id, first_id, last_id, timestamp, modified
-FROM (
+    let insert_count = if let Some(max_records) = limit {
+        let query = format!(
+            r#"
+    INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
     SELECT
-        id,
-        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp ASC) AS first_id,
-        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp DESC) AS last_id,
-        "timestamp",
-        modified,
-        count(*) OVER (PARTITION BY entity_id, run) AS run_length
+        id, first_id, last_id, timestamp, modified
     FROM (
         SELECT
             id,
-            entity_id,
+            first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp ASC) AS first_id,
+            first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp DESC) AS last_id,
             "timestamp",
-            first_appearance,
             modified,
-            sum(change) OVER w2 AS run
+            count(*) OVER (PARTITION BY entity_id, run) AS run_length
         FROM (
             SELECT
                 id,
@@ -105,48 +96,46 @@ FROM (
                 "timestamp",
                 first_appearance,
                 modified,
-                CASE
-                    WHEN hash <> lag(hash) OVER w THEN 1
-                    ELSE 0
-                END AS change
-            FROM attribute_history."{}"
-            WINDOW w AS (PARTITION BY entity_id ORDER BY "timestamp")
-        ) t
-        WINDOW w2 AS (PARTITION BY entity_id ORDER BY "timestamp")
-        LIMIT $1
-    ) runs
-) to_compact WHERE run_length > 1
-"#,
-                attribute_store_name
-            );
+                sum(change) OVER w2 AS run
+            FROM (
+                SELECT
+                    id,
+                    entity_id,
+                    "timestamp",
+                    first_appearance,
+                    modified,
+                    CASE
+                        WHEN hash <> lag(hash) OVER w THEN 1
+                        ELSE 0
+                    END AS change
+                FROM attribute_history."{attribute_store_name}"
+                WINDOW w AS (PARTITION BY entity_id ORDER BY "timestamp")
+            ) t
+            WINDOW w2 AS (PARTITION BY entity_id ORDER BY "timestamp")
+            LIMIT $1
+        ) runs
+    ) to_compact WHERE run_length > 1
+    "#
+        );
 
-            client
-                .execute(&query, &[&(max_records as i64)])
-                .await
-                .unwrap()
-        }
-        None => {
-            let query = format!(
-                r#"
-INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
-SELECT
-    id, first_id, last_id, timestamp, modified
-FROM (
+        client
+            .execute(&query, &[&(max_records as i64)])
+            .await
+            .unwrap()
+    } else {
+        let query = format!(
+            r#"
+    INSERT INTO compact_info(id, first_id, last_id, timestamp, modified)
     SELECT
-        id,
-        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp ASC) AS first_id,
-        first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp DESC) AS last_id,
-        "timestamp",
-        modified,
-        count(*) OVER (PARTITION BY entity_id, run) AS run_length
+        id, first_id, last_id, timestamp, modified
     FROM (
         SELECT
             id,
-            entity_id,
+            first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp ASC) AS first_id,
+            first_value(id) OVER (PARTITION BY entity_id, run ORDER BY timestamp DESC) AS last_id,
             "timestamp",
-            first_appearance,
             modified,
-            sum(change) OVER w2 AS run
+            count(*) OVER (PARTITION BY entity_id, run) AS run_length
         FROM (
             SELECT
                 id,
@@ -154,28 +143,31 @@ FROM (
                 "timestamp",
                 first_appearance,
                 modified,
-                CASE
-                    WHEN hash <> lag(hash) OVER w THEN 1
-                    ELSE 0
-                END AS change
-            FROM attribute_history."{}"
-            WINDOW w AS (PARTITION BY entity_id ORDER BY "timestamp")
-        ) t
-        WINDOW w2 AS (PARTITION BY entity_id ORDER BY "timestamp")
-    ) runs
-) to_compact WHERE run_length > 1
-"#,
-                attribute_store_name
-            );
+                sum(change) OVER w2 AS run
+            FROM (
+                SELECT
+                    id,
+                    entity_id,
+                    "timestamp",
+                    first_appearance,
+                    modified,
+                    CASE
+                        WHEN hash <> lag(hash) OVER w THEN 1
+                        ELSE 0
+                    END AS change
+                FROM attribute_history."{attribute_store_name}"
+                WINDOW w AS (PARTITION BY entity_id ORDER BY "timestamp")
+            ) t
+            WINDOW w2 AS (PARTITION BY entity_id ORDER BY "timestamp")
+        ) runs
+    ) to_compact WHERE run_length > 1
+    "#
+        );
 
-            client.execute(&query, &[]).await.unwrap()
-        }
+        client.execute(&query, &[]).await.unwrap()
     };
 
-    println!(
-        "Inserted {} records to compact into temporary table",
-        insert_count
-    );
+    println!("Inserted {insert_count} records to compact into temporary table");
 
     let update_history_query = format!(
         r#"
@@ -188,28 +180,22 @@ WHERE compact_info.first_id = history.id AND compact_info.id = compact_info.last
 
     let updated_count = client.execute(&update_history_query, &[]).await.unwrap();
 
-    let history_table = format!("attribute_history.\"{}\"", attribute_store_name);
+    let history_table = format!("attribute_history.\"{attribute_store_name}\"");
 
-    println!(
-        "Updated {} records in history table '{}'",
-        updated_count, history_table
-    );
+    println!("Updated {updated_count} records in history table '{history_table}'");
 
     let delete_query = format!(
-        r#"
+        r"
 DELETE FROM attribute_history.{} history
 USING compact_info
 WHERE compact_info.id = history.id
-AND compact_info.id <> compact_info.first_id"#,
+AND compact_info.id <> compact_info.first_id",
         escape_identifier(attribute_store_name),
     );
 
     let delete_count = client.execute(&delete_query, &[]).await.unwrap();
 
-    println!(
-        "Deleted {} records from history table '{}'",
-        delete_count, history_table
-    );
+    println!("Deleted {delete_count} records from history table '{history_table}'");
 
     if updated_count > 0 || delete_count > 0 {
         mark_attribute_store_modified(client, attribute_store_id)
@@ -233,12 +219,12 @@ async fn mark_attribute_store_modified<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_id: i32,
 ) -> Result<(), ()> {
-    let query = r#"
+    let query = r"
 INSERT INTO attribute_directory.attribute_store_modified (attribute_store_id, modified)
 VALUES ($1, now())
 ON CONFLICT (attribute_store_id) DO UPDATE
 SET modified = EXCLUDED.modified
-RETURNING attribute_store_modified"#;
+RETURNING attribute_store_modified";
 
     client.execute(query, &[&attribute_store_id]).await.unwrap();
 
@@ -273,10 +259,10 @@ async fn mark_attribute_store_compacted<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_id: i32,
 ) -> Result<(), CompactError> {
-    let query = r#"
+    let query = r"
 INSERT INTO attribute_directory.attribute_store_compacted (attribute_store_id, compacted)
 SELECT attribute_store_id, modified FROM attribute_directory.attribute_store_modified WHERE attribute_store_id = $1
-ON CONFLICT (attribute_store_id) DO UPDATE SET compacted = EXCLUDED.compacted"#;
+ON CONFLICT (attribute_store_id) DO UPDATE SET compacted = EXCLUDED.compacted";
 
     client
         .execute(query, &[&attribute_store_id])

@@ -44,17 +44,18 @@ pub struct AddAttributes {
 
 impl fmt::Display for AddAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "AddAttributes({}, {}):\n{}",
+            "AddAttributes({}, {}):",
             &self.attribute_store,
-            &self.attributes.len(),
-            self.attributes
-                .iter()
-                .map(|att| format!(" - {}: {}\n", att.name, att.data_type))
-                .collect::<Vec<String>>()
-                .join(""),
-        )
+            &self.attributes.len()
+        )?;
+
+        for att in &self.attributes {
+            writeln!(f, " - {}: {}", att.name, att.data_type)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -116,17 +117,18 @@ pub struct RemoveAttributes {
 
 impl fmt::Display for RemoveAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "RemoveAttributes({}, {})\n{}",
+            "RemoveAttributes({}, {})",
             &self.attribute_store,
-            &self.attributes.len(),
-            self.attributes
-                .iter()
-                .map(|att| format!(" - {att}\n"))
-                .collect::<Vec<String>>()
-                .join(""),
-        )
+            &self.attributes.len()
+        )?;
+
+        for att in &self.attributes {
+            writeln!(f, " - {att}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -256,6 +258,7 @@ pub struct AttributeStore {
 }
 
 impl AttributeStore {
+    #[must_use]
     pub fn diff(
         &self,
         other: &AttributeStore,
@@ -276,7 +279,7 @@ impl AttributeStore {
                         changes.push(Box::new(ChangeAttribute {
                             attribute_store: self.clone(),
                             attribute: other_attribute.clone(),
-                        }))
+                        }));
                     }
                 }
                 None => {
@@ -315,7 +318,7 @@ impl AttributeStore {
             changes.push(Box::new(RemoveAttributes {
                 attribute_store: self.clone(),
                 attributes: removed_attributes,
-            }))
+            }));
         }
 
         changes
@@ -462,7 +465,7 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
         attributes.push(Attribute {
             name: String::from(attribute_name),
             data_type: DataType::from(attribute_data_type),
-            description: attribute_description.unwrap_or(String::from("")),
+            description: attribute_description.unwrap_or_default(),
         });
     }
 

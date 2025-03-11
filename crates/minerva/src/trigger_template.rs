@@ -103,6 +103,7 @@ impl From<Template> for BareTemplate {
 }
 
 impl Template {
+    #[must_use]
     pub fn get_parameter(self, parameter_name: &str) -> Option<TemplateParameter> {
         self.parameters
             .into_iter()
@@ -157,6 +158,7 @@ impl TemplatedTrigger {
         Ok(())
     }
 
+    #[must_use]
     pub fn adapted_parameter_name(&self, parameter: &ParameterValue) -> String {
         match self
             .template
@@ -266,21 +268,21 @@ impl TemplatedTrigger {
         let mut sourcecounter = 1;
         for source in &sources {
             if sourcecounter == 1 {
-                kpi_function.push_str(&format!("\n    FROM trend.\"{}\" t1\n", source));
+                kpi_function.push_str(&format!("\n    FROM trend.\"{source}\" t1\n"));
             } else {
                 kpi_function.push_str(&format!(
                     "    JOIN trend.{} t{} ON t{}.timestamp = t1.timestamp AND t{}.entity_id = t1.entity_id\n",
                     escape_identifier(source), sourcecounter, sourcecounter, sourcecounter
-                ))
+                ));
             };
             sourcecounter += 1;
         }
         sourcecounter = 1;
         for _ in &sources {
             if sourcecounter == 1 {
-                kpi_function.push_str("    WHERE t1.timestamp = $1")
+                kpi_function.push_str("    WHERE t1.timestamp = $1");
             } else {
-                kpi_function.push_str(&format!(" AND t{}.timestamp = $1", sourcecounter))
+                kpi_function.push_str(&format!(" AND t{sourcecounter}.timestamp = $1"));
             };
             sourcecounter += 1;
         }
@@ -311,16 +313,15 @@ impl TemplatedTrigger {
             escape_identifier(&self.entity_type)
         ));
 
-        let description = match &self.description {
-            Some(value) => value.to_string(),
-            None => {
-                let mut description_from_template = self.template.description.clone();
-                for parameter in &self.parameters {
-                    description_from_template = description_from_template
-                        .replace(&("{".to_owned() + &parameter.name + "}"), &parameter.value);
-                }
-                description_from_template
+        let description = if let Some(value) = &self.description {
+            value.to_string()
+        } else {
+            let mut description_from_template = self.template.description.clone();
+            for parameter in &self.parameters {
+                description_from_template = description_from_template
+                    .replace(&("{".to_owned() + &parameter.name + "}"), &parameter.value);
             }
+            description_from_template
         };
 
         Ok(Trigger {

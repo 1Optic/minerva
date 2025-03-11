@@ -117,6 +117,7 @@ pub enum MeasValue {
     Numeric(Option<Decimal>),
 }
 
+#[must_use]
 pub fn parse_meas_value(data_type: DataType, value: &str) -> MeasValue {
     match data_type {
         DataType::Int2 => {
@@ -160,13 +161,13 @@ pub fn parse_meas_value(data_type: DataType, value: &str) -> MeasValue {
 pub fn map_int2(value: &Option<i16>, target_data_type: DataType) -> Result<MeasValue, Error> {
     match target_data_type {
         DataType::Int2 => Ok(MeasValue::Int2(*value)),
-        DataType::Integer => Ok(MeasValue::Integer(value.map(|x| x as i32))),
-        DataType::Int8 => Ok(MeasValue::Int8(value.map(|x| x as i64))),
+        DataType::Integer => Ok(MeasValue::Integer(value.map(i32::from))),
+        DataType::Int8 => Ok(MeasValue::Int8(value.map(i64::from))),
         DataType::Numeric => Ok(MeasValue::Numeric(value.map(Decimal::from_i16).flatten())),
         DataType::Double => Ok(MeasValue::Double(value.map(f64::from_i16).flatten())),
         DataType::Real => Ok(MeasValue::Real(value.map(f32::from_i16).flatten())),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
@@ -174,12 +175,12 @@ pub fn map_int2(value: &Option<i16>, target_data_type: DataType) -> Result<MeasV
 pub fn map_int4(value: &Option<i32>, target_data_type: DataType) -> Result<MeasValue, Error> {
     match target_data_type {
         DataType::Integer => Ok(MeasValue::Integer(*value)),
-        DataType::Int8 => Ok(MeasValue::Int8(value.map(|x| x as i64))),
+        DataType::Int8 => Ok(MeasValue::Int8(value.map(i64::from))),
         DataType::Numeric => Ok(MeasValue::Numeric(value.map(Decimal::from_i32).flatten())),
         DataType::Double => Ok(MeasValue::Double(value.map(f64::from_i32).flatten())),
         DataType::Real => Ok(MeasValue::Real(value.map(f32::from_i32).flatten())),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
@@ -192,7 +193,7 @@ pub fn map_int8(value: &Option<i64>, target_data_type: DataType) -> Result<MeasV
         DataType::Double => Ok(MeasValue::Double(value.map(f64::from_i64).flatten())),
         DataType::Real => Ok(MeasValue::Real(value.map(f32::from_i64).flatten())),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
@@ -205,7 +206,7 @@ pub fn map_real(value: &Option<f32>, target_data_type: DataType) -> Result<MeasV
         DataType::Int8 => Ok(MeasValue::Int8(value.map(i64::from_f32).flatten())),
         DataType::Integer => Ok(MeasValue::Integer(value.map(i32::from_f32).flatten())),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
@@ -217,7 +218,7 @@ pub fn map_double(value: &Option<f64>, target_data_type: DataType) -> Result<Mea
         DataType::Int8 => Ok(MeasValue::Int8(value.map(i64::from_f64).flatten())),
         DataType::Integer => Ok(MeasValue::Integer(value.map(i32::from_f64).flatten())),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
@@ -233,12 +234,13 @@ pub fn map_numeric(
         DataType::Double => Ok(MeasValue::Double(value.map(|x| x.to_f64()).flatten())),
         DataType::Numeric => Ok(MeasValue::Numeric(*value)),
         _ => Err(Error::Runtime(crate::error::RuntimeError {
-            msg: format!("No mapping defined for {:?} -> {}", value, target_data_type),
+            msg: format!("No mapping defined for {value:?} -> {target_data_type}"),
         })),
     }
 }
 
 impl MeasValue {
+    #[must_use]
     pub fn null_value_of_type(data_type: DataType) -> MeasValue {
         match data_type {
             DataType::Int2 => MeasValue::Int2(None),
@@ -247,7 +249,7 @@ impl MeasValue {
             DataType::Int8 => MeasValue::Int8(None),
             DataType::Real => MeasValue::Real(None),
             DataType::Double => MeasValue::Double(None),
-            _ => MeasValue::Text("".to_string()),
+            _ => MeasValue::Text(String::new()),
         }
     }
 
@@ -261,19 +263,19 @@ impl MeasValue {
             MeasValue::Text(v) => match data_type {
                 DataType::Text => Ok(MeasValue::Text(v.to_string())),
                 _ => Err(Error::Runtime(crate::error::RuntimeError {
-                    msg: format!("No mapping defined for {:?} -> {}", v, data_type),
+                    msg: format!("No mapping defined for {v:?} -> {data_type}"),
                 })),
             },
             MeasValue::TextArray(v) => match data_type {
                 DataType::Text => Ok(MeasValue::Text(v.join(","))),
                 _ => Err(Error::Runtime(crate::error::RuntimeError {
-                    msg: format!("No mapping defined for {:?} -> {}", v, data_type),
+                    msg: format!("No mapping defined for {v:?} -> {data_type}"),
                 })),
             },
             MeasValue::Timestamp(v) => match data_type {
                 DataType::Timestamp => Ok(MeasValue::Timestamp(*v)),
                 _ => Err(Error::Runtime(crate::error::RuntimeError {
-                    msg: format!("No mapping defined for {:?} -> {}", v, data_type),
+                    msg: format!("No mapping defined for {v:?} -> {data_type}"),
                 })),
             },
             MeasValue::Numeric(v) => map_numeric(v, data_type),
@@ -285,30 +287,30 @@ impl fmt::Display for MeasValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             MeasValue::Int2(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
             MeasValue::Integer(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
             MeasValue::Int8(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
             MeasValue::Real(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
             MeasValue::Double(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
-            MeasValue::Text(v) => write!(f, "{}", v),
+            MeasValue::Text(v) => write!(f, "{v}"),
             MeasValue::TextArray(_) => write!(f, "ARRAY(text)"),
-            MeasValue::Timestamp(v) => write!(f, "{}", v),
+            MeasValue::Timestamp(v) => write!(f, "{v}"),
             MeasValue::Numeric(v) => match v {
-                Some(i) => write!(f, "{}", i),
+                Some(i) => write!(f, "{i}"),
                 None => write!(f, "NULL"),
             },
         }
@@ -368,5 +370,5 @@ lazy_static! {
     pub static ref INTEGER_NONE_VALUE: MeasValue = MeasValue::Integer(None);
     pub static ref INT8_NONE_VALUE: MeasValue = MeasValue::Int8(None);
     pub static ref NUMERIC_NONE_VALUE: MeasValue = MeasValue::Numeric(None);
-    pub static ref TEXT_NONE_VALUE: MeasValue = MeasValue::Text("".to_string());
+    pub static ref TEXT_NONE_VALUE: MeasValue = MeasValue::Text(String::new());
 }

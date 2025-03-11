@@ -40,7 +40,9 @@ impl Cmd for TrendStoreUpdate {
 
                 let changes = trend_store_db.diff(&trend_store, diff_options);
 
-                if !changes.is_empty() {
+                if changes.is_empty() {
+                    println!("Trend store already up-to-date");
+                } else {
                     println!("Updating trend store");
 
                     for change in changes {
@@ -67,8 +69,6 @@ impl Cmd for TrendStoreUpdate {
                             }
                         }
                     }
-                } else {
-                    println!("Trend store already up-to-date")
                 }
 
                 Ok(())

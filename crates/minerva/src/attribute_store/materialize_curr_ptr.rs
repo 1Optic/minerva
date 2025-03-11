@@ -34,7 +34,7 @@ pub enum MaterializeCurrPtrError {
 
 impl From<MaterializeCurrPtrError> for Error {
     fn from(value: MaterializeCurrPtrError) -> Self {
-        Error::Runtime(format!("Could not compact attribute data: {}", value).into())
+        Error::Runtime(format!("Could not compact attribute data: {value}").into())
     }
 }
 
@@ -154,8 +154,7 @@ pub async fn curr_data_storage_method<T: GenericClient + Send + Sync>(
             'r' => Ok(CurrDataStorageMethod::Table),
             'v' => Ok(CurrDataStorageMethod::View),
             _ => Err(MaterializeCurrPtrError::Unexpected(format!(
-                "Unexpected relation type: '{}'",
-                kind_char
+                "Unexpected relation type: '{kind_char}'"
             ))),
         }
     }
@@ -165,7 +164,7 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_name: &str,
 ) -> Result<u64, MaterializeCurrPtrError> {
-    let query = format!("TRUNCATE TABLE attribute.\"{}\"", attribute_store_name);
+    let query = format!("TRUNCATE TABLE attribute.\"{attribute_store_name}\"");
 
     let _count = client.execute(&query, &[]).await.map_err(|e| {
         MaterializeCurrPtrError::Unexpected(format!("Could not truncate curr-data table: {e}"))
@@ -210,7 +209,7 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
         .collect::<Vec<String>>()
         .join(",");
 
-    let query = format!("INSERT INTO attribute.\"{}\"({}) SELECT {} FROM attribute_history.\"{}\" history JOIN attribute_history.\"{}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id", attribute_store_name, dest_cols_part, src_cols_part, attribute_store_name, attribute_store_name);
+    let query = format!("INSERT INTO attribute.\"{attribute_store_name}\"({dest_cols_part}) SELECT {src_cols_part} FROM attribute_history.\"{attribute_store_name}\" history JOIN attribute_history.\"{attribute_store_name}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id");
 
     let record_count = client.execute(&query, &[]).await.map_err(|e| {
         MaterializeCurrPtrError::Unexpected(format!(

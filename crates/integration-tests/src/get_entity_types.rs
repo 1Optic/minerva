@@ -13,7 +13,7 @@ mod tests {
 
     use crate::common::{get_available_port, MinervaService, MinervaServiceConfig};
 
-    const TREND_STORE_DEFINITION: &str = r###"
+    const TREND_STORE_DEFINITION: &str = r"
     title: Raw node data
     data_source: hub
     entity_type: node
@@ -37,7 +37,7 @@ mod tests {
             description: test
             expression: power_kwh / 1000
 
-    "###;
+    ";
 
     #[tokio::test]
     async fn get_entity_types() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,7 +62,7 @@ mod tests {
             create_schema(&mut client).await?;
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
             let add_trend_store = AddTrendStore { trend_store };
 

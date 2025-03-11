@@ -1,5 +1,4 @@
 use serde_json::Value;
-use std::ops::DerefMut;
 use std::time::Duration;
 
 use deadpool_postgres::Pool;
@@ -38,8 +37,10 @@ impl TrendMaterializationSourceData {
 }
 
 fn as_minerva(sources: &[TrendMaterializationSourceData]) -> Vec<TrendMaterializationSource> {
-    let result: Vec<TrendMaterializationSource> =
-        sources.iter().map(|source| source.as_minerva()).collect();
+    let result: Vec<TrendMaterializationSource> = sources
+        .iter()
+        .map(TrendMaterializationSourceData::as_minerva)
+        .collect();
 
     result
 }
@@ -439,7 +440,7 @@ impl TrendFunctionMaterializationData {
                 code: 500,
                 message: format!("Update of materialization failed: {e}"),
             })
-            .map(|_| {
+            .map(|()| {
                 Ok(Success {
                     code: 200,
                     message: "Update of materialization succeeded.".to_string(),
@@ -470,7 +471,7 @@ pub(super) async fn get_trend_view_materializations(
 ) -> Result<HttpResponse, ServiceError> {
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let sources: Vec<TrendMaterializationSourceIdentifier> = client
@@ -524,7 +525,7 @@ pub(super) async fn get_trend_view_materializations(
                 let mut this_sources: Vec<TrendMaterializationSourceData> = vec![];
                 for source in &sources {
                     if source.materialization == mat_id {
-                        this_sources.push(source.source.clone())
+                        this_sources.push(source.source.clone());
                     }
                 }
                 TrendViewMaterializationFull {
@@ -567,7 +568,7 @@ pub(super) async fn get_trend_view_materialization(
 
     let client = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
     let sources: Vec<TrendMaterializationSourceData> = client
@@ -666,7 +667,7 @@ pub(super) async fn get_trend_function_materializations(pool: Data<Pool>) -> imp
                                 mapping_function: row.get(2),
                             },
                         };
-                        sources.push(source)
+                        sources.push(source);
                     }
 
                     let query = client.query("SELECT fm.id, m.id, src_function, tsp.name, processing_delay::text, stability_delay::text, reprocessing_period::text, enabled, pg_proc.prosrc, data_type, routine_definition, external_language, m.description, old_data_threshold::text, old_data_stability_delay::text FROM trend_directory.function_materialization fm JOIN trend_directory.materialization m ON fm.materialization_id = m.id JOIN information_schema.routines ON FORMAT('%s.\"%s\"', routine_schema, routine_name) = src_function  JOIN trend_directory.trend_store_part tsp ON dst_trend_store_part_id = tsp.id LEFT JOIN pg_proc ON trend_directory.fingerprint_function_name(m) = proname", &[],).await;
@@ -682,7 +683,7 @@ pub(super) async fn get_trend_function_materializations(pool: Data<Pool>) -> imp
                                 let mut this_sources: Vec<TrendMaterializationSourceData> = vec![];
                                 for source in &sources {
                                     if source.materialization == mat_id {
-                                        this_sources.push(source.source.clone())
+                                        this_sources.push(source.source.clone());
                                     }
                                 }
 
@@ -711,7 +712,7 @@ pub(super) async fn get_trend_function_materializations(pool: Data<Pool>) -> imp
                                         .map(|value| parse_interval(&value).unwrap()),
                                 };
 
-                                m.push(materialization)
+                                m.push(materialization);
                             }
                             HttpResponse::Ok().json(m)
                         }
@@ -775,7 +776,7 @@ pub(super) async fn get_trend_function_materialization(
                                     trend_store_part: inner_row.get(0),
                                     mapping_function: inner_row.get(1),
                                 };
-                                sources.push(source)
+                                sources.push(source);
                             }
 
                             let materialization = TrendFunctionMaterializationFull {
@@ -856,7 +857,7 @@ pub(super) async fn get_trend_materializations(pool: Data<Pool>) -> impl Respond
                                 mapping_function: row.get(2),
                             },
                         };
-                        sources.push(source)
+                        sources.push(source);
                     }
 
                     let query_result = client.query(
@@ -884,7 +885,7 @@ pub(super) async fn get_trend_materializations(pool: Data<Pool>) -> impl Respond
                                 let mut this_sources: Vec<TrendMaterializationSourceData> = vec![];
                                 for source in &sources {
                                     if source.materialization == mat_id {
-                                        this_sources.push(source.source.clone())
+                                        this_sources.push(source.source.clone());
                                     }
                                 }
 
@@ -936,7 +937,7 @@ pub(super) async fn get_trend_materializations(pool: Data<Pool>) -> impl Respond
                                             vec![];
                                         for source in &sources {
                                             if source.materialization == mat_id {
-                                                this_sources.push(source.source.clone())
+                                                this_sources.push(source.source.clone());
                                             }
                                         }
 
@@ -970,7 +971,7 @@ pub(super) async fn get_trend_materializations(pool: Data<Pool>) -> impl Respond
                                             },
                                         );
 
-                                        m.push(materialization)
+                                        m.push(materialization);
                                     }
 
                                     HttpResponse::Ok().json(m)
@@ -1012,10 +1013,10 @@ pub(super) async fn post_trend_view_materialization(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await.map_err(|e| Error {
         code: 500,
@@ -1054,10 +1055,10 @@ pub(super) async fn post_trend_function_materialization(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await.map_err(|e| Error {
         code: 500,
@@ -1110,29 +1111,27 @@ pub(super) async fn delete_trend_view_materialization(
                             &[&vm_id],
                         )
                         .await;
-                    match result {
-                        Err(e) => HttpResponse::InternalServerError().json(Error {
+                    if let Err(e) = result {
+                        HttpResponse::InternalServerError().json(Error {
                             code: 500,
                             message: "Deletion failed: ".to_owned() + &e.to_string(),
-                        }),
-                        Ok(_) => {
-                            let result = client
-                                .execute(
-                                    "DELETE FROM trend_directory.materialization WHERE id = $1",
-                                    &[&m_id],
-                                )
-                                .await;
-                            match result {
-                                Err(e) => HttpResponse::InternalServerError().json(Error {
-                                    code: 500,
-                                    message: "Deletion partially failed: ".to_owned()
-                                        + &e.to_string(),
-                                }),
-                                Ok(_) => HttpResponse::Ok().json(Success {
-                                    code: 200,
-                                    message: "materialization deleted".to_string(),
-                                }),
-                            }
+                        })
+                    } else {
+                        let result = client
+                            .execute(
+                                "DELETE FROM trend_directory.materialization WHERE id = $1",
+                                &[&m_id],
+                            )
+                            .await;
+                        match result {
+                            Err(e) => HttpResponse::InternalServerError().json(Error {
+                                code: 500,
+                                message: "Deletion partially failed: ".to_owned() + &e.to_string(),
+                            }),
+                            Ok(_) => HttpResponse::Ok().json(Success {
+                                code: 200,
+                                message: "materialization deleted".to_string(),
+                            }),
                         }
                     }
                 }
@@ -1183,29 +1182,27 @@ pub(super) async fn delete_trend_function_materialization(
                             &[&fm_id],
                         )
                         .await;
-                    match result {
-                        Err(e) => HttpResponse::InternalServerError().json(Error {
+                    if let Err(e) = result {
+                        HttpResponse::InternalServerError().json(Error {
                             code: 500,
                             message: "Deletion failed: ".to_owned() + &e.to_string(),
-                        }),
-                        Ok(_) => {
-                            let result = client
-                                .execute(
-                                    "DELETE FROM trend_directory.materialization WHERE id = $1",
-                                    &[&m_id],
-                                )
-                                .await;
-                            match result {
-                                Err(e) => HttpResponse::InternalServerError().json(Error {
-                                    code: 500,
-                                    message: "Deletion partially failed: ".to_owned()
-                                        + &e.to_string(),
-                                }),
-                                Ok(_) => HttpResponse::Ok().json(Success {
-                                    code: 200,
-                                    message: "Function materialization deleted.".to_string(),
-                                }),
-                            }
+                        })
+                    } else {
+                        let result = client
+                            .execute(
+                                "DELETE FROM trend_directory.materialization WHERE id = $1",
+                                &[&m_id],
+                            )
+                            .await;
+                        match result {
+                            Err(e) => HttpResponse::InternalServerError().json(Error {
+                                code: 500,
+                                message: "Deletion partially failed: ".to_owned() + &e.to_string(),
+                            }),
+                            Ok(_) => HttpResponse::Ok().json(Success {
+                                code: 200,
+                                message: "Function materialization deleted.".to_string(),
+                            }),
                         }
                     }
                 }
@@ -1237,10 +1234,10 @@ pub(super) async fn update_trend_view_materialization(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await.map_err(|e| Error {
         code: 500,
@@ -1275,10 +1272,10 @@ pub(super) async fn update_trend_function_materialization(
 
     let mut manager = pool.get().await.map_err(|_| ServiceError {
         kind: ServiceErrorKind::PoolError,
-        message: "".to_string(),
+        message: String::new(),
     })?;
 
-    let client: &mut tokio_postgres::Client = manager.deref_mut().deref_mut();
+    let client: &mut tokio_postgres::Client = &mut manager;
 
     let mut transaction = client.transaction().await.map_err(|e| Error {
         code: 500,

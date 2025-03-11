@@ -498,10 +498,8 @@ fn generate_time_aggregation(
         &source_granularity_suffix,
     )?;
 
-    let mapping_function = format!(
-        "trend.mapping_{}->{}",
-        source_granularity_suffix, target_granularity_suffix
-    );
+    let mapping_function =
+        format!("trend.mapping_{source_granularity_suffix}->{target_granularity_suffix}");
 
     let parts: Vec<AggregationPart> = trend_store
         .parts
@@ -536,7 +534,7 @@ fn translate_time_aggregation_part_name(
                 "{entity_type_and_data_source}_{target_granularity_suffix}"
             ))
         }
-        None => Err(format!("Could not translate part name '{}'", name)),
+        None => Err(format!("Could not translate part name '{name}'")),
     }
 }
 
@@ -693,7 +691,7 @@ fn add_to_aggregate_trend_store(
         });
 
     if let Some(existing_trend_store) = result {
-        for part in aggregate_trend_store.parts.into_iter() {
+        for part in aggregate_trend_store.parts {
             if existing_trend_store
                 .parts
                 .iter()
@@ -860,14 +858,12 @@ fn write_function_entity_aggregations(
         writeln!(writer, "#").unwrap();
         writeln!(
             writer,
-            "# definition:         {}",
-            relative_aggregation_file_path
+            "# definition:         {relative_aggregation_file_path}"
         )
         .unwrap();
         writeln!(
             writer,
-            "# source trend store: {}",
-            relative_source_definition_path
+            "# source trend store: {relative_source_definition_path}"
         )
         .unwrap();
         writeln!(writer, "#").unwrap();
@@ -1075,8 +1071,8 @@ fn write_view_entity_aggregations(
     Ok(())
 }
 
-/// Translate a part name with standard naming convention <data_source>_<entity_type>_<granularity>
-/// to <data_source_<target_entity_type>_<granularity>.
+/// Translate a part name with standard naming convention <`data_source`>_<`entity_type`>_<granularity>
+/// to <`data_source`_<`target_entity_type`>_<granularity>.
 fn translate_entity_aggregation_part_name(
     name: String,
     target_entity_type: &str,
@@ -1121,6 +1117,6 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
 
     standard_aggregations
         .get(granularity)
-        .ok_or(format!("No predefined granularity '{:?}'", granularity))
+        .ok_or(format!("No predefined granularity '{granularity:?}'"))
         .cloned()
 }

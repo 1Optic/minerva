@@ -18,13 +18,10 @@ impl Cmd for TrendStoreDelete {
 
         let mut client = connect_db().await?;
 
-        let result = delete_trend_store(&mut client, self.id).await;
-
-        match result {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Runtime(RuntimeError {
+        delete_trend_store(&mut client, self.id).await.map_err(|e| {
+            Error::Runtime(RuntimeError {
                 msg: format!("Error deleting trend store: {e}"),
-            })),
-        }
+            })
+        })
     }
 }

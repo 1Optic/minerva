@@ -59,6 +59,9 @@ pub enum TriggerOptCommands {
 }
 
 impl TriggerOpt {
+    /// # Errors
+    ///
+    /// Will return `Err` if a subcommand returns an error.
     pub async fn run(&self) -> CmdResult {
         match &self.command {
             TriggerOptCommands::List(list) => list.run().await,

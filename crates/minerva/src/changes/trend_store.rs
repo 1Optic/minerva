@@ -22,18 +22,18 @@ pub struct RemoveTrends {
 
 impl fmt::Display for RemoveTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "RemoveTrends({}, {}):\n{}",
+            "RemoveTrends({}, {}):",
             &self.trend_store_part,
-            self.trends.len(),
-            &self
-                .trends
-                .iter()
-                .map(|t| format!(" - {}\n", &t))
-                .collect::<Vec<String>>()
-                .join("")
-        )
+            self.trends.len()
+        )?;
+
+        for t in &self.trends {
+            writeln!(f, " - {}", &t)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -99,18 +99,18 @@ pub struct AddTrends {
 
 impl fmt::Display for AddTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "AddTrends({}, {}):\n{}",
+            "AddTrends({}, {}):",
             &self.trend_store_part,
-            &self.trends.len(),
-            &self
-                .trends
-                .iter()
-                .map(|t| format!(" - {}: {}\n", &t.name, &t.data_type))
-                .collect::<Vec<String>>()
-                .join("")
-        )
+            &self.trends.len()
+        )?;
+
+        for t in &self.trends {
+            writeln!(f, " - {}: {}", &t.name, &t.data_type)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -232,17 +232,18 @@ pub struct ModifyTrendDataTypes {
 
 impl fmt::Display for ModifyTrendDataTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "ModifyTrendDataTypes({}, {}):\n{}",
+            "ModifyTrendDataTypes({}, {}):",
             &self.trend_store_part,
-            self.modifications.len(),
-            self.modifications
-                .iter()
-                .map(|m| format!(" - {}: {} -> {}\n", m.trend_name, m.from_type, m.to_type))
-                .collect::<Vec<String>>()
-                .join(""),
-        )
+            self.modifications.len()
+        )?;
+
+        for m in &self.modifications {
+            writeln!(f, " - {}: {} -> {}", m.trend_name, m.from_type, m.to_type)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -631,18 +632,13 @@ pub struct AddTrendStore {
 
 impl fmt::Display for AddTrendStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "AddTrendStore({})\n{}",
-            &self.trend_store,
-            &self
-                .trend_store
-                .parts
-                .iter()
-                .map(|part| format!(" - {}\n", &part.name))
-                .collect::<Vec<String>>()
-                .join("")
-        )
+        writeln!(f, "AddTrendStore({})", &self.trend_store)?;
+
+        for part in &self.trend_store.parts {
+            writeln!(f, " - {}", &part.name)?;
+        }
+
+        Ok(())
     }
 }
 

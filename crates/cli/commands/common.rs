@@ -8,7 +8,7 @@ use tokio_postgres::{config::SslMode, Config};
 use tokio_postgres::{Client, NoTls};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
-use minerva::error::{ConfigurationError, Error};
+use minerva::error::{ConfigurationError, Error, RuntimeError};
 
 pub type CmdResult = Result<(), Error>;
 
@@ -21,6 +21,7 @@ pub trait Cmd {
     async fn run(&self) -> CmdResult;
 }
 
+#[must_use]
 pub fn show_db_config(config: &Config) -> String {
     let hosts = config.get_hosts();
 
@@ -53,41 +54,40 @@ pub fn show_db_config(config: &Config) -> String {
 }
 
 pub fn get_db_config() -> Result<Config, Error> {
-    let config = match env::var(ENV_DB_CONN) {
-        Ok(value) => Config::new().options(&value).clone(),
-        Err(_) => {
-            // No single environment variable set, let's check for psql settings
-            let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
-            let mut config = Config::new();
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) {
+        Config::new().options(&value).clone()
+    } else {
+        // No single environment variable set, let's check for psql settings
+        let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
+        let mut config = Config::new();
 
-            let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
+        let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
 
-            let sslmode = match env_sslmode.to_lowercase().as_str() {
-                "disable" => SslMode::Disable,
-                "prefer" => SslMode::Prefer,
-                "require" => SslMode::Require,
-                _ => {
-                    return Err(Error::Configuration(ConfigurationError {
-                        msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                    }))
-                }
-            };
-
-            let default_user_name = env::var("USER").unwrap_or("postgres".into());
-
-            let config = config
-                .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
-                .port(port)
-                .user(env::var("PGUSER").unwrap_or(default_user_name))
-                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
-                .ssl_mode(sslmode);
-
-            let pg_password = env::var("PGPASSWORD");
-
-            match pg_password {
-                Ok(password) => config.password(password).clone(),
-                Err(_) => config.clone(),
+        let sslmode = match env_sslmode.to_lowercase().as_str() {
+            "disable" => SslMode::Disable,
+            "prefer" => SslMode::Prefer,
+            "require" => SslMode::Require,
+            _ => {
+                return Err(Error::Configuration(ConfigurationError {
+                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                }))
             }
+        };
+
+        let default_user_name = env::var("USER").unwrap_or("postgres".into());
+
+        let config = config
+            .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
+            .port(port)
+            .user(env::var("PGUSER").unwrap_or(default_user_name))
+            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
+            .ssl_mode(sslmode);
+
+        let pg_password = env::var("PGPASSWORD");
+
+        match pg_password {
+            Ok(password) => config.password(password).clone(),
+            Err(_) => config.clone(),
         }
     };
 
@@ -99,12 +99,26 @@ pub async fn connect_db() -> Result<Client, Error> {
 }
 
 pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
-    let client = if config.get_ssl_mode() != SslMode::Disable {
+    let client = if config.get_ssl_mode() == SslMode::Disable {
+        let (client, connection) = config.connect(NoTls).await?;
+
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {e}");
+            }
+        });
+
+        client
+    } else {
         let mut roots = rustls::RootCertStore::empty();
 
         for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
         {
-            roots.add(cert).unwrap();
+            roots.add(cert).map_err(|e| {
+                Error::Runtime(RuntimeError::from_msg(format!(
+                    "Could not add certificate to certificate store: {e}"
+                )))
+            })?;
         }
 
         let tls_config = RustlsClientConfig::builder()
@@ -118,16 +132,6 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
                 &config, e
             ))
         })?;
-
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {e}");
-            }
-        });
-
-        client
-    } else {
-        let (client, connection) = config.connect(NoTls).await?;
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {

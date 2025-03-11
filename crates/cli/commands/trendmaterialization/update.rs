@@ -48,7 +48,7 @@ impl Cmd for TrendMaterializationUpdate {
         };
 
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 transaction.commit().await?;
 
                 println!("Updated trend materialization");

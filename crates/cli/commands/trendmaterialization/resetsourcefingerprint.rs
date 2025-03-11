@@ -17,17 +17,16 @@ impl Cmd for TrendMaterializationResetSourceFingerprint {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let result = reset_source_fingerprint(&mut client, &self.materialization).await;
+        reset_source_fingerprint(&mut client, &self.materialization)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!("Error updating trend materialization: {e}"),
+                })
+            })?;
 
-        match result {
-            Ok(_) => {
-                println!("Updated trend materialization");
+        println!("Updated trend materialization");
 
-                Ok(())
-            }
-            Err(e) => Err(Error::Runtime(RuntimeError {
-                msg: format!("Error updating trend materialization: {e}"),
-            })),
-        }
+        Ok(())
     }
 }

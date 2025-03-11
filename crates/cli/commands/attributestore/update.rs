@@ -37,7 +37,9 @@ impl Cmd for AttributeStoreUpdate {
 
         let changes = attribute_store_db.diff(&attribute_store, diff_options);
 
-        if !changes.is_empty() {
+        if changes.is_empty() {
+            println!("Attribute store already up-to-date");
+        } else {
             println!("Updating attribute store");
 
             for change in changes {
@@ -52,8 +54,6 @@ impl Cmd for AttributeStoreUpdate {
                     }
                 }
             }
-        } else {
-            println!("Attribute store already up-to-date");
         }
 
         Ok(())

@@ -26,6 +26,7 @@ use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use crate::database::{connect_to_db, create_database, drop_database};
 use crate::error::Error;
 
+#[must_use]
 pub fn generate_name(len: usize) -> String {
     Alphanumeric.sample_string(&mut rand::rng(), len)
 }
@@ -56,6 +57,7 @@ pub fn create_citus_container(
         .with_cmd(vec!["-c", "config-file=/etc/postgresql/postgresql.conf"])
 }
 
+#[must_use]
 pub fn get_available_port(ip_addr: Ipv4Addr) -> Option<u16> {
     (1000..50000).find(|port| port_available(SocketAddr::V4(SocketAddrV4::new(ip_addr, *port))))
 }
@@ -68,7 +70,7 @@ pub async fn add_worker(client: &mut Client, host: IpAddr, port: u16) -> Result<
     let _count = client
         .execute(
             "SELECT citus_add_node($1, $2)",
-            &[&(&host.to_string()), &(port as i32)],
+            &[&(&host.to_string()), &i32::from(port)],
         )
         .await
         .map_err(|e| format!("Could not add worker node: {e}"))?;
@@ -140,13 +142,14 @@ pub struct TestDatabase {
 
 impl TestDatabase {
     pub async fn drop_database(&self, client: &mut Client) {
-        drop_database(client, &self.name).await.unwrap()
+        drop_database(client, &self.name).await.unwrap();
     }
 
     pub async fn connect(&self) -> Result<Client, crate::error::Error> {
         connect_to_db(&self.connect_config, 3).await
     }
 
+    #[must_use]
     pub fn get_env(&self) -> Vec<(String, String)> {
         let host = match &self.connect_config.get_hosts()[0] {
             tokio_postgres::config::Host::Tcp(tcp_host) => tcp_host.to_string(),
@@ -166,6 +169,7 @@ impl TestDatabase {
         ]
     }
 
+    #[must_use]
     pub fn config(&self) -> Config {
         self.connect_config.clone()
     }
@@ -282,6 +286,7 @@ pub struct WorkerNode {
 }
 
 impl WorkerNode {
+    #[must_use]
     pub fn connect_config(&self, database_name: &str) -> Config {
         let mut config = Config::new();
 
@@ -313,7 +318,7 @@ impl MinervaCluster {
 
         let controller_container = create_citus_container(
             &image_ref,
-            &format!("{}_coordinator", network_name),
+            &format!("{network_name}_coordinator"),
             Some(5432),
             &config.config_file,
         )
@@ -322,11 +327,8 @@ impl MinervaCluster {
         .await
         .map_err(|e| {
             crate::error::Error::Runtime(
-                format!(
-                    "Could not create coordinator container of image '{}': {e}",
-                    image_ref
-                )
-                .into(),
+                format!("Could not create coordinator container of image '{image_ref}': {e}")
+                    .into(),
             )
         })?;
 
@@ -370,8 +372,8 @@ impl MinervaCluster {
 
         let image_ref = config.image_provider.image().await;
 
-        for i in 1..(config.worker_count + 1) {
-            let container_name = format!("{}_node{i}", network_name);
+        for i in 1..=config.worker_count {
+            let container_name = format!("{network_name}_node{i}");
             let container =
                 create_citus_container(&image_ref, &container_name, None, &config.config_file)
                     .with_network(network_name.clone())
@@ -413,6 +415,7 @@ impl MinervaCluster {
         })
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         self.workers.len()
     }
@@ -436,6 +439,7 @@ impl MinervaCluster {
         connect_to_db(&self.connect_config(database_name), 3).await
     }
 
+    #[must_use]
     pub fn connect_config(&self, database_name: &str) -> Config {
         let mut config = Config::new();
 

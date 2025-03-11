@@ -36,14 +36,14 @@ impl Cmd for TrendStoreDiff {
                     minerva::trend_store::TrendStoreDiffOptions::default(),
                 );
 
-                if !changes.is_empty() {
+                if changes.is_empty() {
+                    println!("Trend store already up-to-date");
+                } else {
                     println!("Differences with the database");
 
                     for change in changes {
                         println!("{}", &change);
                     }
-                } else {
-                    println!("Trend store already up-to-date")
                 }
 
                 Ok(())

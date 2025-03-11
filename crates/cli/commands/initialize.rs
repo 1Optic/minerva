@@ -87,7 +87,7 @@ impl Cmd for InitializeOpt {
 
             for node in c.nodes {
                 client
-                    .execute(&query, &[&node.address, &(node.port as i32)])
+                    .execute(&query, &[&node.address, &i32::from(node.port)])
                     .await
                     .map_err(|e| format!("Error adding node to cluster: {e}"))?;
             }

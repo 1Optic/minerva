@@ -101,34 +101,33 @@ impl fmt::Display for Notification {
 }
 
 fn get_db_config() -> Result<TokioConfig, String> {
-    let config = match env::var(ENV_DB_CONN) {
-        Ok(value) => TokioConfig::new().options(&value).clone(),
-        Err(_) => {
-            // No single environment variable set, let's check for psql settings
-            let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
-            let mut config = TokioConfig::new();
+    let config = if let Ok(value) = env::var(ENV_DB_CONN) {
+        TokioConfig::new().options(&value).clone()
+    } else {
+        // No single environment variable set, let's check for psql settings
+        let port: u16 = env::var("PGPORT").unwrap_or("5432".into()).parse().unwrap();
+        let mut config = TokioConfig::new();
 
-            let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
+        let env_sslmode = env::var("PGSSLMODE").unwrap_or("prefer".into());
 
-            let sslmode = match env_sslmode.to_lowercase().as_str() {
-                "disable" => SslMode::Disable,
-                "prefer" => SslMode::Prefer,
-                "require" => SslMode::Require,
-                _ => return Err(format!("Unsupported SSL mode '{}'", &env_sslmode)),
-            };
+        let sslmode = match env_sslmode.to_lowercase().as_str() {
+            "disable" => SslMode::Disable,
+            "prefer" => SslMode::Prefer,
+            "require" => SslMode::Require,
+            _ => return Err(format!("Unsupported SSL mode '{}'", &env_sslmode)),
+        };
 
-            let config = config
-                .host(env::var("PGHOST").unwrap_or("localhost".into()))
-                .port(port)
-                .user(env::var("PGUSER").unwrap_or("postgres".into()))
-                .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
-                .ssl_mode(sslmode);
+        let config = config
+            .host(env::var("PGHOST").unwrap_or("localhost".into()))
+            .port(port)
+            .user(env::var("PGUSER").unwrap_or("postgres".into()))
+            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
+            .ssl_mode(sslmode);
 
-            let pg_password = env::var("PGPASSWORD");
-            match pg_password {
-                Ok(password) => config.password(password).clone(),
-                Err(_) => config.clone(),
-            }
+        let pg_password = env::var("PGPASSWORD");
+        match pg_password {
+            Ok(password) => config.password(password).clone(),
+            Err(_) => config.clone(),
         }
     };
 
@@ -166,17 +165,17 @@ fn show_config(config: &TokioConfig) -> String {
     )
 }
 
-async fn connect_db() -> Result<Pool, String> {
+fn connect_db() -> Result<Pool, String> {
     let config = get_db_config()?;
 
     let config_repr = show_config(&config);
 
     info!("Connecting to database: {}", &config_repr);
 
-    make_db_pool(&config).await
+    make_db_pool(&config)
 }
 
-async fn make_db_pool(config: &TokioConfig) -> Result<Pool, String> {
+fn make_db_pool(config: &TokioConfig) -> Result<Pool, String> {
     let mut roots = rustls::RootCertStore::empty();
 
     for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
@@ -227,7 +226,7 @@ async fn main() {
         .install_default()
         .expect("Failed to install rustls crypto provider");
     let config = get_config();
-    let pool = connect_db().await.unwrap();
+    let pool = connect_db().unwrap();
     let mut client = pool.get().await.unwrap();
     let httpclient = Client::new();
     let transaction = client.transaction().await.unwrap();
@@ -260,7 +259,12 @@ async fn main() {
 
         let mut missed_notification = -1;
 
-        if !result.is_empty() {
+        if result.is_empty() {
+            info!(
+                "{}: no new notifications received.",
+                Local::now().format("%Y-%m-%d %H:%M:%S")
+            );
+        } else {
             info!(
                 "{}: {} notifications received.",
                 Local::now().format("%Y-%m-%d %H:%M:%S"),
@@ -307,12 +311,8 @@ async fn main() {
                     }
                 }
             }
-        } else {
-            info!(
-                "{}: no new notifications received.",
-                Local::now().format("%Y-%m-%d %H:%M:%S")
-            )
         }
+
         if missed_notification > -1 && missed_notification <= last_notification {
             last_notification = missed_notification - 1;
         }
