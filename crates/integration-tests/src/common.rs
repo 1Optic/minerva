@@ -90,7 +90,7 @@ impl MinervaService {
 
             debug!("Trying to connect to service at {}", ipv4_addr);
 
-            if let Ok(_) = result {
+            if result.is_ok() {
                 return Ok(());
             } else {
                 // Check if process is still running
