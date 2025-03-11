@@ -44,7 +44,12 @@ pub struct AddAttributes {
 
 impl fmt::Display for AddAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "AddAttributes({}, {}):", &self.attribute_store, &self.attributes.len())?;
+        writeln!(
+            f,
+            "AddAttributes({}, {}):",
+            &self.attribute_store,
+            &self.attributes.len()
+        )?;
 
         for att in &self.attributes {
             writeln!(f, " - {}: {}", att.name, att.data_type)?;
@@ -112,10 +117,15 @@ pub struct RemoveAttributes {
 
 impl fmt::Display for RemoveAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "RemoveAttributes({}, {})", &self.attribute_store, &self.attributes.len())?;
+        writeln!(
+            f,
+            "RemoveAttributes({}, {})",
+            &self.attribute_store,
+            &self.attributes.len()
+        )?;
 
         for att in &self.attributes {
-             writeln!(f, " - {att}")?;
+            writeln!(f, " - {att}")?;
         }
 
         Ok(())
