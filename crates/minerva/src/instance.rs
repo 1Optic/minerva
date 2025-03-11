@@ -1,12 +1,15 @@
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::{BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use chrono::Duration;
 use glob::glob;
 
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
@@ -65,11 +68,14 @@ pub struct InstanceDockerImage {
     pub path: PathBuf,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
+    #[serde_as(as = "HashMap<humantime_serde, humantime_serde>")]
+    pub retention_mapping: HashMap<Duration, Duration>,
 }
 
 #[derive(thiserror::Error, Debug)]

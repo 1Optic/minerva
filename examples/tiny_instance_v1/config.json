@@ -1,4 +1,7 @@
 {
     "entity_aggregation_hints": [],
-    "entity_types": []
+    "entity_types": [],
+    "retention_mapping": [
+        ["15m", "14days"]
+    ]
 }
