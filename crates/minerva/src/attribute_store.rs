@@ -1,4 +1,3 @@
-use postgres_protocol::message::frontend::execute;
 use serde::{Deserialize, Serialize};
 use std::boxed::Box;
 use std::fmt;
