@@ -29,13 +29,12 @@ impl Cmd for TriggerPreviewNotifications {
         let mut table = Table::new();
         let style = "     ═╪ ┆          ";
         table.load_preset(style);
-        table.set_header(vec!["entity_id", "timestamp", "weight", "details", "data"]);
+        table.set_header(vec!["entity_id", "timestamp", "weight", "data"]);
         for trigger in triggers {
             table.add_row(vec![
                 trigger.0.to_string(),
                 trigger.1,
                 trigger.2.to_string(),
-                trigger.3,
                 trigger.4,
             ]);
         }

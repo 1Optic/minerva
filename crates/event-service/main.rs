@@ -25,7 +25,6 @@ struct NotificationData {
     timestamp: String,
     rule: String,
     entity: String,
-    details: String,
     data: Value,
 }
 
@@ -36,7 +35,6 @@ struct Notification {
     timestamp: SystemTime,
     rule: String,
     entity: String,
-    details: String,
     data: Value,
 }
 
@@ -84,7 +82,6 @@ fn notification_from_data(data: NotificationData) -> Notification {
             .into(),
         rule: data.rule,
         entity: data.entity,
-        details: data.details,
         data: data.data,
     }
 }
@@ -244,13 +241,13 @@ async fn main() {
         let transaction = client.transaction().await.unwrap();
         let result: Vec<Row> = match last_notification {
             -1 => transaction.query(
-                "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_last_notifications($1, $2)",
+                "SELECT id, timestamp::text, rule, entity, data FROM notification_directory.get_last_notifications($1, $2)",
                 &[&config.notification_store, &config.max_notifications]
             )
             .await
             .unwrap(),
             _ => transaction.query(
-                "SELECT id, timestamp::text, rule, entity, details, data FROM notification_directory.get_next_notifications($1, $2, $3)",
+                "SELECT id, timestamp::text, rule, entity, data FROM notification_directory.get_next_notifications($1, $2, $3)",
                 &[&config.notification_store, &last_notification, &config.max_notifications]
             )
             .await
@@ -277,8 +274,7 @@ async fn main() {
                     timestamp: row.get(1),
                     rule: row.get(2),
                     entity: row.get(3),
-                    details: row.get(4),
-                    data: row.get(5),
+                    data: row.get(4),
                 };
                 let notification = notification_from_data(notification_data);
 
