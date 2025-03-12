@@ -191,7 +191,6 @@ LEFT JOIN trigger_rule.%I AS exc ON
     exc.expires > n.timestamp $fn$ LANGUAGE sql STABLE',
     trigger.notification_fn_name($1),
     trigger.weight_fn_name($1),
-    trigger.notification_message_fn_name($1),
     trigger.notification_data_fn_name($1),
     $1.name,
     trigger.exception_weight_table_name($1)
