@@ -11,6 +11,7 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio_postgres::Client;
+use humantime_serde::Serde;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 
@@ -74,7 +75,7 @@ pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
-    #[serde_as(as = "HashMap<humantime_serde, humantime_serde>")]
+    #[serde_as(as = "HashMap<Serde<Duration>, Serde<Duration>>")]
     pub retention_mapping: HashMap<Duration, Duration>,
 }
 
