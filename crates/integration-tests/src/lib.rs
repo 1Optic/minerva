@@ -10,6 +10,7 @@ pub mod initialize;
 pub mod load_data;
 pub mod trend_materialization;
 pub mod trend_storage;
+pub mod trigger_trigger;
 
 static INIT: Once = Once::new();
 
