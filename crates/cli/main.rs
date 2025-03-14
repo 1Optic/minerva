@@ -20,6 +20,7 @@ use crate::commands::trendstore::TrendStoreOpt;
 use crate::commands::trigger::TriggerOpt;
 use crate::commands::update::UpdateOpt;
 use crate::commands::virtualentity::VirtualEntityOpt;
+use crate::commands::define::DefineOpt;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, name = "minerva", arg_required_else_help = true)]
@@ -60,6 +61,8 @@ enum Commands {
     Aggregation(AggregationOpt),
     #[command(about = "Manage virtual entities")]
     VirtualEntity(VirtualEntityOpt),
+    #[command(about = "Define Minerva instance")]
+    Define(DefineOpt),
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -96,6 +99,7 @@ async fn main() -> ExitCode {
         Some(Commands::Start(start)) => start.run().await,
         Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
+        Some(Commands::Define(define)) => define.run().await,
         None => return ExitCode::FAILURE,
     };
 
