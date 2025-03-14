@@ -3,9 +3,9 @@ mod tests {
     use log::info;
     use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
     use minerva::trigger::{AddTrigger, CreateNotifications, Trigger};
+    use serde_json::{json, Value};
     use std::env;
     use std::path::PathBuf;
-    use serde_json::{Value, json};
 
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
@@ -177,7 +177,7 @@ mod tests {
                 .map(|row| row.get(1))
                 .collect();
             assert_eq!(notification_data, vec![expected_data1, expected_data2]);
-    }
+        }
 
         Ok(())
     }
