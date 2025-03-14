@@ -92,33 +92,45 @@ impl Cmd for RelationMaterialize {
         for name in relation_names {
             let mut tx = client.transaction().await?;
 
-            match materialize_relation(&mut tx, &name).await {
-                Ok(changed) => {
-                    tx.commit().await?;
+            let materialization_definition_query = concat!(
+                "SELECT 1 FROM pg_catalog.pg_class c ",
+                "JOIN pg_catalog.pg_namespace ns ",
+                "ON c.relnamespace = ns.oid ",
+                "WHERE relname = $1 AND nspname = $2"
+            );
+
+            match tx
+                .query_one(materialization_definition_query, &[&name, &"relation_def"])
+                .await
+            {
+                Ok(_) => match materialize_relation(&mut tx, &name).await {
+                    Ok(changed) => {
+                        tx.commit().await?;
+                        println!(
+                            "Materialized relation '{name}' (deleted {}, inserted {})",
+                            changed.deleted_count, changed.inserted_count
+                        );
+                    }
+                    Err(e) => {
+                        tx.rollback().await?;
+                        println!("Error materializing relation '{name}': {e}");
+                        error_count += 1;
+                    }
+                },
+                Err(_) => {
                     println!(
-                        "Materialized relation '{name}' (deleted {}, inserted {})",
-                        changed.deleted_count, changed.inserted_count
-                    );
-                }
-                Err(e) => {
-                    tx.rollback().await?;
-                    println!("Error materializing relation '{name}': {e}");
-                    error_count += 1;
+                        "WARNING: Relation {name} does not have a defining view and is skipped."
+                    )
                 }
             }
         }
 
         if error_count > 0 {
-            match &self.name {
-                Some(_) => {
-                    return Err(minerva::error::Error::Runtime(
-                        minerva::error::RuntimeError::from_msg(format!(
-                            "{error_count} relations failed to materialize"
-                        )),
-                    ))
-                }
-                None => println!("WARNING: {error_count} relation(s) failed to materialize"),
-            }
+            return Err(minerva::error::Error::Runtime(
+                minerva::error::RuntimeError::from_msg(format!(
+                    "{error_count} relations failed to materialize"
+                )),
+            ));
         }
 
         Ok(())
