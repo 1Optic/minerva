@@ -5,6 +5,7 @@ mod tests {
     use minerva::trigger::{AddTrigger, CreateNotifications, Trigger};
     use std::env;
     use std::path::PathBuf;
+    use serde_json::{Value, json};
 
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
@@ -158,16 +159,25 @@ mod tests {
 
             let notification_rows = client
                 .query(
-                    "SELECT entity_id FROM notification.\"trigger-notification\"",
+                    "SELECT entity_id, data FROM notification.\"trigger-notification\"",
                     &[],
                 )
                 .await?;
-            let notifications: Vec<i32> = notification_rows
+            let notification_entities: Vec<i32> = notification_rows
+                .clone()
                 .into_iter()
                 .map(|row| row.get(0))
                 .collect();
-            assert_eq!(notifications, vec![2, 3]);
-        }
+            assert_eq!(notification_entities, vec![2, 3]);
+
+            let expected_data1 = json!({"entity": 2, "temp_inside": 30.5, "temp_outside": 19.3, "temp_differential": 11.2});
+            let expected_data2 = json!({"entity": 3, "temp_inside": 36.1, "temp_outside": 25.0, "temp_differential": 11.1});
+            let notification_data: Vec<Value> = notification_rows
+                .into_iter()
+                .map(|row| row.get(1))
+                .collect();
+            assert_eq!(notification_data, vec![expected_data1, expected_data2]);
+    }
 
         Ok(())
     }
