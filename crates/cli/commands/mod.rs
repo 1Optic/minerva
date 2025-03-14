@@ -1,6 +1,7 @@
 pub mod aggregation;
 pub mod attributestore;
 pub mod common;
+pub mod define;
 pub mod diff;
 pub mod dump;
 pub mod initialize;
@@ -13,4 +14,3 @@ pub mod trendstore;
 pub mod trigger;
 pub mod update;
 pub mod virtualentity;
-pub mod define;

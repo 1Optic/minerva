@@ -506,7 +506,7 @@ async fn initialize_notification_stores(
     Ok(())
 }
 
-fn load_trend_stores_from(minerva_instance_root: &Path) -> impl Iterator<Item = TrendStore> {
+pub fn load_trend_stores_from(minerva_instance_root: &Path) -> impl Iterator<Item = TrendStore> {
     let yaml_paths = glob(&format!(
         "{}/trend/*.yaml",
         minerva_instance_root.to_string_lossy()

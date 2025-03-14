@@ -8,6 +8,7 @@ pub mod commands;
 use crate::commands::aggregation::AggregationOpt;
 use crate::commands::attributestore::AttributeStoreOpt;
 use crate::commands::common::Cmd;
+use crate::commands::define::DefineOpt;
 use crate::commands::diff::DiffOpt;
 use crate::commands::dump::DumpOpt;
 use crate::commands::initialize::InitializeOpt;
@@ -20,7 +21,6 @@ use crate::commands::trendstore::TrendStoreOpt;
 use crate::commands::trigger::TriggerOpt;
 use crate::commands::update::UpdateOpt;
 use crate::commands::virtualentity::VirtualEntityOpt;
-use crate::commands::define::DefineOpt;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, name = "minerva", arg_required_else_help = true)]
