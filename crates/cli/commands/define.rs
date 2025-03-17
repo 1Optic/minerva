@@ -1,4 +1,3 @@
-use std::arch::x86_64::_tzcnt_u16;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -32,6 +31,16 @@ struct TrendDefinition {
     time_aggregation: String,
     entity_aggregation: String,
     extra_data: Value,
+}
+
+impl TrendDefinition {
+    pub fn get_trend_store_key(&self) -> TrendStoreKey {
+        TrendStoreKey {
+            data_source: self.data_source.clone(),
+            entity_type: self.entity_type.clone(),
+            granularity: self.granularity,
+        }
+    }
 }
 
 impl From<&TrendDefinition> for Trend {
@@ -80,18 +89,33 @@ impl Default for TrendStorePartParameters {
     }
 }
 
-struct RegisterEntry {
-    row_width: u16,
-    part: TrendStorePart,
+fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
+    params.base_width + TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap() * 3
 }
 
-struct TrendStorePartRegister {
-    name: String,
-    part_entries: HashMap<String, RegisterEntry>,
+fn determine_part<'a>(trend_store_parts: &'a mut HashMap<String, (TrendStoreKey, TrendStorePart)>, trend_definition: &'a TrendDefinition, params: &'a TrendStorePartParameters) -> &'a mut TrendStorePart {
+    let trend_store_part_name = format!(
+        "{}_{}_{}_{}",
+        trend_definition.data_source,
+        trend_definition.entity_type,
+        trend_definition.part,
+        humantime::format_duration(trend_definition.granularity)
+    );
+
+    let (_trend_store_key, part) = trend_store_parts.entry(trend_store_part_name.clone()).or_insert((trend_definition.get_trend_store_key(), TrendStorePart {
+        name: trend_store_part_name,
+        trends: Vec::new(),
+        generated_trends: Vec::new(),
+    }));
+
+    part
 }
 
-fn calc_row_size(trend_store_part: &TrendStorePart) -> u16 {
-    3 + TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap() * 3
+#[derive(Clone, Eq, Hash, PartialEq)]
+struct TrendStoreKey {
+    data_source: String,
+    entity_type: String,
+    granularity: Duration,
 }
 
 fn define_trend_stores(
@@ -101,7 +125,7 @@ fn define_trend_stores(
 ) -> Vec<TrendStore> {
     //let mut trend_store_parts: HashMap<(String, String, String, Duration), TrendStorePartRegister> = HashMap::new();
     //let mut trend_store_parts: HashMap<(String, String, String, Duration), TrendStorePartRegister> = HashMap::new();
-    let mut trend_store_parts: HashMap<String, (String, String, Duration, TrendStorePart)> = HashMap::new();
+    let mut trend_store_parts: HashMap<String, (TrendStoreKey, TrendStorePart)> = HashMap::new();
 
     // First check which trends already exist in the current trend stores and place them into the
     // same parts.
@@ -136,7 +160,7 @@ fn define_trend_stores(
             Some(part) => {
                 println!("curr: {}", part.name);
 
-                let (d,e,r,part) = trend_store_parts.entry(part.name.clone()).or_insert((trend_definition.data_source.clone(), trend_definition.entity_type.clone(), trend_definition.granularity, TrendStorePart {
+                let (trend_store_key, part) = trend_store_parts.entry(part.name.clone()).or_insert((trend_definition.get_trend_store_key(), TrendStorePart {
                     name: part.name.clone(),
                     trends: Vec::new(),
                     generated_trends: Vec::new(),
@@ -157,21 +181,9 @@ fn define_trend_stores(
     for trend_definition in remaining_trend_definitions {
         println!("- {}", trend_definition.name);
 
-        let trend_store_part_name = format!(
-            "{}_{}_{}_{}",
-            trend_definition.data_source,
-            trend_definition.entity_type,
-            trend_definition.part,
-            humantime::format_duration(trend_definition.granularity)
-        );
+        let part = determine_part(&mut trend_store_parts, trend_definition, &params);
 
-        let (d,e,r,part) = trend_store_parts.entry(trend_store_part_name.clone()).or_insert((trend_definition.data_source.clone(), trend_definition.entity_type.clone(), trend_definition.granularity, TrendStorePart {
-            name: trend_store_part_name,
-            trends: Vec::new(),
-            generated_trends: Vec::new(),
-        }));
-
-        if calc_row_size(part) > 3 {
+        if calc_row_size(&params, part) > params.max_row_width {
         } else {
             part.trends.push(trend_definition.into());
         }
@@ -225,18 +237,16 @@ fn define_trend_stores(
 //        println!("- {}", trend_definition.name);
     }
 
-    let mut trend_stores: HashMap<_, TrendStore> = HashMap::new();
+    let mut trend_stores: HashMap<TrendStoreKey, TrendStore> = HashMap::new();
 
-    for (data_source, entity_type, granularity, part) in trend_store_parts.into_values() {
-        let trend_store_key = (data_source.clone(), entity_type.clone(), granularity);
-
-        let trend_store = trend_stores.entry(trend_store_key).or_insert(TrendStore {
+    for (trend_store_key, part) in trend_store_parts.into_values() {
+        let trend_store = trend_stores.entry(trend_store_key.clone()).or_insert(TrendStore {
             title: Some("Raw data trend store generated from counter list".to_string()),
-            data_source: data_source.clone(),
-            entity_type: entity_type.clone(),
-            granularity,
-            partition_size: granularity_to_partition_size(granularity).unwrap(),
-            retention_period: granularity_to_partition_size(granularity).unwrap(),
+            data_source: trend_store_key.data_source.clone(),
+            entity_type: trend_store_key.entity_type.clone(),
+            granularity: trend_store_key.granularity,
+            partition_size: granularity_to_partition_size(trend_store_key.granularity).unwrap(),
+            retention_period: granularity_to_partition_size(trend_store_key.granularity).unwrap(),
             parts: Vec::new(),
         });
 
