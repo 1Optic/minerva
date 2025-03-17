@@ -41,6 +41,27 @@ impl TrendDefinition {
             granularity: self.granularity,
         }
     }
+
+    pub fn get_default_part_name(&self) -> String {
+        format!(
+            "{}_{}_{}_{}",
+            self.data_source,
+            self.entity_type,
+            self.part,
+            humantime::format_duration(self.granularity)
+        )
+    }
+
+    pub fn get_numbered_part_name(&self, number: u16) -> String {
+        format!(
+            "{}_{}_{}{}_{}",
+            self.data_source,
+            self.entity_type,
+            self.part,
+            number,
+            humantime::format_duration(self.granularity)
+        )
+    }
 }
 
 impl From<&TrendDefinition> for Trend {
@@ -78,6 +99,7 @@ impl Cmd for DefineOpt {
 struct TrendStorePartParameters {
     pub base_width: u16,
     pub max_row_width: u16,
+    pub column_size: u16,
 }
 
 impl Default for TrendStorePartParameters {
@@ -85,30 +107,70 @@ impl Default for TrendStorePartParameters {
         TrendStorePartParameters {
             base_width: 36,
             max_row_width: 8160,
+            column_size: 15,
         }
     }
 }
 
-fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
-    params.base_width + TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap() * 3
+struct TrendStorePartHolder {
+    trend_store_key: TrendStoreKey,
+    parts: HashMap<String, TrendStorePart>,
 }
 
-fn determine_part<'a>(trend_store_parts: &'a mut HashMap<String, (TrendStoreKey, TrendStorePart)>, trend_definition: &'a TrendDefinition, params: &'a TrendStorePartParameters) -> &'a mut TrendStorePart {
-    let trend_store_part_name = format!(
-        "{}_{}_{}_{}",
-        trend_definition.data_source,
-        trend_definition.entity_type,
-        trend_definition.part,
-        humantime::format_duration(trend_definition.granularity)
-    );
+impl TrendStorePartHolder {
+    pub fn new(trend_store_key: TrendStoreKey) -> Self {
+        TrendStorePartHolder { trend_store_key, parts: HashMap::new() }
+    }
 
-    let (_trend_store_key, part) = trend_store_parts.entry(trend_store_part_name.clone()).or_insert((trend_definition.get_trend_store_key(), TrendStorePart {
-        name: trend_store_part_name,
-        trends: Vec::new(),
-        generated_trends: Vec::new(),
-    }));
+    pub fn add_trend_to_existing_part(&mut self, part_name: &str, trend: Trend) {
+        let part = self.parts.entry(part_name.to_string()).or_insert(TrendStorePart {
+            name: part_name.to_string(),
+            trends: Vec::new(),
+            generated_trends: Vec::new(),
+        });
 
-    part
+        part.trends.push(trend);
+    }
+
+    pub fn add_trend(&mut self, params: &TrendStorePartParameters, trend_definition: &TrendDefinition) -> String {
+        let default_part_name = trend_definition.get_default_part_name();
+
+        let mut part = self.parts.entry(default_part_name.clone()).or_insert(TrendStorePart {
+            name: default_part_name.clone(),
+            trends: Vec::new(),
+            generated_trends: Vec::new(),
+        });
+
+        let mut current_num = 1;
+
+        while calc_row_size(params, part) > params.max_row_width {
+            let next_part_name = trend_definition.get_numbered_part_name(current_num);
+
+            println!("Adding to '{next_part_name}'");
+
+            part = self.parts.entry(next_part_name.clone()).or_insert(TrendStorePart {
+                name: next_part_name.clone(),
+                trends: Vec::new(),
+                generated_trends: Vec::new(),
+            });
+
+            current_num += 1;
+        }
+
+        part.trends.push(trend_definition.into());
+
+        part.name.clone()
+    }
+}
+
+fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
+    let num_columns = TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap();
+
+    let result = params.base_width + num_columns * params.column_size;
+
+    println!("row size of '{}'({} trends): {result}", trend_store_part.name, trend_store_part.trends.len());
+
+    result
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -123,9 +185,8 @@ fn define_trend_stores(
     current_trend_stores: &[TrendStore],
     params: TrendStorePartParameters,
 ) -> Vec<TrendStore> {
-    //let mut trend_store_parts: HashMap<(String, String, String, Duration), TrendStorePartRegister> = HashMap::new();
-    //let mut trend_store_parts: HashMap<(String, String, String, Duration), TrendStorePartRegister> = HashMap::new();
-    let mut trend_store_parts: HashMap<String, (TrendStoreKey, TrendStorePart)> = HashMap::new();
+    let re = regex::Regex::new(r"[1-9]$").unwrap();
+    let mut trend_store_parts: HashMap<String, TrendStorePartHolder> = HashMap::new();
 
     // First check which trends already exist in the current trend stores and place them into the
     // same parts.
@@ -133,13 +194,6 @@ fn define_trend_stores(
     let mut remaining_trend_definitions: Vec<&TrendDefinition> = Vec::new();
 
     for trend_definition in trend_definitions {
-        let trend_store_part_key = (
-            trend_definition.data_source.clone(),
-            trend_definition.entity_type.clone(),
-            trend_definition.part.clone(),
-            trend_definition.granularity,
-        );
-
         let current_trend_store = current_trend_stores.iter().find(|t| {
             t.data_source.eq(&trend_definition.data_source)
                 && t.entity_type.eq(&trend_definition.entity_type)
@@ -157,100 +211,57 @@ fn define_trend_stores(
             });
 
         match current_trend_store_part {
-            Some(part) => {
-                println!("curr: {}", part.name);
+            Some(current_part) => {
+                println!("curr: {}", current_part.name);
 
-                let (trend_store_key, part) = trend_store_parts.entry(part.name.clone()).or_insert((trend_definition.get_trend_store_key(), TrendStorePart {
-                    name: part.name.clone(),
-                    trends: Vec::new(),
-                    generated_trends: Vec::new(),
-                }));
+                // Check if the part name is suffixed with a digit, indicating that it is part of
+                // a split part.
+                let stripped_part_name = re.replace(&current_part.name, "").to_string();
 
-                part.trends.push(trend_definition.into());
+                println!("stripped part name: {}", stripped_part_name);
+
+                let part_holder = trend_store_parts
+                    .entry(stripped_part_name.clone())
+                    .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
+
+                part_holder.add_trend_to_existing_part(&current_part.name, trend_definition.into());
+                println!("- Added '{}' to '{}'", trend_definition.name, current_part.name);
             }, 
             None => {
                 remaining_trend_definitions.push(trend_definition);
             }
         }
-
-        println!(" -> {trend_store_part_key:?}");
     }
 
-    println!("{} remaining trend definitions", remaining_trend_definitions.len());
+    // Now give the remaining trends a place
 
     for trend_definition in remaining_trend_definitions {
-        println!("- {}", trend_definition.name);
+        let part_holder = trend_store_parts
+            .entry(trend_definition.get_default_part_name())
+            .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
 
-        let part = determine_part(&mut trend_store_parts, trend_definition, &params);
-
-        if calc_row_size(&params, part) > params.max_row_width {
-        } else {
-            part.trends.push(trend_definition.into());
-        }
-
-//        let new_part_name = match current_trend_store_part_name {
-//            Some(name) => name,
-//            None => format!(
-//                "{}_{}_{}_{}",
-//                trend_definition.data_source,
-//                trend_definition.entity_type,
-//                trend_definition.part,
-//                humantime::format_duration(trend_definition.granularity)
-//            ),
-//        };
-//
-//        let trend_store_part_register =
-//            trend_store_parts
-//                .entry(trend_store_part_key)
-//                .or_insert(TrendStorePartRegister {
-//                    name: trend_definition.part.clone(),
-//                    part_entries: HashMap::new(),
-//                });
-//
-//        let entry = trend_store_part_register
-//            .part_entries
-//            .entry(new_part_name.clone())
-//            .or_insert(RegisterEntry {
-//                row_width: params.base_width,
-//                part: TrendStorePart {
-//                    name: new_part_name,
-//                    trends: Vec::new(),
-//                    generated_trends: Vec::new(),
-//                },
-//            });
-//        
-//        let matching_entry = if entry.row_width > params.max_row_width {
-//            trend_store_part_register.part_entries.insert(k, v)
-//        } else {
-//            entry
-//        };
-//
-//        matching_entry.part.trends.push(Trend {
-//            name: trend_definition.name.clone(),
-//            data_type: trend_definition.data_type,
-//            description: trend_definition.description.clone(),
-//            entity_aggregation: trend_definition.entity_aggregation.clone(),
-//            time_aggregation: trend_definition.time_aggregation.clone(),
-//            extra_data: trend_definition.extra_data.clone(),
-//        });
-//
-//        println!("- {}", trend_definition.name);
+        let part_name = part_holder.add_trend(&params, trend_definition);
+        println!("- Added '{}' to '{}'", trend_definition.name, part_name);
     }
+
+    // Collect the trend store parts into trend stores
 
     let mut trend_stores: HashMap<TrendStoreKey, TrendStore> = HashMap::new();
 
-    for (trend_store_key, part) in trend_store_parts.into_values() {
-        let trend_store = trend_stores.entry(trend_store_key.clone()).or_insert(TrendStore {
+    for part_holder in trend_store_parts.into_values() {
+        let trend_store = trend_stores.entry(part_holder.trend_store_key.clone()).or_insert(TrendStore {
             title: Some("Raw data trend store generated from counter list".to_string()),
-            data_source: trend_store_key.data_source.clone(),
-            entity_type: trend_store_key.entity_type.clone(),
-            granularity: trend_store_key.granularity,
-            partition_size: granularity_to_partition_size(trend_store_key.granularity).unwrap(),
-            retention_period: granularity_to_partition_size(trend_store_key.granularity).unwrap(),
+            data_source: part_holder.trend_store_key.data_source.clone(),
+            entity_type: part_holder.trend_store_key.entity_type.clone(),
+            granularity: part_holder.trend_store_key.granularity,
+            partition_size: granularity_to_partition_size(part_holder.trend_store_key.granularity).unwrap(),
+            retention_period: granularity_to_partition_size(part_holder.trend_store_key.granularity).unwrap(),
             parts: Vec::new(),
         });
 
-        trend_store.parts.push(part);
+        let mut parts: Vec<TrendStorePart> = part_holder.parts.into_values().collect();
+        parts.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap());
+        trend_store.parts.extend(parts);
     }
 
     trend_stores.into_values().collect()
@@ -320,6 +331,7 @@ mod tests {
         let params = TrendStorePartParameters {
             base_width: 3,
             max_row_width: 6,
+            column_size: 15,
         };
 
         let new_trend_stores =
@@ -339,8 +351,17 @@ mod tests {
             "There should be 2 new trend store parts"
         );
 
-        let first_trend_store_part = first_trend_store.parts.first().unwrap();
+        let mut it = first_trend_store.parts.iter();
+        let first_trend_store_part = it.next().unwrap();
 
-        assert_eq!(first_trend_store_part.name, "my-test_node_traffic_15m");
+        assert_eq!(first_trend_store_part.name, "my-test_node_traffic1_15m");
+        assert_eq!(first_trend_store_part.trends.len(), 1);
+        assert_eq!(first_trend_store_part.trends.first().unwrap().name, "rx");
+
+        let second_trend_store_part = it.next().unwrap();
+
+        assert_eq!(second_trend_store_part.name, "my-test_node_traffic_15m");
+        assert_eq!(second_trend_store_part.trends.len(), 1);
+        assert_eq!(second_trend_store_part.trends.first().unwrap().name, "tx");
     }
 }
