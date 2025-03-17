@@ -89,6 +89,10 @@ impl Cmd for DiffOpt {
                     println!("* {}", &change);
                 }
             }
+
+            return Err(Error::Runtime(minerva::error::RuntimeError::from_msg(
+                "".to_string(),
+            )));
         }
 
         Ok(())

@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CLI: Exit with error failure code on differences with instance definition
 - Library: Use Citus sequential mode for attribute store changes to prevent
-  Citus related errors. 
+  Citus related errors.
 
 ## [9.24.0] - 2025-03-10
 
