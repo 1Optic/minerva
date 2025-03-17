@@ -15,8 +15,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use minerva::error::{ConfigurationError, DatabaseError, Error};
 
-mod info;
-use info::get_version;
+mod version;
+use version::{get_version, Version};
 
 mod trendmaterialization;
 use trendmaterialization::{
@@ -121,7 +121,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
         ),
         components(
             schemas(
-                TrendMaterializationSourceData, TrendMaterializationDef,
+                Version, TrendMaterializationSourceData, TrendMaterializationDef,
                 TrendViewMaterializationFull, TrendFunctionMaterializationFull,
                 TrendViewMaterializationData, TrendFunctionMaterializationData,
                 TrendFull, GeneratedTrendFull, TrendStorePartFull, TrendStoreFull,
