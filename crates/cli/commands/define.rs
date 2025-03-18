@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use async_trait::async_trait;
 use clap::Parser;
-use minerva::aggregation_generation::granularity_to_partition_size;
+use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_store};
 use minerva::instance::load_trend_stores_from;
 use minerva::meas_value::DataType;
 use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
@@ -86,11 +86,15 @@ impl Cmd for DefineOpt {
         let current_trend_stores: Vec<TrendStore> =
             load_trend_stores_from(&self.instance_root).collect();
 
-        define_trend_stores(
+        let trend_stores = define_trend_stores(
             &trend_definitions,
             &current_trend_stores,
             TrendStorePartParameters::default(),
         );
+
+        for trend_store in &trend_stores {
+            save_trend_store(&self.instance_root, trend_store).unwrap();
+        }
 
         Ok(())
     }

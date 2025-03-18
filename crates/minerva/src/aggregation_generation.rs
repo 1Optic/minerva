@@ -188,7 +188,7 @@ fn compile_time_aggregation(
     Ok(target_trend_store)
 }
 
-fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Result<(), String> {
+pub fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Result<(), String> {
     let trend_store_file_name = format!("{}.yaml", trend_store_name(trend_store)?);
 
     let trend_store_file_path: PathBuf = PathBuf::from_iter([
