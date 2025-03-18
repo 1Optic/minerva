@@ -375,10 +375,10 @@ mod tests {
             docker_image: None,
             entity_aggregation_hints: Vec::new(),
             entity_types: Vec::new(),
-            retention: vec![RetentionConfig {
+            retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
-            }],
+            }]),
         };
 
         let new_trend_stores = define_trend_stores(
