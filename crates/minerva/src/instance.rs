@@ -7,6 +7,7 @@ use std::process::Command;
 use glob::glob;
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
@@ -66,10 +67,31 @@ pub struct InstanceDockerImage {
 }
 
 #[derive(Serialize, Deserialize, Default)]
+pub struct RetentionConfig {
+    #[serde(with = "humantime_serde")]
+    pub granularity: Duration,
+    #[serde(with = "humantime_serde")]
+    pub retention_period: Duration,
+}
+
+#[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
+    pub retention: Option<Vec<RetentionConfig>>,
+}
+
+impl InstanceConfig {
+    pub fn granularity_to_retention(&self, granularity: Duration) -> Option<Duration> {
+        match &self.retention {
+            Some(l) => l
+                .iter()
+                .find(|retention_config| retention_config.granularity.eq(&granularity))
+                .map(|c| c.retention_period),
+            None => None,
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -506,7 +528,7 @@ async fn initialize_notification_stores(
     Ok(())
 }
 
-fn load_trend_stores_from(minerva_instance_root: &Path) -> impl Iterator<Item = TrendStore> {
+pub fn load_trend_stores_from(minerva_instance_root: &Path) -> impl Iterator<Item = TrendStore> {
     let yaml_paths = glob(&format!(
         "{}/trend/*.yaml",
         minerva_instance_root.to_string_lossy()
