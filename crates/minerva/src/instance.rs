@@ -7,8 +7,8 @@ use std::process::Command;
 use glob::glob;
 
 use serde::{Deserialize, Serialize};
-use tokio_postgres::Client;
 use std::time::Duration;
+use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 
@@ -85,8 +85,11 @@ pub struct InstanceConfig {
 impl InstanceConfig {
     pub fn granularity_to_retention(&self, granularity: Duration) -> Option<Duration> {
         match &self.retention {
-            Some(l) => l.iter().find(|retention_config| retention_config.granularity.eq(&granularity)).map(|c| c.retention_period),
-            None => None
+            Some(l) => l
+                .iter()
+                .find(|retention_config| retention_config.granularity.eq(&granularity))
+                .map(|c| c.retention_period),
+            None => None,
         }
     }
 }

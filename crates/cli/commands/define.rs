@@ -84,8 +84,9 @@ impl Cmd for DefineOpt {
         let trend_definitions: Vec<TrendDefinition> =
             serde_json::from_reader(std::io::stdin()).unwrap();
 
-        let instance_config = load_instance_config(&self.instance_root)
-            .map_err(|e| RuntimeError::from_msg(format!("Could not load instance configuration: {e}")))?;
+        let instance_config = load_instance_config(&self.instance_root).map_err(|e| {
+            RuntimeError::from_msg(format!("Could not load instance configuration: {e}"))
+        })?;
 
         let current_trend_stores: Vec<TrendStore> =
             load_trend_stores_from(&self.instance_root).collect();
@@ -128,27 +129,40 @@ struct TrendStorePartHolder {
 
 impl TrendStorePartHolder {
     pub fn new(trend_store_key: TrendStoreKey) -> Self {
-        TrendStorePartHolder { trend_store_key, parts: HashMap::new() }
+        TrendStorePartHolder {
+            trend_store_key,
+            parts: HashMap::new(),
+        }
     }
 
     pub fn add_trend_to_existing_part(&mut self, part_name: &str, trend: Trend) {
-        let part = self.parts.entry(part_name.to_string()).or_insert(TrendStorePart {
-            name: part_name.to_string(),
-            trends: Vec::new(),
-            generated_trends: Vec::new(),
-        });
+        let part = self
+            .parts
+            .entry(part_name.to_string())
+            .or_insert(TrendStorePart {
+                name: part_name.to_string(),
+                trends: Vec::new(),
+                generated_trends: Vec::new(),
+            });
 
         part.trends.push(trend);
     }
 
-    pub fn add_trend(&mut self, params: &TrendStorePartParameters, trend_definition: &TrendDefinition) -> String {
+    pub fn add_trend(
+        &mut self,
+        params: &TrendStorePartParameters,
+        trend_definition: &TrendDefinition,
+    ) -> String {
         let default_part_name = trend_definition.get_default_part_name();
 
-        let mut part = self.parts.entry(default_part_name.clone()).or_insert(TrendStorePart {
-            name: default_part_name.clone(),
-            trends: Vec::new(),
-            generated_trends: Vec::new(),
-        });
+        let mut part = self
+            .parts
+            .entry(default_part_name.clone())
+            .or_insert(TrendStorePart {
+                name: default_part_name.clone(),
+                trends: Vec::new(),
+                generated_trends: Vec::new(),
+            });
 
         let mut current_num = 1;
 
@@ -157,11 +171,14 @@ impl TrendStorePartHolder {
 
             println!("Adding to '{next_part_name}'");
 
-            part = self.parts.entry(next_part_name.clone()).or_insert(TrendStorePart {
-                name: next_part_name.clone(),
-                trends: Vec::new(),
-                generated_trends: Vec::new(),
-            });
+            part = self
+                .parts
+                .entry(next_part_name.clone())
+                .or_insert(TrendStorePart {
+                    name: next_part_name.clone(),
+                    trends: Vec::new(),
+                    generated_trends: Vec::new(),
+                });
 
             current_num += 1;
         }
@@ -177,7 +194,11 @@ fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStor
 
     let result = params.base_width + num_columns * params.column_size;
 
-    println!("row size of '{}'({} trends): {result}", trend_store_part.name, trend_store_part.trends.len());
+    println!(
+        "row size of '{}'({} trends): {result}",
+        trend_store_part.name,
+        trend_store_part.trends.len()
+    );
 
     result
 }
@@ -200,7 +221,7 @@ fn define_trend_stores(
 
     // First check which trends already exist in the current trend stores and place them into the
     // same parts.
-    
+
     let mut remaining_trend_definitions: Vec<&TrendDefinition> = Vec::new();
 
     for trend_definition in trend_definitions {
@@ -211,14 +232,13 @@ fn define_trend_stores(
         });
 
         // Check if this trend already existed in the current trend store
-        let current_trend_store_part = current_trend_store
-            .and_then(|t| {
-                t.parts.iter().find(|p| {
-                    p.trends
-                        .iter()
-                        .any(|trend| trend.name.eq(&trend_definition.name))
-                })
-            });
+        let current_trend_store_part = current_trend_store.and_then(|t| {
+            t.parts.iter().find(|p| {
+                p.trends
+                    .iter()
+                    .any(|trend| trend.name.eq(&trend_definition.name))
+            })
+        });
 
         match current_trend_store_part {
             Some(current_part) => {
@@ -227,10 +247,12 @@ fn define_trend_stores(
                 let stripped_part_name = re.replace(&current_part.name, "").to_string();
                 let part_holder = trend_store_parts
                     .entry(stripped_part_name.clone())
-                    .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
+                    .or_insert(TrendStorePartHolder::new(
+                        trend_definition.get_trend_store_key(),
+                    ));
 
                 part_holder.add_trend_to_existing_part(&current_part.name, trend_definition.into());
-            }, 
+            }
             None => {
                 remaining_trend_definitions.push(trend_definition);
             }
@@ -242,7 +264,9 @@ fn define_trend_stores(
     for trend_definition in remaining_trend_definitions {
         let part_holder = trend_store_parts
             .entry(trend_definition.get_default_part_name())
-            .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
+            .or_insert(TrendStorePartHolder::new(
+                trend_definition.get_trend_store_key(),
+            ));
 
         part_holder.add_trend(&params, trend_definition);
     }
@@ -252,15 +276,22 @@ fn define_trend_stores(
     let mut trend_stores: HashMap<TrendStoreKey, TrendStore> = HashMap::new();
 
     for part_holder in trend_store_parts.into_values() {
-        let trend_store = trend_stores.entry(part_holder.trend_store_key.clone()).or_insert(TrendStore {
-            title: Some("Raw data trend store generated from counter list".to_string()),
-            data_source: part_holder.trend_store_key.data_source.clone(),
-            entity_type: part_holder.trend_store_key.entity_type.clone(),
-            granularity: part_holder.trend_store_key.granularity,
-            partition_size: granularity_to_partition_size(part_holder.trend_store_key.granularity).unwrap(),
-            retention_period: instance_config.granularity_to_retention(part_holder.trend_store_key.granularity).unwrap(),
-            parts: Vec::new(),
-        });
+        let trend_store = trend_stores
+            .entry(part_holder.trend_store_key.clone())
+            .or_insert(TrendStore {
+                title: Some("Raw data trend store generated from counter list".to_string()),
+                data_source: part_holder.trend_store_key.data_source.clone(),
+                entity_type: part_holder.trend_store_key.entity_type.clone(),
+                granularity: part_holder.trend_store_key.granularity,
+                partition_size: granularity_to_partition_size(
+                    part_holder.trend_store_key.granularity,
+                )
+                .unwrap(),
+                retention_period: instance_config
+                    .granularity_to_retention(part_holder.trend_store_key.granularity)
+                    .unwrap(),
+                parts: Vec::new(),
+            });
 
         let mut parts: Vec<TrendStorePart> = part_holder.parts.into_values().collect();
         parts.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap());
@@ -276,7 +307,10 @@ mod tests {
 
     use serde_json::json;
 
-    use minerva::{instance::{InstanceConfig, RetentionConfig}, trend_store::{Trend, TrendStore, TrendStorePart}};
+    use minerva::{
+        instance::{InstanceConfig, RetentionConfig},
+        trend_store::{Trend, TrendStore, TrendStorePart},
+    };
 
     use crate::commands::define::TrendDefinition;
 
@@ -341,16 +375,18 @@ mod tests {
             docker_image: None,
             entity_aggregation_hints: Vec::new(),
             entity_types: Vec::new(),
-            retention: vec![
-                RetentionConfig {
-                    granularity: humantime::parse_duration("15m").unwrap(),
-                    retention_period: humantime::parse_duration("14d").unwrap(),
-                }
-            ]
+            retention: vec![RetentionConfig {
+                granularity: humantime::parse_duration("15m").unwrap(),
+                retention_period: humantime::parse_duration("14d").unwrap(),
+            }],
         };
 
-        let new_trend_stores =
-            define_trend_stores(&trend_definitions, &current_trend_stores, params, instance_config);
+        let new_trend_stores = define_trend_stores(
+            &trend_definitions,
+            &current_trend_stores,
+            params,
+            instance_config,
+        );
 
         assert_eq!(
             new_trend_stores.len(),
