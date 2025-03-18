@@ -4,7 +4,8 @@ use std::{collections::HashMap, path::PathBuf};
 use async_trait::async_trait;
 use clap::Parser;
 use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_store};
-use minerva::instance::load_trend_stores_from;
+use minerva::error::RuntimeError;
+use minerva::instance::{load_instance_config, load_trend_stores_from, InstanceConfig};
 use minerva::meas_value::DataType;
 use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,9 @@ impl Cmd for DefineOpt {
         let trend_definitions: Vec<TrendDefinition> =
             serde_json::from_reader(std::io::stdin()).unwrap();
 
+        let instance_config = load_instance_config(&self.instance_root)
+            .map_err(|e| RuntimeError::from_msg(format!("Could not load instance configuration: {e}")))?;
+
         let current_trend_stores: Vec<TrendStore> =
             load_trend_stores_from(&self.instance_root).collect();
 
@@ -90,6 +94,7 @@ impl Cmd for DefineOpt {
             &trend_definitions,
             &current_trend_stores,
             TrendStorePartParameters::default(),
+            instance_config,
         );
 
         for trend_store in &trend_stores {
@@ -188,6 +193,7 @@ fn define_trend_stores(
     trend_definitions: &[TrendDefinition],
     current_trend_stores: &[TrendStore],
     params: TrendStorePartParameters,
+    instance_config: InstanceConfig,
 ) -> Vec<TrendStore> {
     let re = regex::Regex::new(r"[1-9]$").unwrap();
     let mut trend_store_parts: HashMap<String, TrendStorePartHolder> = HashMap::new();
@@ -259,7 +265,7 @@ fn define_trend_stores(
             entity_type: part_holder.trend_store_key.entity_type.clone(),
             granularity: part_holder.trend_store_key.granularity,
             partition_size: granularity_to_partition_size(part_holder.trend_store_key.granularity).unwrap(),
-            retention_period: granularity_to_partition_size(part_holder.trend_store_key.granularity).unwrap(),
+            retention_period: instance_config.granularity_to_retention(part_holder.trend_store_key.granularity).unwrap(),
             parts: Vec::new(),
         });
 
@@ -277,7 +283,7 @@ mod tests {
 
     use serde_json::json;
 
-    use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
+    use minerva::{instance::{InstanceConfig, RetentionConfig}, trend_store::{Trend, TrendStore, TrendStorePart}};
 
     use crate::commands::define::TrendDefinition;
 
@@ -338,8 +344,20 @@ mod tests {
             column_size: 15,
         };
 
+        let instance_config = InstanceConfig {
+            docker_image: None,
+            entity_aggregation_hints: Vec::new(),
+            entity_types: Vec::new(),
+            retention: vec![
+                RetentionConfig {
+                    granularity: humantime::parse_duration("15m").unwrap(),
+                    retention_period: humantime::parse_duration("14d").unwrap(),
+                }
+            ]
+        };
+
         let new_trend_stores =
-            define_trend_stores(&trend_definitions, &current_trend_stores, params);
+            define_trend_stores(&trend_definitions, &current_trend_stores, params, instance_config);
 
         assert_eq!(
             new_trend_stores.len(),

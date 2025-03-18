@@ -8,6 +8,7 @@ use glob::glob;
 
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Client;
+use std::time::Duration;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 
@@ -66,10 +67,28 @@ pub struct InstanceDockerImage {
 }
 
 #[derive(Serialize, Deserialize, Default)]
+pub struct RetentionConfig {
+    #[serde(with = "humantime_serde")]
+    pub granularity: Duration,
+    #[serde(with = "humantime_serde")]
+    pub retention_period: Duration,
+}
+
+#[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
+    pub retention: Option<Vec<RetentionConfig>>,
+}
+
+impl InstanceConfig {
+    pub fn granularity_to_retention(&self, granularity: Duration) -> Option<Duration> {
+        match &self.retention {
+            Some(l) => l.iter().find(|retention_config| retention_config.granularity.eq(&granularity)).map(|c| c.retention_period),
+            None => None
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
