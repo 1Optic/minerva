@@ -222,20 +222,14 @@ fn define_trend_stores(
 
         match current_trend_store_part {
             Some(current_part) => {
-                println!("curr: {}", current_part.name);
-
                 // Check if the part name is suffixed with a digit, indicating that it is part of
                 // a split part.
                 let stripped_part_name = re.replace(&current_part.name, "").to_string();
-
-                println!("stripped part name: {}", stripped_part_name);
-
                 let part_holder = trend_store_parts
                     .entry(stripped_part_name.clone())
                     .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
 
                 part_holder.add_trend_to_existing_part(&current_part.name, trend_definition.into());
-                println!("- Added '{}' to '{}'", trend_definition.name, current_part.name);
             }, 
             None => {
                 remaining_trend_definitions.push(trend_definition);
@@ -250,8 +244,7 @@ fn define_trend_stores(
             .entry(trend_definition.get_default_part_name())
             .or_insert(TrendStorePartHolder::new(trend_definition.get_trend_store_key()));
 
-        let part_name = part_holder.add_trend(&params, trend_definition);
-        println!("- Added '{}' to '{}'", trend_definition.name, part_name);
+        part_holder.add_trend(&params, trend_definition);
     }
 
     // Collect the trend store parts into trend stores
