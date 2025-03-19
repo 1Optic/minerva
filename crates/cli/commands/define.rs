@@ -386,6 +386,8 @@ mod tests {
             docker_image: None,
             entity_aggregation_hints: Vec::new(),
             entity_types: Vec::new(),
+            old_data_stability_delay: Duration::from_secs(3600 * 3),
+            old_data_threshold: Duration::from_secs(3600 * 6),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
