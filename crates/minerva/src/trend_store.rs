@@ -110,7 +110,7 @@ enum DeleteTrendStoreErrorKind {
     DatabaseError,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql, PartialEq, Eq)]
 #[postgres(name = "trend_descr")]
 pub struct Trend {
     pub name: PostgresName,
@@ -238,7 +238,7 @@ impl Trend {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql, PartialEq, Eq)]
 #[postgres(name = "generated_trend_descr")]
 pub struct GeneratedTrend {
     pub name: PostgresName,
@@ -263,7 +263,7 @@ pub struct TrendStorePartDiffOptions {
     pub ignore_deletions: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql, PartialEq, Eq)]
 #[postgres(name = "trend_store_part_descr")]
 pub struct TrendStorePart {
     pub name: PostgresName,
@@ -271,6 +271,18 @@ pub struct TrendStorePart {
 
     #[serde(default = "default_generated_trends")]
     pub generated_trends: Vec<GeneratedTrend>,
+}
+
+impl PartialOrd for TrendStorePart {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TrendStorePart {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name.cmp(&other.name)
+    }
 }
 
 fn default_generated_trends() -> Vec<GeneratedTrend> {
@@ -1027,9 +1039,13 @@ pub struct TrendStore {
     pub granularity: Duration,
     #[serde(with = "humantime_serde")]
     pub partition_size: Duration,
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "humantime_serde", default = "default_retention_period")]
     pub retention_period: Duration,
     pub parts: Vec<TrendStorePart>,
+}
+
+fn default_retention_period() -> Duration {
+    Duration::from_secs(86400 * 30)
 }
 
 impl TrendStore {
