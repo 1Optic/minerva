@@ -20,6 +20,12 @@ pub struct TrendMaterializationUpdate {
         help = "run basic verification commands after creation"
     )]
     verify: bool,
+    #[arg(
+        short = 'L',
+        long = "include-logic",
+        help = "also update the materialization function or view"
+    )]
+    include_logic: bool,
 }
 
 #[async_trait]
@@ -32,7 +38,14 @@ impl Cmd for TrendMaterializationUpdate {
 
         let mut transaction = client.transaction().await?;
 
-        trend_materialization.update(&mut transaction).await?;
+        if self.include_logic {
+            trend_materialization
+                .update_definition(&mut transaction)
+                .await?;
+        }
+        trend_materialization
+            .update_attributes(&mut transaction)
+            .await?;
 
         let result = if self.verify {
             let report =

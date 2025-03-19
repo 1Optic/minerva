@@ -186,7 +186,10 @@ impl TrendViewMaterialization {
         changes
     }
 
-    async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
+    async fn update_view<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
         self.create_view(client).await?;
         self.init_view_materialization(client).await?;
         create_fingerprint_function(
@@ -196,7 +199,6 @@ impl TrendViewMaterialization {
         )
         .await?;
         self.connect_sources(client).await?;
-        self.update_attributes(client).await?;
 
         Ok(())
     }
@@ -230,7 +232,7 @@ impl TrendViewMaterialization {
                 "description = '{}'::jsonb, ",
                 "old_data_threshold = {}, ",
                 "old_data_stability_delay = {} ",
-                "WHERE materialization::text = $7",
+                "WHERE materialization::text = $5",
             ),
             &self
                 .description
@@ -642,7 +644,10 @@ impl TrendFunctionMaterialization {
         }
     }
 
-    async fn update<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
+    async fn update_function<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
         self.create_function(client).await?;
         self.init_function_materialization(client).await?;
         create_fingerprint_function(
@@ -652,7 +657,6 @@ impl TrendFunctionMaterialization {
         )
         .await?;
         self.connect_sources(client).await?;
-        self.update_attributes(client).await?;
 
         Ok(())
     }
@@ -794,16 +798,34 @@ impl TrendMaterialization {
         Ok(())
     }
 
-    pub async fn update<T: GenericClient + Send + Sync>(
+    pub async fn update_attributes<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        match self {
+            TrendMaterialization::View(m) => m.update_attributes(client).await,
+            TrendMaterialization::Function(m) => m.update_attributes(client).await,
+        }
+    }
+
+    pub async fn update_definition<T: GenericClient + Send + Sync>(
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
         self.teardown(client).await?;
 
         match self {
-            TrendMaterialization::View(m) => m.update(client).await,
-            TrendMaterialization::Function(m) => m.update(client).await,
+            TrendMaterialization::View(m) => m.update_view(client).await,
+            TrendMaterialization::Function(m) => m.update_function(client).await,
         }
+    }
+
+    pub async fn update<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        self.update_definition(client).await?;
+        self.update_attributes(client).await
     }
 
     pub async fn create<T: GenericClient + Send + Sync>(
