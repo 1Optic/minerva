@@ -80,6 +80,10 @@ pub struct InstanceConfig {
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
     pub retention: Option<Vec<RetentionConfig>>,
+    #[serde(with = "humantime_serde")]
+    pub old_data_threshold: Duration,
+    #[serde(with = "humantime_serde")]
+    pub old_data_stability_delay: Duration,
 }
 
 impl InstanceConfig {

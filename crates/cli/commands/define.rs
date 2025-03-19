@@ -122,14 +122,29 @@ impl Default for TrendStorePartParameters {
     }
 }
 
+#[derive(PartialEq, Eq)]
 struct TrendStorePartHolder {
+    base_name: String,
     trend_store_key: TrendStoreKey,
     parts: HashMap<String, TrendStorePart>,
 }
 
+impl Ord for TrendStorePartHolder {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.base_name.cmp(&other.base_name)
+    }
+}
+
+impl PartialOrd for TrendStorePartHolder {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl TrendStorePartHolder {
-    pub fn new(trend_store_key: TrendStoreKey) -> Self {
+    pub fn new(base_name: String, trend_store_key: TrendStoreKey) -> Self {
         TrendStorePartHolder {
+            base_name,
             trend_store_key,
             parts: HashMap::new(),
         }
@@ -169,8 +184,6 @@ impl TrendStorePartHolder {
         while calc_row_size(params, part) > params.max_row_width {
             let next_part_name = trend_definition.get_numbered_part_name(current_num);
 
-            println!("Adding to '{next_part_name}'");
-
             part = self
                 .parts
                 .entry(next_part_name.clone())
@@ -192,15 +205,7 @@ impl TrendStorePartHolder {
 fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
     let num_columns = TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap();
 
-    let result = params.base_width + num_columns * params.column_size;
-
-    println!(
-        "row size of '{}'({} trends): {result}",
-        trend_store_part.name,
-        trend_store_part.trends.len()
-    );
-
-    result
+    params.base_width + num_columns * params.column_size
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -248,6 +253,7 @@ fn define_trend_stores(
                 let part_holder = trend_store_parts
                     .entry(stripped_part_name.clone())
                     .or_insert(TrendStorePartHolder::new(
+                        stripped_part_name.clone(),
                         trend_definition.get_trend_store_key(),
                     ));
 
@@ -265,6 +271,7 @@ fn define_trend_stores(
         let part_holder = trend_store_parts
             .entry(trend_definition.get_default_part_name())
             .or_insert(TrendStorePartHolder::new(
+                trend_definition.get_default_part_name(),
                 trend_definition.get_trend_store_key(),
             ));
 
@@ -275,7 +282,11 @@ fn define_trend_stores(
 
     let mut trend_stores: HashMap<TrendStoreKey, TrendStore> = HashMap::new();
 
-    for part_holder in trend_store_parts.into_values() {
+    let mut part_holders: Vec<TrendStorePartHolder> = trend_store_parts.into_values().collect();
+
+    part_holders.sort();
+
+    for part_holder in part_holders {
         let trend_store = trend_stores
             .entry(part_holder.trend_store_key.clone())
             .or_insert(TrendStore {
@@ -375,6 +386,8 @@ mod tests {
             docker_image: None,
             entity_aggregation_hints: Vec::new(),
             entity_types: Vec::new(),
+            old_data_stability_delay: Duration::from_secs(3600 * 3),
+            old_data_threshold: Duration::from_secs(3600 * 6),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),

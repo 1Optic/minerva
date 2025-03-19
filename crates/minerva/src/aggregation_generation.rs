@@ -46,6 +46,7 @@ pub fn generate_all_standard_aggregations(
                 // should be done based on the fact that there is no materialization as source.
                 generate_standard_aggregations(
                     &mut instance,
+                    &config,
                     trend_store,
                     &config.entity_aggregation_hints,
                 )?;
@@ -58,6 +59,7 @@ pub fn generate_all_standard_aggregations(
 
 fn generate_standard_aggregations(
     minerva_instance: &mut MinervaInstance,
+    instance_config: &InstanceConfig,
     trend_store: TrendStore,
     aggregation_hints: &[EntityAggregationHint],
 ) -> Result<(), AggregationGenerationError> {
@@ -86,6 +88,7 @@ fn generate_standard_aggregations(
     for (relation, target_type) in &entity_relations {
         build_entity_aggregation(
             minerva_instance,
+            instance_config,
             &trend_store,
             relation,
             target_type,
@@ -137,6 +140,7 @@ fn generate_standard_aggregations(
     for (source_granularity, target_granularity) in aggregations {
         let target_trend_store = build_time_aggregation(
             minerva_instance,
+            instance_config,
             &trend_store,
             source_granularity,
             target_granularity,
@@ -150,6 +154,7 @@ fn generate_standard_aggregations(
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
                 minerva_instance,
+                instance_config,
                 &target_trend_store,
                 relation,
                 target_type,
@@ -164,6 +169,7 @@ fn generate_standard_aggregations(
 
 fn build_time_aggregation(
     minerva_instance: &MinervaInstance,
+    instance_config: &InstanceConfig,
     trend_store: &TrendStore,
     source_granularity: &Duration,
     target_granularity: &Duration,
@@ -171,14 +177,16 @@ fn build_time_aggregation(
     let time_aggregation =
         generate_time_aggregation(trend_store, source_granularity, target_granularity)?;
 
-    compile_time_aggregation(minerva_instance, &time_aggregation)
+    compile_time_aggregation(minerva_instance, instance_config, &time_aggregation)
 }
 
 fn compile_time_aggregation(
     minerva_instance: &MinervaInstance,
+    instance_config: &InstanceConfig,
     aggregation: &TimeAggregation,
 ) -> Result<TrendStore, String> {
-    let target_trend_store = write_time_aggregations(minerva_instance, aggregation)?;
+    let target_trend_store =
+        write_time_aggregations(minerva_instance, instance_config, aggregation)?;
 
     save_trend_store(
         &minerva_instance.instance_root.clone().unwrap(),
@@ -217,6 +225,7 @@ fn trend_store_name(trend_store: &TrendStore) -> Result<String, String> {
 
 fn write_time_aggregations(
     minerva_instance: &MinervaInstance,
+    instance_config: &InstanceConfig,
     aggregation: &TimeAggregation,
 ) -> Result<TrendStore, String> {
     let mut target_trend_store_parts: Vec<TrendStorePart> = Vec::new();
@@ -253,6 +262,7 @@ fn write_time_aggregations(
         .collect();
 
         let (aggregation, target_trend_store_part) = define_part_time_aggregation(
+            instance_config,
             source_part,
             &trend_store.granularity,
             aggregation.mapping_function.clone(),
@@ -315,6 +325,7 @@ pub fn granularity_to_partition_size(granularity: Duration) -> Option<Duration> 
 }
 
 fn define_part_time_aggregation(
+    config: &InstanceConfig,
     source_part: &TrendStorePart,
     source_granularity: &Duration,
     mapping_function: String,
@@ -338,8 +349,8 @@ fn define_part_time_aggregation(
             target_granularity,
         ),
         description: None,
-        old_data_threshold: None,
-        old_data_stability_delay: None,
+        old_data_threshold: Some(config.old_data_threshold),
+        old_data_stability_delay: Some(config.old_data_stability_delay),
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
@@ -542,6 +553,7 @@ fn translate_time_aggregation_part_name(
 
 fn build_entity_aggregation(
     minerva_instance: &mut MinervaInstance,
+    instance_config: &InstanceConfig,
     trend_store: &TrendStore,
     relation: &Relation,
     target_entity_type: &str,
@@ -576,7 +588,7 @@ fn build_entity_aggregation(
         aggregation_file_path,
     };
 
-    compile_entity_aggregation(minerva_instance, &aggregation_context)?;
+    compile_entity_aggregation(minerva_instance, instance_config, &aggregation_context)?;
 
     Ok(())
 }
@@ -651,6 +663,7 @@ fn generate_entity_aggregation(
 
 fn compile_entity_aggregation(
     minerva_instance: &mut MinervaInstance,
+    instance_config: &InstanceConfig,
     aggregation_context: &AggregationContext,
 ) -> Result<(), String> {
     match aggregation_context.definition.aggregation_type {
@@ -659,7 +672,11 @@ fn compile_entity_aggregation(
                 "Generating function materialization: {}",
                 aggregation_context.aggregation_file_path.to_string_lossy()
             );
-            write_function_entity_aggregations(minerva_instance, aggregation_context)?;
+            write_function_entity_aggregations(
+                minerva_instance,
+                instance_config,
+                aggregation_context,
+            )?;
             add_to_aggregate_trend_store(minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
         }
         AggregationType::View => {
@@ -794,6 +811,7 @@ fn define_entity_aggregate_trend(trend: &Trend) -> Trend {
 
 fn write_function_entity_aggregations(
     minerva_instance: &MinervaInstance,
+    instance_config: &InstanceConfig,
     aggregation_context: &AggregationContext,
 ) -> Result<(), String> {
     for part in &aggregation_context.source_definition.parts {
@@ -810,6 +828,7 @@ fn write_function_entity_aggregations(
             .unwrap_or(&default_dest_part);
 
         let aggregation = define_function_part_entity_aggregation(
+            instance_config,
             part,
             aggregation_context.definition.relation.clone(),
             dest_part.name.clone(),
@@ -828,7 +847,7 @@ fn write_function_entity_aggregations(
             file_path.to_string_lossy()
         );
 
-        let file = File::create_new(file_path.clone()).map_err(|e| {
+        let file = File::create(file_path.clone()).map_err(|e| {
             format!(
                 "Could not write entity materialization to '{}': {e}",
                 file_path.to_string_lossy()
@@ -882,6 +901,7 @@ fn write_function_entity_aggregations(
 }
 
 fn define_function_part_entity_aggregation(
+    config: &InstanceConfig,
     source_part: &TrendStorePart,
     relation: String,
     name: String,
@@ -899,8 +919,8 @@ fn define_function_part_entity_aggregation(
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
         description: None,
-        old_data_threshold: None,
-        old_data_stability_delay: None,
+        old_data_threshold: Some(config.old_data_threshold),
+        old_data_stability_delay: Some(config.old_data_stability_delay),
     }
 }
 
