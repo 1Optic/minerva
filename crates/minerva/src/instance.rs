@@ -131,7 +131,7 @@ pub enum GraphNode {
 }
 
 impl GraphNode {
-    pub fn matches_ref(&self, node_ref: &str) -> bool { 
+    pub fn matches_ref(&self, node_ref: &str) -> bool {
         self.to_string().eq(node_ref)
     }
 }

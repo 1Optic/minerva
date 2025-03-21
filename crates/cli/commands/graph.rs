@@ -4,8 +4,11 @@ use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::instance::MinervaInstance;
-use petgraph::{prelude::GraphMap, visit::{DfsPostOrder, Walker}};
 use petgraph::data::ElementIterator;
+use petgraph::{
+    prelude::GraphMap,
+    visit::{DfsPostOrder, Walker},
+};
 
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
 
@@ -44,7 +47,10 @@ impl Cmd for GraphOpt {
             Some(node_ref) => {
                 let graph = instance.dependency_graph();
 
-                let index = graph.node_indices().find(|i| graph[*i].to_string().eq(node_ref)).unwrap();
+                let index = graph
+                    .node_indices()
+                    .find(|i| graph[*i].to_string().eq(node_ref))
+                    .unwrap();
 
                 let mut dfs = DfsPostOrder::new(&graph, index);
 
