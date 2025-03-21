@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::BufReader;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -17,6 +19,8 @@ use super::common::{Cmd, CmdResult};
 pub struct DefineOpt {
     #[arg(help = "Root directory of Minerva instance to write to")]
     instance_root: PathBuf,
+    #[arg(help = "File with JSON formatted trend specifications")]
+    file: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -81,8 +85,11 @@ impl From<&TrendDefinition> for Trend {
 #[async_trait]
 impl Cmd for DefineOpt {
     async fn run(&self) -> CmdResult {
-        let trend_definitions: Vec<TrendDefinition> =
-            serde_json::from_reader(std::io::stdin()).unwrap();
+        let trend_definitions: Vec<TrendDefinition> = if self.file == PathBuf::from("-") {
+            serde_json::from_reader(std::io::stdin()).unwrap()
+        } else {
+            serde_json::from_reader(BufReader::new(File::open(&self.file).unwrap())).unwrap()
+        };
 
         let instance_config = load_instance_config(&self.instance_root).map_err(|e| {
             RuntimeError::from_msg(format!("Could not load instance configuration: {e}"))
