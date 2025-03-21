@@ -3,5 +3,25 @@
   "extends": [
     "config:best-practices"
   ],
-  "labels": ["dependency"]
+  "labels": ["dependency"],
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "crate"
+      ],
+      "dependencyDashboardApproval": false,
+      "rangeStrategy": "bump",
+      "matchPackageNames": [
+        "*"
+      ]
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
 }
