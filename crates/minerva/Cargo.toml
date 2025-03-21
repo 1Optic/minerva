@@ -37,7 +37,7 @@ quick_cache = "0.6.1"
 refinery = { version = "0.8.14", features = ["tokio-postgres"] }
 bollard = "0.18.1"
 bollard-stubs = "=1.47.1-rc.27.3.1"
-erased-serde = "0.4.5"
+erased-serde = "0.4.6"
 petgraph = "0.7.1"
 
 [dev-dependencies]
