@@ -11,7 +11,7 @@ path = "main.rs"
 
 [dependencies]
 actix-web = "4.10.2"
-actix-cors = "0.7"
+actix-cors = "0.7.1"
 utoipa = { version = "5.0", features = ["chrono"] }
 lazy_static = "1.4.0"
 clap = "4.5"
