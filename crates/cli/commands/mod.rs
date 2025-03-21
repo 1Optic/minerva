@@ -4,6 +4,7 @@ pub mod common;
 pub mod define;
 pub mod diff;
 pub mod dump;
+pub mod graph;
 pub mod initialize;
 pub mod loaddata;
 pub mod relation;

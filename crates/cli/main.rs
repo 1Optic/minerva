@@ -11,6 +11,7 @@ use crate::commands::common::Cmd;
 use crate::commands::define::DefineOpt;
 use crate::commands::diff::DiffOpt;
 use crate::commands::dump::DumpOpt;
+use crate::commands::graph::GraphOpt;
 use crate::commands::initialize::InitializeOpt;
 use crate::commands::loaddata::LoadDataOpt;
 use crate::commands::relation::RelationOpt;
@@ -39,6 +40,8 @@ enum Commands {
     Dump(DumpOpt),
     #[command(about = "Create a diff between Minerva instance definitions")]
     Diff(DiffOpt),
+    #[command(about = "Create a graph of a Minerva instance")]
+    Graph(GraphOpt),
     #[command(about = "Update a Minerva database from an instance definition")]
     Update(UpdateOpt),
     #[command(about = "Initialize a complete Minerva instance")]
@@ -86,6 +89,7 @@ async fn main() -> ExitCode {
         Some(Commands::Schema(schema)) => schema.run().await,
         Some(Commands::Dump(dump)) => dump.run().await,
         Some(Commands::Diff(diff)) => diff.run().await,
+        Some(Commands::Graph(graph)) => graph.run().await,
         Some(Commands::Update(update)) => update.run().await,
         Some(Commands::Initialize(initialize)) => initialize.run().await,
         Some(Commands::TrendStore(trend_store)) => trend_store.run().await,
