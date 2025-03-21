@@ -30,8 +30,7 @@ impl Cmd for GraphOpt {
         };
 
         let graph = instance.dependency_graph();
-        let dot =
-            petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
+        let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
 
         println!("{}", dot);
 
