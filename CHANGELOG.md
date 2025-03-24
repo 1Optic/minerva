@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.25.0] - 2025-03-24
+
 ### Fixed
 
-- CLI: Exit with error failure code on differences with instance definition
+- CLI: Exit with error failure code on differences with instance definition.
 - Library: Use Citus sequential mode for attribute store changes to prevent
   Citus related errors.
+
+### Added
+
+- CLI: Added subcommand to generate trend data dependency graph.
+- DB Schema: Added data column for triggers and removed old details column.
+
+### Changed
+
+- CLI: Report missing relation definition views as warnings and do not return
+  error exit code.
+- CLI: Enumerate changes during instance update as progress indicator.
 
 ## [9.24.0] - 2025-03-10
 
@@ -368,4 +381,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.22.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.21.3...9.22.0
 [9.23.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.22.0...9.23.0
 [9.24.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.23.0...9.24.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.24.0...HEAD
+[9.25.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.24.0...9.25.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.25.0...HEAD
