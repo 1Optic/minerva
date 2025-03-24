@@ -26,7 +26,7 @@ anyhow = "1.0.97"
 bytes = "1.6"
 rust_decimal = { version = "1.35", features = ["db-postgres"] }
 rustls = "0.23.18"
-rustls-native-certs = "0.8"
+rustls-native-certs = "0.8.1"
 lazy_static = "1.4"
 thiserror = "2.0"
 log = "0.4"
