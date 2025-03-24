@@ -98,8 +98,10 @@ async fn update(
 
     println!("Applying changes:");
 
-    for change in changes {
-        println!("\n\n* {change}");
+    let num_changes = changes.len();
+
+    for (index, change) in changes.iter().enumerate() {
+        println!("\n\n* [{}/{num_changes}] {change}", index + 1);
 
         if (!interactive)
             || Confirm::new()
