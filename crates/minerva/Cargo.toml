@@ -34,7 +34,7 @@ url = { version = "2.5", optional = true}
 rand = { version = "0.9", optional = true}
 testcontainers = { version = "0.23.3", optional = true }
 quick_cache = "0.6.1"
-refinery = { version = "0.8.14", features = ["tokio-postgres"] }
+refinery = { version = "0.8.16", features = ["tokio-postgres"] }
 bollard = "0.18.1"
 bollard-stubs = "=1.47.1-rc.27.3.1"
 erased-serde = "0.4.6"
