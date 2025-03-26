@@ -46,6 +46,8 @@ pub enum AggregationType {
     ViewMaterialization,
     #[serde(rename = "FUNCTION_MATERIALIZATION")]
     FunctionMaterialization,
+    #[serde(rename = "SUPPRESS")]
+    Suppress,
 }
 
 pub struct DiffOptions {

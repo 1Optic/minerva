@@ -685,6 +685,10 @@ fn compile_entity_aggregation(
         AggregationType::ViewMaterialization => {
             write_view_entity_aggregations(minerva_instance, aggregation_context)
         }
+        AggregationType::Suppress => {
+            println!("Suppressing aggregation generation");
+            Ok(())
+        }
     }
 }
 
