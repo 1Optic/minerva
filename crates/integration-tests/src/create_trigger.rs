@@ -176,9 +176,18 @@ mod tests {
 
         let mut client = test_database.connect().await?;
 
-        let message = create_notifications(&mut client, "low_temperature", Some(Utc.with_ymd_and_hms(2025, 3, 5, 12, 0, 0).unwrap())).await.unwrap();
+        let message = create_notifications(
+            &mut client,
+            "low_temperature",
+            Some(Utc.with_ymd_and_hms(2025, 3, 5, 12, 0, 0).unwrap()),
+        )
+        .await
+        .unwrap();
 
-        assert_eq!(message, "Created 0 notifications for trigger 'low_temperature'");
+        assert_eq!(
+            message,
+            "Created 0 notifications for trigger 'low_temperature'"
+        );
 
         let (_, src): (String, String) = get_function_def(&mut client, "low_temperature")
             .await
