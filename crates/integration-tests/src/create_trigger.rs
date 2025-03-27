@@ -14,7 +14,6 @@ mod tests {
     use minerva::trend_materialization::get_function_def;
     use minerva::trend_store::TrendStore;
     use minerva::trigger::create_notifications;
-    //use reqwest::StatusCode;
     use serde_json::json;
 
     use crate::common::get_available_port;
