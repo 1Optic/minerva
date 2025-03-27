@@ -15,6 +15,9 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use minerva::error::{ConfigurationError, DatabaseError, Error};
 
+mod version;
+use version::{get_version, Version};
+
 mod trendmaterialization;
 use trendmaterialization::{
     delete_trend_function_materialization, delete_trend_view_materialization,
@@ -76,6 +79,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
     #[derive(OpenApi)]
     #[openapi(
         paths(
+            version::get_version,
             trendmaterialization::get_trend_view_materializations,
             trendmaterialization::get_trend_view_materialization,
             trendmaterialization::get_trend_function_materializations,
@@ -117,7 +121,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
         ),
         components(
             schemas(
-                TrendMaterializationSourceData, TrendMaterializationDef,
+                Version, TrendMaterializationSourceData, TrendMaterializationDef,
                 TrendViewMaterializationFull, TrendFunctionMaterializationFull,
                 TrendViewMaterializationData, TrendFunctionMaterializationData,
                 TrendFull, GeneratedTrendFull, TrendStorePartFull, TrendStoreFull,
@@ -165,6 +169,7 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-doc/openapi.json", openapi.clone()),
             )
+            .service(get_version)
             .service(get_trend_view_materializations)
             .service(get_trend_view_materialization)
             .service(get_trend_function_materializations)
