@@ -148,28 +148,49 @@ impl TrendViewMaterialization {
 
     async fn create<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
         self.create_view(client).await?;
-        self.define_materialization(client).await?;
-        self.connect_sources(client).await?;
         create_fingerprint_function(
             client,
             &self.target_trend_store_part,
             &self.fingerprint_function,
         )
         .await?;
+        self.define_materialization(client).await?;
+        if self.enabled {
+            self.do_enable(client).await?;
+        };
+        self.connect_sources(client).await?;
 
         Ok(())
+    }
+
+    async fn do_enable<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
+        let query = concat!(
+            "UPDATE trend_directory.materialization AS m ",
+            "SET enabled = true ",
+            "FROM trend_directory.trend_store_part AS dtsp ",
+            "WHERE m.dst_trend_store_part_id = dtsp.id ",
+            "AND dtsp.name = $1"
+        );
+        match client.query(query, &[&self.target_trend_store_part]).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
+                "Unable to enable materialization: {e}"
+            )))),
+        }
     }
 
     #[must_use]
     pub fn diff(&self, other: &TrendViewMaterialization) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
-        // Comparing a view from the database with a view definition is not
-        // really usefull because PostgreSQL rewrites the SQL.
-        //if self.view != other.view {
-        //    changes.push(Box::new(UpdateView { trend_view_materialization:
-        // self.clone() }));
-        //}
+        let this_view_fingerprint = pg_query::fingerprint(&self.view).unwrap();
+        let other_view_finerprint = pg_query::fingerprint(&other.view).unwrap();
+
+        if this_view_fingerprint.hex != other_view_finerprint.hex {
+            changes.push(Box::new(UpdateView {
+                trend_view_materialization: self.clone(),
+            }));
+        }
 
         if self.enabled != other.enabled
             || self.processing_delay != other.processing_delay
@@ -230,17 +251,15 @@ impl TrendViewMaterialization {
                 "reprocessing_period = $3::text::interval, ",
                 "enabled = $4, ",
                 "description = '{}'::jsonb, ",
-                "old_data_threshold = {}, ",
-                "old_data_stability_delay = {} ",
-                "WHERE materialization::text = $5",
+                "old_data_threshold = $5::text::interval, ",
+                "old_data_stability_delay = $6::text::interval ",
+                "WHERE materialization::text = $7",
             ),
             &self
                 .description
                 .as_ref()
                 .unwrap_or(&serde_json::json!("{}"))
                 .to_string(),
-            &create_text_interval(self.old_data_threshold),
-            &create_text_interval(self.old_data_stability_delay),
         );
 
         let query_args: &[&(dyn ToSql + Sync)] = &[
@@ -248,6 +267,12 @@ impl TrendViewMaterialization {
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
             &self.enabled,
+            &self
+                .old_data_threshold
+                .map(|v| format_duration(v).to_string()),
+            &self
+                .old_data_stability_delay
+                .map(|v| format_duration(v).to_string()),
             &self.target_trend_store_part,
         ];
 
@@ -354,6 +379,37 @@ impl fmt::Display for UpdateTrendViewMaterializationAttributes {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
+pub struct UpdateTrendFunctionMaterializationAttributes {
+    pub trend_function_materialization: TrendFunctionMaterialization,
+}
+
+#[async_trait]
+impl Change for UpdateTrendFunctionMaterializationAttributes {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.trend_function_materialization
+            .update_attributes(&mut tx)
+            .await?;
+
+        tx.commit().await?;
+
+        Ok("Updated attributes of function materialization".into())
+    }
+}
+
+impl fmt::Display for UpdateTrendFunctionMaterializationAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UpdateTrendFunctionMaterializationAttributes({})",
+            &self.trend_function_materialization.target_trend_store_part,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct UpdateView {
     pub trend_view_materialization: TrendViewMaterialization,
 }
@@ -394,11 +450,59 @@ impl fmt::Display for UpdateView {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdateFunction {
+    pub trend_function_materialization: TrendFunctionMaterialization,
+}
+
+#[async_trait]
+impl Change for UpdateFunction {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        self.trend_function_materialization
+            .update_function(&mut tx)
+            .await
+            .unwrap();
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Updated function '{}'",
+            &self.trend_function_materialization.target_trend_store_part
+        ))
+    }
+}
+
+impl fmt::Display for UpdateFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UpdateFunction({}, {})",
+            &self.trend_function_materialization.target_trend_store_part,
+            &self.trend_function_materialization.target_trend_store_part
+        )
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendMaterializationFunction {
     pub return_type: String,
     pub src: String,
     pub language: String,
+}
+
+impl TrendMaterializationFunction {
+    pub fn function_definition(&self, name: &str) -> String {
+        format!(
+            "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS {} AS $function$\n{}\n$function$ LANGUAGE {}",
+            &escape_identifier(name),
+            &self.return_type,
+            &self.src.trim(),
+            &self.language,
+        )
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -469,54 +573,40 @@ impl TrendFunctionMaterialization {
         }
     }
 
-    async fn create_function<T: GenericClient + Send + Sync>(
+    async fn drop_function<T: GenericClient + Send + Sync>(
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
         let query = format!(
-            "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS {} AS $function$\n{}\n$function$ LANGUAGE {}",
+            "DROP FUNCTION trend.{}(timestamp with time zone)",
             &escape_identifier(&self.target_trend_store_part),
-            &self.function.return_type,
-            &self.function.src,
-            &self.function.language,
         );
 
-        match client.execute(query.as_str(), &[]).await {
+        client
+            .execute(&query, &[])
+            .await
+            .map_err(|e| {
+                Error::Database(DatabaseError::from_msg(format!(
+                    "Error dropping function: {e}"
+                )))
+            })
+            .map(|_| ())
+    }
+
+    async fn create_function<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        let query = self
+            .function
+            .function_definition(&self.target_trend_store_part);
+
+        match client.execute(&query, &[]).await {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
                 "Error creating function: {e}"
             )))),
         }
-    }
-
-    async fn init_function_materialization<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let function_ident = format!(
-            "trend.{}",
-            &escape_identifier(&self.target_trend_store_part)
-        );
-
-        let query = concat!(
-            "INSERT INTO trend_directory.function_materialization(materialization_id, src_function) ",
-            "SELECT m.id, $2::text::regproc ",
-            "FROM trend_directory.materialization m ",
-            "JOIN trend_directory.trend_store_part dstp ",
-            "ON m.dst_trend_store_part_id = dstp.id ",
-            "WHERE dstp.name = $1"
-        );
-
-        client
-            .execute(query, &[&self.target_trend_store_part, &function_ident])
-            .await
-            .map_err(|e| {
-                Error::Database(DatabaseError::from_msg(format!(
-                    "Error initializing function materialization: {e}"
-                )))
-            })?;
-
-        Ok(())
     }
 
     async fn create<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
@@ -583,8 +673,49 @@ impl TrendFunctionMaterialization {
     }
 
     #[must_use]
-    pub fn diff(&self, _other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
-        Vec::new()
+    pub fn diff(&self, other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        let this_complete_function_src = self
+            .function
+            .function_definition(&self.target_trend_store_part);
+
+        let other_complete_function_src = other
+            .function
+            .function_definition(&other.target_trend_store_part);
+
+        let function_equals = if self.function.language.to_lowercase().eq("plpgsql")
+            && self.function.language.to_lowercase().eq("plpgsql")
+        {
+            // We need to use the experimental plpgsql parsing because the fingerprinting does not
+            // yet work for plpgsql code.
+            let this_json = pg_query::parse_plpgsql(&this_complete_function_src).unwrap();
+            let other_json = pg_query::parse_plpgsql(&other_complete_function_src).unwrap();
+
+            this_json.eq(&other_json)
+        } else {
+            false
+        };
+
+        if !function_equals {
+            changes.push(Box::new(UpdateFunction {
+                trend_function_materialization: other.clone(),
+            }));
+        }
+
+        if self.enabled != other.enabled
+            || self.processing_delay != other.processing_delay
+            || self.stability_delay != other.stability_delay
+            || self.reprocessing_period != other.reprocessing_period
+            || self.old_data_threshold != other.old_data_threshold
+            || self.old_data_stability_delay != other.old_data_stability_delay
+        {
+            changes.push(Box::new(UpdateTrendFunctionMaterializationAttributes {
+                trend_function_materialization: other.clone(),
+            }));
+        }
+
+        changes
     }
 
     async fn update_attributes<T: GenericClient + Send + Sync>(
@@ -599,17 +730,15 @@ impl TrendFunctionMaterialization {
                 "reprocessing_period = $3::text::interval, ",
                 "enabled = $4, ",
                 "description = '{}'::jsonb, ",
-                "old_data_threshold = {}, ",
-                "old_data_stability_delay = {} ",
-                "WHERE materialization::text = $5",
+                "old_data_threshold = $5::text::interval, ",
+                "old_data_stability_delay = $6::text::interval ",
+                "WHERE materialization::text = $7",
             ),
             &self
                 .description
                 .as_ref()
                 .unwrap_or(&serde_json::json!("{}"))
                 .to_string(),
-            &create_text_interval(self.old_data_threshold),
-            &create_text_interval(self.old_data_stability_delay),
         );
 
         let query_args: &[&(dyn ToSql + Sync)] = &[
@@ -617,6 +746,12 @@ impl TrendFunctionMaterialization {
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
             &self.enabled,
+            &self
+                .old_data_threshold
+                .map(|v| format_duration(v).to_string()),
+            &self
+                .old_data_stability_delay
+                .map(|v| format_duration(v).to_string()),
             &self.target_trend_store_part,
         ];
 
@@ -648,15 +783,8 @@ impl TrendFunctionMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
+        self.drop_function(client).await?;
         self.create_function(client).await?;
-        self.init_function_materialization(client).await?;
-        create_fingerprint_function(
-            client,
-            &self.target_trend_store_part,
-            &self.fingerprint_function,
-        )
-        .await?;
-        self.connect_sources(client).await?;
 
         Ok(())
     }
@@ -1101,8 +1229,8 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
     let target_trend_store_part: String = row.get(6);
     let src_view: Option<String> = row.get(7);
     let src_function: Option<String> = row.get(8);
-    let old_data_stability_delay_str: Option<String> = row.get(9);
-    let old_data_threshold_str: Option<String> = row.get(10);
+    let old_data_threshold_str: Option<String> = row.get(9);
+    let old_data_stability_delay_str: Option<String> = row.get(10);
 
     let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
     let (_fingerprint_function_lang, fingerprint_function_def) =
@@ -1269,8 +1397,8 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
         let target_trend_store_part: String = row.get(6);
         let src_view: Option<String> = row.get(7);
         let src_function: Option<String> = row.get(8);
-        let old_data_stability_delay_str: Option<String> = row.get(9);
-        let old_data_threshold_str: Option<String> = row.get(10);
+        let old_data_threshold_str: Option<String> = row.get(9);
+        let old_data_stability_delay_str: Option<String> = row.get(10);
 
         let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
         let (_fingerprint_function_lang, fingerprint_function_def) =

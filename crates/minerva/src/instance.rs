@@ -108,6 +108,8 @@ pub enum InstanceConfigLoadError {
     NoSuchFile(String),
     #[error("Could not open file: {0}")]
     FileOpen(#[from] std::io::Error),
+    #[error("Could not deserialize config: {0}")]
+    Deserialize(String),
 }
 
 pub fn load_instance_config(
@@ -121,7 +123,8 @@ pub fn load_instance_config(
 
     let config_file = std::fs::File::open(config_file_path)?;
     let reader = BufReader::new(config_file);
-    let image_config: InstanceConfig = serde_json::from_reader(reader).unwrap();
+    let image_config: InstanceConfig = serde_json::from_reader(reader)
+        .map_err(|e| InstanceConfigLoadError::Deserialize(format!("{e}")))?;
 
     Ok(image_config)
 }

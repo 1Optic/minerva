@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(language, "plpgsql");
 
         let expected_src = concat!(
-            "\nBEGIN\n",
+            "BEGIN\n",
             "RETURN QUERY EXECUTE $query$\n",
             "SELECT\n",
             "  t1.entity_id,\n",
@@ -183,10 +183,10 @@ mod tests {
             "WHERE t1.timestamp = $1\n",
             "GROUP BY t1.entity_id\n",
             "$query$ USING $1;\n",
-            "END;\n\n"
+            "END;"
         );
 
-        assert_eq!(src, expected_src);
+        assert_eq!(src.trim(), expected_src);
 
         Ok(())
     }
