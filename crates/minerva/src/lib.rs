@@ -5,6 +5,7 @@ pub mod attribute_store;
 pub mod audit_log;
 pub mod change;
 pub mod changes;
+pub mod cluster;
 pub mod database;
 pub mod entity;
 pub mod entity_set;
@@ -22,6 +23,3 @@ pub mod trend_store;
 pub mod trigger;
 pub mod trigger_template;
 pub mod virtual_entity;
-
-#[cfg(feature = "test-containers")]
-pub mod cluster;

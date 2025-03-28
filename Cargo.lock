@@ -2232,6 +2232,7 @@ dependencies = [
  "bollard-stubs",
  "bytes",
  "chrono",
+ "comfy-table",
  "csv",
  "env_logger",
  "erased-serde",

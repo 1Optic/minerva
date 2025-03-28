@@ -1,14 +1,20 @@
+use chrono::Utc;
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL_CONDENSED;
+use comfy_table::*;
 use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt;
+use std::fmt::{self, Display};
 use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
 
-use crate::change::{Change, ChangeResult};
+use crate::change::{Change, ChangeResult, InformationOption};
 use crate::error::DatabaseError;
+use crate::interval::parse_interval;
 use crate::meas_value::DataType;
 use crate::trend_store::create::create_trend_store;
 use crate::trend_store::{GeneratedTrend, Trend, TrendStore, TrendStorePart};
@@ -83,6 +89,13 @@ impl Change for RemoveTrends {
             &self.trends.len(),
             &self.trend_store_part.name
         ))
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(TrendValueInformation {
+            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_names: self.trends.to_vec(),
+        })]
     }
 }
 
@@ -357,6 +370,79 @@ impl Change for ModifyTrendDataTypes {
             "Altered trend data types for trend store part '{}'",
             &self.trend_store_part.name
         ))
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(TrendValueInformation {
+            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_names: self
+                .modifications
+                .iter()
+                .map(|m| m.trend_name.clone())
+                .collect(),
+        })]
+    }
+}
+
+pub struct TrendValueInformation {
+    pub trend_store_part_name: String,
+    pub trend_names: Vec<String>,
+}
+
+#[async_trait]
+impl InformationOption for TrendValueInformation {
+    fn name(&self) -> String {
+        "Show trend value information".to_string()
+    }
+
+    async fn retrieve(&self, client: &mut Client) -> Vec<String> {
+        let trend_store_row = client
+            .query_one("SELECT granularity::text FROM trend_directory.trend_store ts JOIN trend_directory.trend_store_part tsp on tsp.trend_store_id = ts.id WHERE tsp.name = $1", &[&self.trend_store_part_name])
+            .await
+            .unwrap();
+
+        let granularity_str: String = trend_store_row.get(0);
+        let granularity = parse_interval(&granularity_str).unwrap();
+
+        let expressions: Vec<String> = self
+            .trend_names
+            .iter()
+            .map(|name| format!("max({})::numeric", escape_identifier(name)))
+            .collect();
+        let expressions_part: String = expressions.join(", ");
+        let query = format!(
+            "SELECT {} FROM trend.{} WHERE timestamp > $1",
+            expressions_part,
+            escape_identifier(&self.trend_store_part_name)
+        );
+
+        let timestamp_threshold = Utc::now() - (granularity * 10);
+
+        let row = client
+            .query_one(&query, &[&timestamp_threshold])
+            .await
+            .unwrap();
+
+        let mut table = Table::new();
+
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .apply_modifier(UTF8_ROUND_CORNERS)
+            .set_header(vec!["trend", "max"]);
+
+        for (index, trend_name) in self.trend_names.iter().enumerate() {
+            let max = row.get::<usize, Option<Decimal>>(index);
+
+            table.add_row(vec![Cell::new(trend_name), Cell::new(format!("{max:?}"))]);
+        }
+
+        table.lines().collect()
+    }
+}
+
+impl Display for TrendValueInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
     }
 }
 

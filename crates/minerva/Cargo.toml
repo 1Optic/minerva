@@ -30,9 +30,9 @@ rustls-native-certs = "0.8.1"
 lazy_static = "1.5.0"
 thiserror = "2.0.12"
 log = "0.4.27"
-url = { version = "2.5.4", optional = true}
-rand = { version = "0.9", optional = true}
-testcontainers = { version = "0.23.3", optional = true }
+url = { version = "2.5.4" }
+rand = { version = "0.9" }
+testcontainers = { version = "0.23.3" }
 quick_cache = "0.6.12"
 refinery = { version = "0.8.16", features = ["tokio-postgres"] }
 bollard = "0.18.1"
@@ -40,9 +40,8 @@ bollard-stubs = "=1.47.1-rc.27.3.1"
 erased-serde = "0.4.6"
 petgraph = "0.7.1"
 pg_query = "6.0.0"
+comfy-table = "7.1.4"
 
 [dev-dependencies]
 env_logger = { version = "=0.11.7" }
 
-[features]
-test-containers = ["dep:url", "dep:rand", "dep:testcontainers"]
