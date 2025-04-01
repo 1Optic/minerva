@@ -197,6 +197,8 @@ LEFT JOIN trigger_rule.%I AS exc ON
 );
 $$ LANGUAGE sql STABLE;
 
+-- Update all existing 'trigger_rule.<name>_create_notification' functions
+SELECT trigger.create_notification_fn(rule) FROM trigger.rule;
 
 INSERT INTO notification_directory.attribute (notification_store_id, name, data_type, description) SELECT a1.notification_store_id, 'data', 'json', 'trigger specific data for notification' FROM notification_directory.attribute a1 LEFT JOIN notification_directory.attribute a2 ON a1.notification_store_id = a2.notification_store_id AND a2.name = 'data' WHERE a1.name = 'details' AND a2 IS NULL;
 
