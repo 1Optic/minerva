@@ -39,7 +39,7 @@ bollard = "0.18.1"
 bollard-stubs = "=1.47.1-rc.27.3.1"
 erased-serde = "0.4.6"
 petgraph = "0.7.1"
-pg_query = "6.0.0"
+pg_query = "6.1.0"
 comfy-table = "7.1.4"
 
 [dev-dependencies]
