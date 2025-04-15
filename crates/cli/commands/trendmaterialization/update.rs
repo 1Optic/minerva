@@ -43,6 +43,15 @@ impl Cmd for TrendMaterializationUpdate {
                 .update_definition(&mut transaction)
                 .await?;
         }
+
+        trend_materialization
+            .update_sources(&mut transaction)
+            .await?;
+
+        trend_materialization
+            .update_fingerprint_function(&mut transaction)
+            .await?;
+
         trend_materialization
             .update_attributes(&mut transaction)
             .await?;

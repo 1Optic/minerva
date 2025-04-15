@@ -239,6 +239,27 @@ impl TrendViewMaterialization {
         Ok(())
     }
 
+    async fn update_sources<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        drop_materialization_sources(client, &self.target_trend_store_part).await?;
+        self.connect_sources(client).await
+    }
+
+    async fn update_fingerprint_function<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        drop_fingerprint_function(client, &self.target_trend_store_part).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await
+    }
+
     async fn update_attributes<T: GenericClient + Send + Sync>(
         &self,
         client: &mut T,
@@ -651,27 +672,6 @@ impl TrendFunctionMaterialization {
             .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))
     }
 
-    async fn drop_sources<T: GenericClient + Send + Sync>(
-        &self,
-        client: &mut T,
-    ) -> Result<(), Error> {
-        let query = format!(
-            concat!(
-        "DELETE FROM trend_directory.materialization_trend_store_link tsl ",
-        "USING trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
-        "ON m.dst_trend_store_part_id = dstp.id ",
-        "WHERE dstp.name = '{}' AND tsl.materialization_id = m.id"
-        ),
-            &self.target_trend_store_part
-        );
-        match client.query(&query, &[]).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error removing old sources: {e}"
-            )))),
-        }
-    }
-
     #[must_use]
     pub fn diff(&self, other: &TrendFunctionMaterialization) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
@@ -790,10 +790,31 @@ impl TrendFunctionMaterialization {
     }
 
     async fn delete<T: GenericClient + Send + Sync>(&self, client: &mut T) -> Result<(), Error> {
-        self.drop_sources(client).await?;
+        drop_materialization_sources(client, &self.target_trend_store_part).await?;
         self.drop_materialization(client).await?;
         drop_fingerprint_function(client, &self.target_trend_store_part).await?;
         Ok(())
+    }
+
+    async fn update_sources<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        drop_materialization_sources(client, &self.target_trend_store_part).await?;
+        self.connect_sources(client).await
+    }
+
+    async fn update_fingerprint_function<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        drop_fingerprint_function(client, &self.target_trend_store_part).await?;
+        create_fingerprint_function(
+            client,
+            &self.target_trend_store_part,
+            &self.fingerprint_function,
+        )
+        .await
     }
 }
 
@@ -933,6 +954,26 @@ impl TrendMaterialization {
         match self {
             TrendMaterialization::View(m) => m.update_attributes(client).await,
             TrendMaterialization::Function(m) => m.update_attributes(client).await,
+        }
+    }
+
+    pub async fn update_sources<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        match self {
+            TrendMaterialization::View(m) => m.update_sources(client).await,
+            TrendMaterialization::Function(m) => m.update_sources(client).await,
+        }
+    }
+
+    pub async fn update_fingerprint_function<T: GenericClient + Send + Sync>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), Error> {
+        match self {
+            TrendMaterialization::View(m) => m.update_fingerprint_function(client).await,
+            TrendMaterialization::Function(m) => m.update_fingerprint_function(client).await,
         }
     }
 
@@ -2171,4 +2212,25 @@ pub async fn get_trend_store_part_columns<T: GenericClient + Send + Sync>(
         .map_err(|e| format!("could not retrieve columns for trend store part: {e}"))?;
 
     Ok(columns)
+}
+
+async fn drop_materialization_sources<T: GenericClient + Send + Sync>(
+    client: &mut T,
+    target_trend_store_part: &str,
+) -> Result<(), Error> {
+    let query = format!(
+        concat!(
+            "DELETE FROM trend_directory.materialization_trend_store_link tsl ",
+            "USING trend_directory.materialization m JOIN trend_directory.trend_store_part dstp ",
+            "ON m.dst_trend_store_part_id = dstp.id ",
+            "WHERE dstp.name = '{}' AND tsl.materialization_id = m.id"
+        ),
+        target_trend_store_part
+    );
+    match client.query(&query, &[]).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
+            "Error removing old sources: {e}"
+        )))),
+    }
 }

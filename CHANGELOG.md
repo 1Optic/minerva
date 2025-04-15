@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI/Library: Fixed updating of sources and fingerprint functions of materializations.
+
 ## [9.26.0] - 2025-03-27
 
 ### Added
