@@ -31,7 +31,7 @@ lazy_static = "1.5.0"
 thiserror = "2.0.12"
 log = "0.4.27"
 url = { version = "2.5.4" }
-rand = { version = "0.9" }
+rand = { version = "0.9.1" }
 testcontainers = { version = "0.23.3" }
 quick_cache = "0.6.12"
 refinery = { version = "0.8.16", features = ["tokio-postgres"] }
