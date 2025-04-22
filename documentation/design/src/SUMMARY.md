@@ -1,6 +1,6 @@
 # Summary
 
 - [Overall](./overall.md)
-- [Default Alias](./default-alias-column.md)
+- [Primary Alias](./primary-alias-column.md)
 - [Minerva Notification Event Service](./notification_export.md)
 - [Minerva Notification Triggers](./notification_triggers.md)
