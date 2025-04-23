@@ -25,7 +25,7 @@ erDiagram
 
     "trigger.template" {
         id serial PK
-        name text
+        name text UK
         description_body text
         sql_body text
     }
@@ -81,7 +81,7 @@ Trigger templates can be stored in a YAML based format:
 name: {user_defined_trigger_name}
 kpi_data:
 - name: "{selected_kpi}"
-data_type: numeric
+  data_type: numeric
 kpi_function: |-
     BEGIN
         RETURN QUERY EXECUTE $query$
@@ -100,8 +100,6 @@ condition: |-
     {trend_1} {[<|<=|>|>=]} {value_1}
 weight: |-
     SELECT {value_1}
-notification: |-
-    'obsolete'
 data: |-
     SELECT json_build_object(
         'cell', vce.cell,
@@ -121,8 +119,6 @@ data: |-
     FROM cached."inventory_v-cell_ext" vce
     WHERE vce.entity_id = $1.entity_id
 tags: ['SSE']
-fingerprint: |-
-    'obsolete'
 notification_store: trigger-notification
 trend_store_links:
 - part_name: tripaiku_v-cell_1d
