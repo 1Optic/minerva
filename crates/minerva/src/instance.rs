@@ -131,6 +131,7 @@ pub fn load_instance_config(
 
 #[derive(Clone)]
 pub enum GraphNode {
+    Table(String),
     TrendStorePart(String),
     TrendMaterialization(String),
 }
@@ -144,6 +145,9 @@ impl GraphNode {
 impl Display for GraphNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            GraphNode::Table(name) => {
+                write!(f, "Table({})", name)
+            }
             GraphNode::TrendStorePart(name) => {
                 write!(f, "TrendStorePart({})", name)
             }
@@ -327,7 +331,7 @@ impl MinervaInstance {
     pub fn dependency_graph(&self) -> petgraph::Graph<GraphNode, String> {
         let mut graph = petgraph::Graph::new();
 
-        let mut trend_store_part_node_map: HashMap<&str, petgraph::graph::NodeIndex> =
+        let mut table_node_map: HashMap<String, petgraph::graph::NodeIndex> =
             HashMap::new();
 
         for trend_store in &self.trend_stores {
@@ -335,7 +339,7 @@ impl MinervaInstance {
                 let node = GraphNode::TrendStorePart(trend_store_part.name.clone());
                 let node_idx = graph.add_node(node);
 
-                trend_store_part_node_map.insert(&trend_store_part.name, node_idx);
+                table_node_map.insert(format!("trend.{}", &trend_store_part.name), node_idx);
             }
         }
 
@@ -345,14 +349,16 @@ impl MinervaInstance {
                     let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
                         m.target_trend_store_part.clone(),
                     ));
-                    let source_index = trend_store_part_node_map
-                        .get(m.target_trend_store_part.as_str())
+                    let table_name = format!("trend.{}",m.target_trend_store_part);
+                    let source_index = table_node_map
+                        .get(&table_name)
                         .unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map
-                            .get(source.trend_store_part.as_str())
+                        let table_name = format!("trend.{}", source.trend_store_part);
+                        let target_index = table_node_map
+                            .get(&table_name)
                             .unwrap();
                         graph.add_edge(materialization_node_idx, *target_index, "".to_string());
                     }
@@ -361,16 +367,41 @@ impl MinervaInstance {
                     let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
                         m.target_trend_store_part.clone(),
                     ));
-                    let source_index = trend_store_part_node_map
-                        .get(m.target_trend_store_part.as_str())
+                    let table_name = format!("trend.{}",m.target_trend_store_part);
+                    let source_index = table_node_map
+                        .get(&table_name)
                         .unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map
-                            .get(source.trend_store_part.as_str())
+                        let table_name = format!("trend.{}", source.trend_store_part);
+                        let target_index = table_node_map
+                            .get(&table_name)
                             .unwrap();
                         graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                    }
+                }
+            }
+        }
+
+        for relation in &self.relations {
+            let relation_node_index = graph.add_node(GraphNode::Table(format!("relation.{}", relation.name)));
+
+            match pg_query::parse(&relation.query) {
+                Err(_e) => {},
+                Ok(parse_result) => {
+                    for table in parse_result.tables() {
+                        let source_index = match table_node_map.get(table.as_str()) {
+                            None => {
+                                let node = GraphNode::Table(table);
+                                graph.add_node(node) 
+                            },
+                            Some(index) => {
+                                *index
+                            }
+                        };
+
+                        graph.add_edge(relation_node_index, source_index, "".to_string());
                     }
                 }
             }

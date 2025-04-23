@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::instance::EntityAggregationHint;
 use crate::meas_value::DataType;
 use crate::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationSource,
+    TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationSource, TrendMaterializationTrendSource,
 };
 use crate::trend_store::{Trend, TrendStore, TrendStorePart};
 use crate::{
@@ -339,10 +339,10 @@ fn define_part_time_aggregation(
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
         reprocessing_period: Duration::from_secs(86400 * 7),
-        sources: vec![TrendMaterializationSource {
+        sources: vec![TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
             trend_store_part: source_part.name.clone(),
             mapping_function,
-        }],
+        })],
         function: time_aggregate_function(source_part, target_granularity)?,
         fingerprint_function: define_time_fingerprint_sql(
             source_part,
@@ -917,10 +917,10 @@ fn define_function_part_entity_aggregation(
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
         reprocessing_period: Duration::from_secs(86400 * 3),
-        sources: vec![TrendMaterializationSource {
+        sources: vec![TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
             trend_store_part: source_part.name.clone(),
             mapping_function: "trend.mapping_id".to_string(),
-        }],
+        })],
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
         description: None,
