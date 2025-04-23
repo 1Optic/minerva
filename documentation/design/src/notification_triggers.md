@@ -26,6 +26,7 @@ erDiagram
     "trigger.template" {
         id serial PK
         name text UK
+        name text
         description_body text
         sql_body text
     }
