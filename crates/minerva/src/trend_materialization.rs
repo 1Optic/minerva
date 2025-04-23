@@ -28,9 +28,14 @@ use super::interval::parse_interval;
 pub const MATERIALIZATION_FUNCTION_SCHEMA: &str = "trend";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TrendMaterializationSource {
+pub struct TrendMaterializationTrendSource {
     pub trend_store_part: String,
     pub mapping_function: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum TrendMaterializationSource {
+    Trend(TrendMaterializationTrendSource)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1604,10 +1609,10 @@ async fn load_sources<T: GenericClient + Send + Sync>(
         let trend_store_part: String = row.get(0);
         let mapping_function: String = row.get(1);
 
-        sources.push(TrendMaterializationSource {
+        sources.push(TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
             trend_store_part,
             mapping_function,
-        });
+        }));
     }
 
     Ok(sources)
