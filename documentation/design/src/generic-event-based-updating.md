@@ -4,10 +4,11 @@ For a data platform as Minerva, it is essential that all data is as up-to-date
 as possible using as little resources as possible. For trend materialization,
 an event-based updating mechanism has been in use for a long time and this
 works really well. We want to use a similar mechanism for all such updating
-base on changes. A few concrete examples:
+based on changes. A few concrete examples:
 
 1. Updating of relation tables
 2. Updating of alias tables
+3. External data that is based on data in Minerva
 
 ## Approach
 
