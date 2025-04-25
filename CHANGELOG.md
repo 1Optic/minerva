@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.26.1] - 2025-04-25
+
 ### Fixed
 
+- CLI/Library: Fixed migration issue with notification functions
 - CLI/Library: Fixed updating of sources and fingerprint functions of materializations.
 
 ## [9.26.0] - 2025-03-27
@@ -395,4 +398,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.24.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.23.0...9.24.0
 [9.25.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.24.0...9.25.0
 [9.26.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.25.0...9.26.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.0...HEAD
+[9.26.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.0...9.26.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...HEAD
