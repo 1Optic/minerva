@@ -13,6 +13,7 @@ use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
+use crate::trend_materialization::TrendMaterializationSource;
 
 use super::attribute_materialization::{
     load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
@@ -356,11 +357,19 @@ impl MinervaInstance {
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let table_name = format!("trend.{}", source.trend_store_part);
-                        let target_index = table_node_map
-                            .get(&table_name)
-                            .unwrap();
-                        graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                        match source {
+                            TrendMaterializationSource::Trend(trend_source) => {
+                                let table_name = format!("trend.{}", trend_source.trend_store_part);
+                                let target_index = table_node_map
+                                    .get(&table_name)
+                                    .unwrap();
+                                graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                            },
+                            TrendMaterializationSource::Attribute(attribute_source) => {
+                            },
+                            TrendMaterializationSource::Relation(relation_name) => {
+                            }
+                        }
                     }
                 }
                 TrendMaterialization::Function(m) => {
@@ -374,11 +383,19 @@ impl MinervaInstance {
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let table_name = format!("trend.{}", source.trend_store_part);
-                        let target_index = table_node_map
-                            .get(&table_name)
-                            .unwrap();
-                        graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                        match source {
+                            TrendMaterializationSource::Trend(trend_source) => {
+                                let table_name = format!("trend.{}", trend_source.trend_store_part);
+                                let target_index = table_node_map
+                                    .get(&table_name)
+                                    .unwrap();
+                                graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                            },
+                            TrendMaterializationSource::Attribute(attribute_source) => {
+                            },
+                            TrendMaterializationSource::Relation(relation_name) => {
+                            }
+                        }
                     }
                 }
             }
