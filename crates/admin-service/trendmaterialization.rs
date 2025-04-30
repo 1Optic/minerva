@@ -10,8 +10,7 @@ use utoipa::ToSchema;
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction,
-    TrendMaterializationSource, TrendViewMaterialization,
+    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction, TrendMaterializationSource, TrendMaterializationTrendSource, TrendViewMaterialization
 };
 use tokio_postgres::Transaction;
 
@@ -29,10 +28,10 @@ pub struct TrendMaterializationSourceData {
 
 impl TrendMaterializationSourceData {
     fn as_minerva(&self) -> TrendMaterializationSource {
-        TrendMaterializationSource {
+        TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
             trend_store_part: self.trend_store_part.to_string(),
             mapping_function: self.mapping_function.to_string(),
-        }
+        })
     }
 }
 

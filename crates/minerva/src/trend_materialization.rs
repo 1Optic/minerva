@@ -34,8 +34,16 @@ pub struct TrendMaterializationTrendSource {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrendMaterializationAttributeSource {
+    pub data_source: String,
+    pub entity_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TrendMaterializationSource {
-    Trend(TrendMaterializationTrendSource)
+    Trend(TrendMaterializationTrendSource),
+    Relation(String),
+    Attribute(TrendMaterializationAttributeSource)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -2029,31 +2037,40 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
         .await?;
 
     for source in sources {
-        let source_trend_store_part_id: i32 =
-            get_trend_store_part_id(client, &source.trend_store_part)
-                .await?
-                .ok_or(
-                    ConnectMaterializationSourcesError::NoSuchSourceTrendStorePart(
-                        source.trend_store_part.clone(),
-                    ),
-                )?;
+        match source {
+            TrendMaterializationSource::Trend(trend_source) => {
+                let source_trend_store_part_id: i32 =
+                    get_trend_store_part_id(client, &trend_source.trend_store_part)
+                        .await?
+                        .ok_or(
+                            ConnectMaterializationSourcesError::NoSuchSourceTrendStorePart(
+                                trend_source.trend_store_part.clone(),
+                            ),
+                        )?;
 
-        let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
+                let mapping_function = format!("{}(timestamptz)", &trend_source.mapping_function);
 
-        let insert_count = client
-            .execute(
-                &statement,
-                &[
-                    &mapping_function,
-                    &materialization_id,
-                    &source_trend_store_part_id,
-                ],
-            )
-            .await?;
+                let insert_count = client
+                    .execute(
+                        &statement,
+                        &[
+                            &mapping_function,
+                            &materialization_id,
+                            &source_trend_store_part_id,
+                        ],
+                    )
+                    .await?;
 
-        if insert_count == 0 {
-            return Err(ConnectMaterializationSourcesError::NoLinkInserted);
+                if insert_count == 0 {
+                    return Err(ConnectMaterializationSourcesError::NoLinkInserted);
+                }
+            },
+            TrendMaterializationSource::Relation(relation_name) => {
+            },
+            TrendMaterializationSource::Attribute(attribute_source) => {
+            }
         }
+
     }
 
     Ok(())
