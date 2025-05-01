@@ -1,10 +1,16 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::future::Future;
 
+use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use quick_cache::sync::Cache;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio_postgres::GenericClient;
+use tokio_postgres::types::ToSql;
+use tokio_postgres::{Client, GenericClient};
+
+use super::change::{Change, ChangeResult};
 
 #[derive(Error, Debug)]
 pub enum EntityMappingError {
@@ -20,6 +26,19 @@ pub enum EntityMappingError {
 
 type EntityTypeName = String;
 type EntityName = String;
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
+pub struct EntityType {
+    name: EntityTypeName,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    primary_alias: Option<String>,
+}
+
+impl fmt::Display for EntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EntityType({})", &self.name)
+    }
+}
 
 pub trait EntityMapping {
     fn names_to_entity_ids<T: GenericClient + Sync>(
@@ -174,5 +193,28 @@ async fn create_entity<T: GenericClient>(
             .try_get(0)
             .map_err(EntityMappingError::EntityCreationError),
         None => Err(EntityMappingError::EntityInsertError),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddEntityType {
+    pub entity_type: EntityType,
+}
+
+impl fmt::Display for AddEntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AddEntityType({})", &self.entity_type)
+    }
+}
+
+#[async_trait]
+impl Change for AddEntityType {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let tx = client.transaction().await?;
+
+        // TODO: This has not been implemented yet
+
+        Ok(format!("Created entity_type '{}'", &self.entity_type.name))
     }
 }
