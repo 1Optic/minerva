@@ -136,7 +136,7 @@ mod tests {
             create_schema(&mut client).await?;
 
             client.execute(
-                r"SELECT directory.create_entity_type('Site', 'substring(name from ''.*=(\d+)$''')",
+                r"SELECT directory.create_entity_type('Site', 'substring(name from ''.*=(\d+)$'')')",
                 &[],
             ).await?;
 
@@ -158,11 +158,10 @@ mod tests {
             assert_eq!(alias, "100".to_string());
 
             let query = concat!(
-                "SELECT trend_directory.define_trend_store(",
+                "SELECT id FROM trend_directory.define_trend_store(",
                 "directory.name_to_data_source('minerva'), ",
-                "directory.name_to_entity_set('Site'), ",
-                "'15m'::interval, '1d'::interval",
-                ") RETURNING id",
+                "directory.name_to_entity_type('Site'), ",
+                "'15m'::interval, '1d'::interval)",
             );
 
             let trend_store_row = client.query_one(query, &[]).await?;
