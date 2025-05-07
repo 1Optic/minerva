@@ -89,12 +89,119 @@ AS $$
     END;
 $$ LANGUAGE plpgsql VOLATILE STRICT;
 
-
 DROP FUNCTION "directory"."init_entity_type"(directory.entity_type);
 
 DROP FUNCTION "directory"."define_entity_type"(text);
 
 DROP FUNCTION "entity"."create_entity_table"(directory.entity_type);
 
+
+ALTER TYPE "trend_directory"."trend_store_part_descr" ADD ATTRIBUTE "primary_alias" boolean;
+
 ALTER TABLE "trend_directory"."trend_store_part"
     ADD COLUMN "primary_alias" boolean NOT NULL DEFAULT false;
+
+CREATE FUNCTION "trend_directory"."define_trend_store_part"("trend_store_id" integer, "name" name, "primary_alias" boolean)
+    RETURNS trend_directory.trend_store_part
+AS $$
+    INSERT INTO trend_directory.trend_store_part (trend_store_id, name, primary_alias)
+        VALUES ($1, $2, $3)
+    RETURNING *;
+$$ LANGUAGE sql VOLATILE;
+
+CREATE FUNCTION "trend_directory"."define_trend_store_part"("trend_store_id" integer, "name" name, "primary_alias" boolean, "trends" trend_directory.trend_descr[], "generated_trends" trend_directory.generated_trend_descr[])
+    RETURNS trend_directory.trend_store_part
+AS $$
+    SELECT trend_directory.define_generated_table_trends(
+        trend_directory.define_table_trends(
+            trend_directory.define_trend_store_part($1, $2, $3),
+            $4
+        ),
+        $5
+    );
+$$ LANGUAGE sql VOLATILE;
+
+CREATE OR REPLACE FUNCTION "trend_directory"."create_trend_store_part"("trend_store_id" integer, "name" name)
+    RETURNS trend_directory.trend_store_part
+AS $$
+    SELECT trend_directory.initialize_trend_store_part(
+        trend_directory.define_trend_store_part($1, $2, false)
+    );
+$$ LANGUAGE sql VOLATILE;
+
+CREATE OR REPLACE FUNCTION "trend_directory"."define_trend_store"(trend_directory.trend_store, trend_directory.trend_store_part_descr[])
+    RETURNS trend_directory.trend_store
+AS $$
+    SELECT trend_directory.define_trend_store_part($1.id, name, trends, generated_trends)
+        FROM unnest($2);
+    SELECT $1;
+$$ LANGUAGE sql VOLATILE;
+
+CREATE FUNCTION "trend_directory"."ensure_name_column"(trend_directory."trend_store_part")
+    RETURNS VOID
+AS $$
+    DECLARE
+        entity_type text;
+    BEGIN
+        IF NOT $1.primary_alias THEN
+            SELECT et.name FROM trend_directory.trend_store ts JOIN directory.entity_type et 
+                ON ts.entity_type_id = et.id WHERE ts.id = $1.trend_store_id;
+            UPDATE trend_directory."trend_store_part" SET primary_alias = true WHERE id = $1.id;
+            EXECUTE FORMAT(
+                'ALTER TABLE trend.%I '
+                'ADD COLUMN name text',
+                $1.name
+            );
+            EXECUTE FORMAT(
+                'UPDATE trend.%I t SET name = e.primary_alias FROM entity.%I e WHERE e.id = t.entity_id',
+                $1.name, entity_type
+            );
+            EXECUTE FORMAT(
+                'ALTER TABLE trend.%I ADD UNIQUE (name)',
+                $1.name
+            );
+        END IF;
+    END;
+$$ LANGUAGE plpgsql VOLATILE;
+
+CREATE OR REPLACE FUNCTION "trend_directory"."assure_table_trends_exist"("trend_store_id" integer, "trend_store_part_name" text, trend_directory.trend_descr[], trend_directory.generated_trend_descr[])
+    RETURNS text[]
+AS $$
+    DECLARE
+        tsp trend_directory.trend_store_part;
+        result text[];
+    BEGIN
+        SELECT * FROM trend_directory.get_or_create_trend_store_part($1, $2) INTO tsp;
+
+        CREATE TEMP TABLE missing_trends(trend trend_directory.trend_descr);
+        CREATE TEMP TABLE missing_generated_trends(trend trend_directory.generated_trend_descr);
+        -- Name
+        IF $3.primary_alias THEN
+            PERFORM trend_directory.ensure_name_column(tsp);
+        END IF;
+
+        -- Normal trends
+        INSERT INTO missing_trends SELECT trend_directory.missing_table_trends(tsp, $3);
+
+        IF EXISTS (SELECT * FROM missing_trends LIMIT 1) THEN
+            PERFORM trend_directory.create_table_trends(tsp, ARRAY(SELECT trend FROM missing_trends));
+        END IF;
+
+        -- Generated trends
+        INSERT INTO missing_generated_trends SELECT trend_directory.missing_generated_table_trends(tsp, $4);
+
+        IF EXISTS (SELECT * FROM missing_generated_trends LIMIT 1) THEN
+            PERFORM trend_directory.create_generated_table_trends(tsp, missing_generated_trends);
+        END IF;
+
+        SELECT ARRAY(SELECT (mt).trend.name FROM missing_trends mt UNION SELECT (mt).trend.name FROM missing_generated_trends mt) INTO result;
+        DROP TABLE missing_trends;
+        DROP TABLE missing_generated_trends;
+
+        RETURN result;
+    END;
+$$ LANGUAGE plpgsql VOLATILE;
+
+DROP FUNCTION  "trend_directory"."define_trend_store_part"("trend_store_id" integer, "name" name, "trends" trend_directory.trend_descr[], "generated_trends" trend_directory.generated_trend_descr[]);
+
+DROP FUNCTION "trend_directory"."define_trend_store_part"("trend_store_id" integer, "name" name);
