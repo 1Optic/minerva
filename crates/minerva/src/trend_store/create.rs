@@ -110,7 +110,7 @@ pub async fn create_entity_type<T: GenericClient>(
     let id: i32 = rows.first().unwrap().get(0);
 
     let create_entity_table_query =
-        "SELECT entity.create_entity_table(entity_type) FROM directory.entity_type WHERE name = $1";
+        "SELECT entity.create_entity_table(entity_type, NULL) FROM directory.entity_type WHERE name = $1";
     client.execute(create_entity_table_query, &[&name]).await?;
 
     let create_get_entity_function_query = "SELECT entity.create_get_entity_function(entity_type) FROM directory.entity_type WHERE name = $1";
