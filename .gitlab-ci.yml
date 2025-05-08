@@ -3,13 +3,14 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   TESTCONTAINERS_HOST_OVERRIDE: "host.docker.internal"
 
-image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.86.0@sha256:5c3eb6f264fe52a95157feda45d4ed7a11170f7d06962339e39cd5526c0a02ce"
+image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.86.2@sha256:65582634ee8782a9d5cdaeccf043721cf88c35cc41dc42a55d75cdef3ae8b865"
 
 stages:
   - lint
   - test
   - build
   - build-image
+  - docs
 
 lint-openapi:
   stage: lint
@@ -89,3 +90,18 @@ build-image:
       --destination "${DOCKER_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
   rules:
     - if: $CI_COMMIT_TAG
+
+build-docs:
+  stage: docs
+  script:
+    - mdbook build documentation/design
+    - rclone version
+    - rclone
+      --verbose
+      --webdav-vendor other
+      sync documentation/design/book/ :webdav:/static-sites/minerva/design
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+      - .gitlab-ci.yml
+      - documentation/**
