@@ -23,7 +23,7 @@ SELECT ARRAY[
        $1.name
     )
 ];
-$$ LANGUAGE sql VOLATILE;
+$$ LANGUAGE sql VOLATILE STRICT;
 
 CREATE FUNCTION "entity"."create_entity_table"(directory.entity_type, primary_alias text)
     RETURNS directory.entity_type
@@ -42,22 +42,21 @@ AS $$
     SELECT entity.create_get_entity_function($1);
     SELECT entity.create_create_entity_function($1);
     SELECT entity.create_to_entity_function($1);
-$$ LANGUAGE sql VOLATILE STRICT;
+$$ LANGUAGE sql VOLATILE;
 
 CREATE FUNCTION "directory"."define_entity_type"(entity_type_name text, primary_alias text, "description" text)
     RETURNS directory.entity_type
 AS $$
     INSERT INTO directory.entity_type(name, primary_alias, description)
-    VALUES ($1, $2, $3)
-    ON CONFLICT DO NOTHING;
+        VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;
     SELECT * FROM directory.entity_type WHERE name = $1;
-$$ LANGUAGE sql VOLATILE STRICT;
+$$ LANGUAGE sql VOLATILE;
 
 CREATE FUNCTION "directory"."create_entity_type"(entity_type_name text, primary_alias text)
     RETURNS directory.entity_type
 AS $$
     SELECT directory.init_entity_type(directory.define_entity_type($1, $2, ''), $2);
-$$ LANGUAGE sql VOLATILE STRICT;
+$$ LANGUAGE sql VOLATILE;
 
 CREATE OR REPLACE FUNCTION "directory"."create_entity_type"(text)
     RETURNS directory.entity_type
@@ -87,7 +86,7 @@ AS $$
             END IF;
         END IF;
     END;
-$$ LANGUAGE plpgsql VOLATILE STRICT;
+$$ LANGUAGE plpgsql VOLATILE;
 
 DROP FUNCTION "directory"."init_entity_type"(directory.entity_type);
 
@@ -170,13 +169,15 @@ AS $$
     DECLARE
         tsp trend_directory.trend_store_part;
         result text[];
+        has_primary_alias  boolean;
     BEGIN
         SELECT * FROM trend_directory.get_or_create_trend_store_part($1, $2) INTO tsp;
+        SELECT primary_alias FROM $3 INTO has_primary_alias;
 
         CREATE TEMP TABLE missing_trends(trend trend_directory.trend_descr);
         CREATE TEMP TABLE missing_generated_trends(trend trend_directory.generated_trend_descr);
         -- Name
-        IF $3.primary_alias THEN
+        IF has_primary_alias THEN
             PERFORM trend_directory.ensure_name_column(tsp);
         END IF;
 
