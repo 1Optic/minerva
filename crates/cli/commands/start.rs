@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::signal;
 
 use minerva::cluster::{BuildImageProvider, MinervaCluster, MinervaClusterConfig};
-use minerva::error::Error;
+use minerva::error::{Error, RuntimeError};
 use minerva::instance::{load_instance_config, MinervaInstance};
 use minerva::schema::migrate;
 use minerva::trend_store::create_partitions;
@@ -95,7 +95,11 @@ impl Cmd for StartOpt {
 
         info!("Started containers");
 
-        let test_database = cluster.create_db().await?;
+        let test_database = cluster.create_db().await.map_err(|e| {
+            Error::Runtime(RuntimeError::from_msg(format!(
+                "Could not create database: {e}"
+            )))
+        })?;
 
         info!("Connecting to controller");
         {
