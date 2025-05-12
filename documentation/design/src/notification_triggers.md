@@ -73,6 +73,8 @@ common use-cases and does not require the end-user to write any SQL.
   - name
   - template
   - variable_mapping (mapping of template variables; representation)
+* All values that are defined in templates will be stored as thresholds in an
+  instance of a template.
 
 ### YAML Formatted Template
 
