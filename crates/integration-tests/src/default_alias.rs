@@ -157,6 +157,8 @@ mod tests {
 
             assert_eq!(alias, "100".to_string());
 
+            debug!("Alias checked");
+
             let query = concat!(
                 "SELECT id FROM trend_directory.define_trend_store(",
                 "directory.name_to_data_source('minerva'), ",
@@ -168,9 +170,11 @@ mod tests {
 
             let trend_store_id = trend_store_row.get::<usize, i32>(0);
 
+            debug!("Trend store part created");
+
             let query = concat!(
                 "SELECT trend_directory.assure_table_trends_exist(",
-                "$1, 'sample_trend_store_part',",
+                "$1, 'sample_trend_store_part', true, ",
                 "ARRAY[('value', 'integer', '', 'SUM', 'SUM', '{}'::jsonb)]::trend_directory.trend_descr[],",
                 "ARRAY[]::trend_directory.generated_trend_descr[]",
                 ")",
@@ -180,21 +184,13 @@ mod tests {
 
             let query = concat!(
                 "SELECT trend_directory.assure_table_trends_exist(",
-                "$1, 'sample_trend_store_part_2',",
+                "$1, 'sample_trend_store_part_2', false, ",
                 "ARRAY[('value', 'integer', '', 'SUM', 'SUM', '{}'::jsonb)]::trend_directory.trend_descr[],",
                 "ARRAY[]::trend_directory.generated_trend_descr[]",
                 ")",
             );
 
             client.execute(query, &[&trend_store_id]).await?;
-
-            let query = concat!(
-                "UPDATE trend_directory.trend_store_part ",
-                "SET primary_alias = true ",
-                "WHERE name = 'sample_trend_store_part'",
-            );
-
-            client.execute(query, &[]).await?;
 
             let query = concat!(
                 "SELECT column_name FROM information_schema.columns ",
@@ -204,7 +200,7 @@ mod tests {
             let rows = client.query(query, &[]).await?;
             let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
             assert!(
-                columns.contains(&"alias".to_string()),
+                columns.contains(&"name".to_string()),
                 "alias column not created"
             );
 
@@ -218,7 +214,7 @@ mod tests {
             let rows = client.query(query, &[]).await?;
             let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
             assert!(
-                !columns.contains(&"alias".to_string()),
+                !columns.contains(&"name".to_string()),
                 "alias column created where it should not"
             );
         }
