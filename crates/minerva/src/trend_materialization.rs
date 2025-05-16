@@ -981,8 +981,6 @@ impl TrendMaterialization {
         &self,
         client: &mut T,
     ) -> Result<(), Error> {
-        self.teardown(client).await?;
-
         match self {
             TrendMaterialization::View(m) => m.update_view(client).await,
             TrendMaterialization::Function(m) => m.update_function(client).await,
