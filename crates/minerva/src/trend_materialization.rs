@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_yaml;
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Display};
 use std::marker::{Send, Sync};
 use std::path::Path;
 use std::time::Duration;
@@ -16,10 +16,12 @@ use tokio_postgres::{types::ToSql, types::Type};
 use humantime::format_duration;
 
 use async_trait::async_trait;
+use console::Style;
+use similar::{ChangeTag, TextDiff};
 
 use crate::error::ConfigurationError;
 
-use super::change::{Change, ChangeResult};
+use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{DatabaseError, Error, RuntimeError};
 use super::interval::parse_interval;
 
@@ -474,6 +476,8 @@ impl fmt::Display for UpdateView {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct UpdateFunction {
+    pub original_definition: String,
+    pub new_definition: String,
     pub trend_function_materialization: TrendFunctionMaterialization,
 }
 
@@ -494,6 +498,13 @@ impl Change for UpdateFunction {
             &self.trend_function_materialization.target_trend_store_part
         ))
     }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(FunctionDiff {
+            from_src: self.original_definition.clone(),
+            to_src: self.new_definition.clone(),
+        })]
+    }
 }
 
 impl fmt::Display for UpdateFunction {
@@ -504,6 +515,41 @@ impl fmt::Display for UpdateFunction {
             &self.trend_function_materialization.target_trend_store_part,
             &self.trend_function_materialization.target_trend_store_part
         )
+    }
+}
+
+pub struct FunctionDiff {
+    pub from_src: String,
+    pub to_src: String,
+}
+
+#[async_trait]
+impl InformationOption for FunctionDiff {
+    fn name(&self) -> String {
+        "Show diff".to_string()
+    }
+
+    async fn retrieve(&self, _client: &mut Client) -> Vec<String> {
+        let diff = TextDiff::from_lines(&self.from_src, &self.to_src);
+
+        diff.iter_all_changes()
+            .map(|c| {
+                let (sign, s) = match c.tag() {
+                    ChangeTag::Delete => ("-", Style::new().red().bold()),
+                    ChangeTag::Insert => ("+", Style::new().green().bold()),
+                    ChangeTag::Equal => (" ", Style::new().dim()),
+                };
+
+                s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
+                    .to_string()
+            })
+            .collect()
+    }
+}
+
+impl Display for FunctionDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
     }
 }
 
@@ -699,6 +745,8 @@ impl TrendFunctionMaterialization {
 
         if !function_equals {
             changes.push(Box::new(UpdateFunction {
+                original_definition: this_complete_function_src,
+                new_definition: other_complete_function_src,
                 trend_function_materialization: other.clone(),
             }));
         }
@@ -1669,7 +1717,13 @@ pub async fn get_function_return_type<T: GenericClient + Send + Sync>(
 
     let columns_part = columns
         .iter()
-        .map(|column| format!("    \"{}\" {}", column.name, column.data_type))
+        .map(|column| {
+            format!(
+                "    {} {}",
+                escape_identifier(&column.name),
+                column.data_type
+            )
+        })
         .collect::<Vec<String>>()
         .join(",\n");
 

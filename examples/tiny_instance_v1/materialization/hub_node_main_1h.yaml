@@ -11,13 +11,13 @@ sources:
 function:
   return_type: |
     TABLE (
-      "entity_id" integer,
-      "timestamp" timestamp with time zone,
-      samples smallint,
-      "outside_temp" numeric,
-      "inside_temp" numeric,
-      "power_kwh" numeric,
-      "freq_power" numeric
+        "entity_id" integer,
+        "timestamp" timestamp with time zone,
+        "samples" smallint,
+        "outside_temp" numeric,
+        "inside_temp" numeric,
+        "power_kwh" numeric,
+        "freq_power" numeric
     )
   src: |
     BEGIN
@@ -25,7 +25,7 @@ function:
         SELECT
           entity_id,
           $2 AS timestamp,
-          (count(*))::smallint AS samples,
+          (count(*))::smallint + 6 AS samples,
           SUM(t."outside_temp")::numeric AS "outside_temp",
           SUM(t."inside_temp")::numeric AS "inside_temp",
           SUM(t."power_kwh")::numeric AS "power_kwh",
