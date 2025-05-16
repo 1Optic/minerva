@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
 
 use crate::instance::EntityAggregationHint;
@@ -421,8 +422,8 @@ fn time_aggregate_function(
         .iter()
         .map(|trend| {
             format!(
-                "  \"{}\" {}",
-                trend.name,
+                "    {} {}",
+                escape_identifier(&trend.name),
                 aggregate_data_type(trend.data_type, &trend.time_aggregation)
             )
         })
@@ -448,8 +449,8 @@ fn time_aggregate_function(
     ];
 
     let mut result_columns = vec![
-        "  \"entity_id\" integer".to_string(),
-        "  \"timestamp\" timestamp with time zone".to_string(),
+        "    \"entity_id\" integer".to_string(),
+        "    \"timestamp\" timestamp with time zone".to_string(),
     ];
 
     if !source_part
@@ -458,7 +459,7 @@ fn time_aggregate_function(
         .any(|trend| trend.name.eq("samples"))
     {
         column_expressions.push("      (count(*))::integer AS samples".to_string());
-        result_columns.push("  samples integer".to_string());
+        result_columns.push("    samples integer".to_string());
     }
 
     column_expressions.extend(trend_column_expressions);
