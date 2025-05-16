@@ -11,6 +11,8 @@ use std::fmt::{self, Display};
 use tokio_postgres::{Client, GenericClient};
 
 use async_trait::async_trait;
+use console::Style;
+use similar::{ChangeTag, TextDiff};
 
 use crate::change::{Change, ChangeResult, InformationOption};
 use crate::error::DatabaseError;
@@ -384,6 +386,44 @@ impl Change for ModifyTrendDataTypes {
     }
 }
 
+pub struct TrendExtraDiff {
+    pub from_extra_data: Value,
+    pub to_extra_data: Value,
+}
+
+#[async_trait]
+impl InformationOption for TrendExtraDiff {
+    fn name(&self) -> String {
+        "Show diff".to_string()
+    }
+
+    async fn retrieve(&self, _client: &mut Client) -> Vec<String> {
+        let from = serde_json::to_string_pretty(&self.from_extra_data).unwrap();
+        let to = serde_json::to_string_pretty(&self.to_extra_data).unwrap();
+
+        let diff = TextDiff::from_lines(&from, &to);
+
+        diff.iter_all_changes()
+            .map(|c| {
+                let (sign, s) = match c.tag() {
+                    ChangeTag::Delete => ("-", Style::new().red().bold()),
+                    ChangeTag::Insert => ("+", Style::new().green().bold()),
+                    ChangeTag::Equal => (" ", Style::new().dim()),
+                };
+
+                s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
+                    .to_string()
+            })
+            .collect()
+    }
+}
+
+impl Display for TrendExtraDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
+    }
+}
+
 pub struct TrendValueInformation {
     pub trend_store_part_name: String,
     pub trend_names: Vec<String>,
@@ -459,11 +499,8 @@ impl fmt::Display for ModifyTrendExtraData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Trend({}.{}, {}->{})",
-            &self.trend_store_part_name,
-            &self.trend_name,
-            &self.from_extra_data,
-            &self.to_extra_data
+            "Trend({}.{})",
+            &self.trend_store_part_name, &self.trend_name,
         )
     }
 }
@@ -497,6 +534,13 @@ impl Change for ModifyTrendExtraData {
             "Altered extra_data for trend '{}'.'{}'",
             &self.trend_store_part_name, &self.trend_name,
         ))
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(TrendExtraDiff {
+            from_extra_data: self.from_extra_data.clone(),
+            to_extra_data: self.to_extra_data.clone(),
+        })]
     }
 }
 

@@ -2,17 +2,25 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use clap::Parser;
-use dialoguer::Confirm;
 
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_store::{load_trend_store, load_trend_store_from_file};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::interact::interact;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStoreUpdate {
+    #[arg(short, long)]
+    non_interactive: bool,
     #[arg(help = "trend store definition file")]
     definition: PathBuf,
+    #[arg(long)]
+    ignore_trend_extra_data: bool,
+    #[arg(long)]
+    ignore_trend_data_type: bool,
+    #[arg(long)]
+    ignore_deletions: bool,
 }
 
 #[async_trait]
@@ -33,9 +41,9 @@ impl Cmd for TrendStoreUpdate {
         match result {
             Ok(trend_store_db) => {
                 let diff_options = minerva::trend_store::TrendStoreDiffOptions {
-                    ignore_trend_extra_data: false,
-                    ignore_trend_data_type: false,
-                    ignore_deletions: false,
+                    ignore_trend_extra_data: self.ignore_trend_extra_data,
+                    ignore_trend_data_type: self.ignore_trend_data_type,
+                    ignore_deletions: self.ignore_deletions,
                 };
 
                 let changes = trend_store_db.diff(&trend_store, diff_options);
@@ -45,18 +53,12 @@ impl Cmd for TrendStoreUpdate {
                 } else {
                     println!("Updating trend store");
 
-                    for change in changes {
-                        println!("* {change}");
+                    let num_changes = changes.len();
 
-                        if Confirm::new()
-                            .with_prompt("Apply change?")
-                            .interact()
-                            .map_err(|e| {
-                                Error::Runtime(RuntimeError {
-                                    msg: format!("Could not process input: {e}"),
-                                })
-                            })?
-                        {
+                    for (index, change) in changes.iter().enumerate() {
+                        println!("* [{}/{num_changes}] {change}", index + 1);
+
+                        if self.non_interactive || interact(&mut client, change.as_ref()).await? {
                             let apply_result = change.apply(&mut client).await;
 
                             match apply_result {

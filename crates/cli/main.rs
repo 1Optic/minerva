@@ -4,6 +4,7 @@ use std::io;
 use std::process::ExitCode;
 
 pub mod commands;
+pub mod interact;
 
 use crate::commands::aggregation::AggregationOpt;
 use crate::commands::attributestore::AttributeStoreOpt;
