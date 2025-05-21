@@ -94,7 +94,6 @@ pub fn print_stdout<
             };
 
             print!("{prefix}{buffer}");
-
             buffer.clear();
         }
     });
@@ -354,8 +353,13 @@ impl MinervaCluster {
         })?;
 
         print_stdout(
-            "Coordinator: ".to_string(),
+            "Coordinator STDOUT: ".to_string(),
             controller_container.stdout(true),
+        );
+
+        print_stdout(
+            "Coordinator STDERR: ".to_string(),
+            controller_container.stderr(true),
         );
 
         let controller_host = controller_container.get_host().await.map_err(|e| {

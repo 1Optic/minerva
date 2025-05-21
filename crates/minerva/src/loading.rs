@@ -145,7 +145,8 @@ pub async fn load_data<P: AsRef<Path>>(
             &raw_data_package,
             parser_config.null_value.clone(),
         )
-        .await?;
+        .await
+        .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("{e}"))))?;
 
     end_job(client, job_id).await?;
 

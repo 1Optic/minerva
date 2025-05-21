@@ -14,7 +14,8 @@ use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
 use minerva::meas_value::{DataType, MeasValue};
 use minerva::schema::create_schema;
 use minerva::trend_store::{
-    create_partitions_for_timestamp, DataPackage, MeasurementStore, TrendStore,
+    create_partitions_for_timestamp, DataPackage, DataPackageWriteError, MeasurementStore,
+    StorePackageError, TrendStore,
 };
 
 const TREND_STORE_DEFINITION: &str = r"
@@ -32,7 +33,7 @@ parts:
       - name: inside_temp
         data_type: numeric
       - name: power_kwh
-        data_type: numeric
+        data_type: integer
       - name: freq_power
         data_type: numeric
     generated_trends:
@@ -66,19 +67,32 @@ impl DataPackage for RefinedDataPackage {
         mut writer: std::pin::Pin<&mut BinaryCopyInWriter>,
         values: &[(usize, DataType)],
         created_timestamp: &DateTime<chrono::Utc>,
-    ) -> Result<usize, minerva::error::Error> {
+    ) -> Result<usize, DataPackageWriteError> {
         for (index, entity_id) in self.entity_ids.iter().enumerate() {
             let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                 vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
 
-            let row = self.rows.get(index).unwrap();
+            let row = self.rows.get(index).ok_or_else(|| {
+                DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
+            })?;
 
             for (column_index, _data_type) in values {
-                let v = row.get(*column_index).unwrap();
+                let v = row.get(*column_index).ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!(
+                        "No data column with index {column_index}"
+                    ))
+                })?;
                 sql_values.push(v);
             }
 
-            writer.as_mut().write(&sql_values).await?;
+            writer.as_mut().write(&sql_values).await.map_err(|e| {
+                let db_error = e.as_db_error();
+
+                match db_error {
+                    Some(db_e) => DataPackageWriteError::Generic(format!("dbe: {db_e}")),
+                    None => DataPackageWriteError::Generic(format!("{e}")),
+                }
+            })?;
         }
 
         Ok(self.entity_ids.len())
@@ -160,13 +174,13 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
 
         let rows = vec![vec![
             MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(15.0).unwrap())),
-            MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(43.0).unwrap())),
+            MeasValue::Integer(Some(43)),
         ]];
 
         let package = RefinedDataPackage {
             timestamp,
-            trends,
-            entity_ids,
+            trends: trends.clone(),
+            entity_ids: entity_ids.clone(),
             job_id,
             rows,
         };
@@ -179,6 +193,64 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
         trend_store_part
             .store_package(&mut client, &package)
             .await?;
+
+        // Create a variant of the trend store part with mismatching data types and check for a
+        // corresponding error when trying to store data.
+
+        let mut tsp1 = trend_store_part.clone();
+        tsp1.trends.get_mut(1).unwrap().data_type = DataType::Numeric; // inside_temp
+        tsp1.trends.get_mut(2).unwrap().data_type = DataType::Numeric; // power_kwh
+
+        let package_mismatching_types = RefinedDataPackage {
+            timestamp,
+            trends: trends.clone(),
+            entity_ids: entity_ids.clone(),
+            job_id,
+            rows: vec![vec![
+                MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(15.0).unwrap())), // inside_temp
+                MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(345.6).unwrap())), // power_kwh
+            ]],
+        };
+
+        let result = tsp1
+            .store_package(&mut client, &package_mismatching_types)
+            .await;
+
+        assert_eq!(
+            result,
+            Err(StorePackageError::DatatypeMismatch(
+                "Mismatching data types: [power_kwh(numeric<>integer)]".to_string()
+            ))
+        );
+
+        // Create another variant of the trend store part with slightly different mismatching data
+        // types that should cause a different error internally.
+
+        let mut tsp2 = trend_store_part.clone();
+        tsp2.trends.get_mut(1).unwrap().data_type = DataType::Integer; // inside_temp
+        tsp2.trends.get_mut(2).unwrap().data_type = DataType::Integer; // power_kwh
+
+        let package_mismatching_types = RefinedDataPackage {
+            timestamp,
+            trends,
+            entity_ids,
+            job_id,
+            rows: vec![vec![
+                MeasValue::Integer(Some(15)),  // inside_temp
+                MeasValue::Integer(Some(345)), // power_kwh
+            ]],
+        };
+
+        let result = tsp2
+            .store_package(&mut client, &package_mismatching_types)
+            .await;
+
+        assert_eq!(
+            result,
+            Err(StorePackageError::DatatypeMismatch(
+                "Mismatching data types: [inside_temp(integer<>numeric)]".to_string()
+            ))
+        );
     }
 
     Ok(())
