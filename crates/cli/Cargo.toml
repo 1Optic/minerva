@@ -15,7 +15,7 @@ name = "materialize"
 path = "materialize/lib.rs"
 
 [dependencies]
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 clap_complete = "4.5.50"
 minerva = { version = "*", path = "../minerva" }
 tokio = { version = "1.45.0", features = ["full"] }
