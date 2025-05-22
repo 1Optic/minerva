@@ -468,7 +468,7 @@ impl RawMeasurementStore for TrendStore {
         records: &[(String, DateTime<chrono::Utc>, Vec<String>)],
         null_value: String,
     ) -> Result<(), RawMeasurementStoreError> {
-        let alias_column = entity_mapping.uses_alias_column(&self.entity_type, client).await?;
+        let alias_column = entity_mapping.uses_alias_column(&self.entity_type, client).await.map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
         let entity_ids: Vec<i32> = entity_mapping
             .names_to_entity_ids(
                 client,
@@ -494,7 +494,7 @@ impl RawMeasurementStore for TrendStore {
                         .collect(),
                 )
                 .await
-                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string())))?;
+                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string()))).map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
         } else {
             aliases = (&entity_ids).into_iter().map(|_| None ).collect()
         }
@@ -520,7 +520,7 @@ impl RawMeasurementStore for TrendStore {
 
         for extractor in extractors.values() {
             let (sub_data_package, timestamps) = extractor
-                .extract_sub_package(&entity_ids, records)
+                .extract_sub_package(&entity_ids, records, &aliases)
                 .map_err(|e| RawMeasurementStoreError::ExtractSubPackage(e.to_string()))?;
 
             extractor
@@ -1446,6 +1446,7 @@ async fn load_trend_store_part<T: GenericClient>(conn: &T, name: &str) -> TrendS
         name: String::from(name),
         trends,
         generated_trends: Vec::new(),
+        has_alias_column: false,
     }
 }
 
