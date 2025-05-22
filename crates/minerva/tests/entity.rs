@@ -51,7 +51,7 @@ mod tests {
             ];
 
             let entity_ids = entity_mapping
-                .names_to_entity_ids(&tx, &"node".to_string(), names)
+                .names_to_entity_ids(&tx, &"node".to_string(), &names)
                 .await
                 .unwrap();
 

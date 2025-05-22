@@ -158,6 +158,7 @@ impl TrendStorePartHolder {
                 name: part_name.to_string(),
                 trends: Vec::new(),
                 generated_trends: Vec::new(),
+                has_alias_column: false,
             });
 
         part.trends.push(trend);
@@ -177,6 +178,7 @@ impl TrendStorePartHolder {
                 name: default_part_name.clone(),
                 trends: Vec::new(),
                 generated_trends: Vec::new(),
+                has_alias_column: false,
             });
 
         let mut current_num = 1;
@@ -191,6 +193,7 @@ impl TrendStorePartHolder {
                     name: next_part_name.clone(),
                     trends: Vec::new(),
                     generated_trends: Vec::new(),
+                    has_alias_column: false,
                 });
 
             current_num += 1;
@@ -203,7 +206,7 @@ impl TrendStorePartHolder {
 }
 
 fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
-    let num_columns = TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap();
+    let num_columns = TryInto::<u16>::try_into(trend_store_part.extended_trends().len()).unwrap();
 
     params.base_width + num_columns * params.column_size
 }
@@ -373,6 +376,7 @@ mod tests {
                     extra_data: json!("{}"),
                 }],
                 generated_trends: vec![],
+                has_alias_column: false,
             }],
         }];
 
