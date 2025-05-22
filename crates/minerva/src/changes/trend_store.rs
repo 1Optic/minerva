@@ -217,6 +217,110 @@ async fn initialize_table_trends<T: GenericClient>(
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
+pub struct AddAliasColumn {
+    pub trend_store_part: TrendStorePart,
+}
+
+impl fmt::Display for AddAliasColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "AddAlias({}):",
+            &self.trend_store_part
+        )?;
+        
+        Ok(())
+    }
+}
+
+async fn add_alias_column<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str
+) -> Result<(), tokio_postgres::Error> {
+    let query = concat!(
+        "SELECT trend_directory.ensure_name_column(tsp) ",
+        "FROM trend_directory.trend_store_part tsp ",
+        "WHERE tsp.name = $1"
+    );
+    client.execute(query, &[&trend_store_part_name]).await?;
+
+    Ok(())
+}
+
+#[async_trait]
+impl Change for AddAliasColumn {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        add_alias_column(&mut tx, &self.trend_store_part.name)
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!("Error adding alias column to trend store part: {e}"))
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Added alias column to trend store part '{}'",
+            &self.trend_store_part.name
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemoveAliasColumn {
+    pub trend_store_part: TrendStorePart,
+}
+
+impl fmt::Display for RemoveAliasColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "RemoveAlias({}):",
+            &self.trend_store_part
+        )?;
+        
+        Ok(())
+    }
+}
+
+async fn remove_alias_column<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str
+) -> Result<(), tokio_postgres::Error> {
+    let query = concat!(
+        "SELECT trend_directory.remove_name_column(tsp) ",
+        "FROM trend_directory.trend_store_part tsp ",
+        "WHERE tsp.name = $1"
+    );
+    client.execute(query, &[&trend_store_part_name]).await?;
+
+    Ok(())
+}
+
+#[async_trait]
+impl Change for RemoveAliasColumn {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        remove_alias_column(&mut tx, &self.trend_store_part.name)
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!("Error removing alias column to trend store part: {e}"))
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Removed alias column to trend store part '{}'",
+            &self.trend_store_part.name
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub struct ModifyTrendDataType {
     pub trend_name: String,
     pub from_type: DataType,
@@ -578,7 +682,7 @@ async fn create_base_table<T: GenericClient>(
     trend_store_part: &TrendStorePart,
 ) -> Result<(), tokio_postgres::Error> {
     let column_spec = std::iter::once("job_id bigint NOT NULL".to_string())
-        .chain(trend_store_part.trends.iter().map(trend_column_spec))
+        .chain(trend_store_part.extended_trends().iter().map(trend_column_spec))
         .chain(
             trend_store_part
                 .generated_trends
@@ -675,8 +779,8 @@ pub async fn create_trend_store_part<T: GenericClient>(
     trend_store_part: &TrendStorePart,
 ) -> Result<(), tokio_postgres::Error> {
     let query = concat!(
-        "INSERT INTO trend_directory.trend_store_part(trend_store_id, name) ",
-        "SELECT trend_store.id, $4 ",
+        "INSERT INTO trend_directory.trend_store_part(trend_store_id, name, primary_alias) ",
+        "SELECT trend_store.id, $4, $5 ",
         "FROM trend_directory.trend_store ",
         "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
         "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
@@ -694,6 +798,7 @@ pub async fn create_trend_store_part<T: GenericClient>(
                 &trend_store.entity_type,
                 &granularity_str,
                 &trend_store_part.name,
+                &trend_store_part.has_alias_column,
             ],
         )
         .await?;

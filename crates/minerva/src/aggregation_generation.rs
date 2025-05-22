@@ -358,7 +358,7 @@ fn define_part_time_aggregation(
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
-        .trends
+        .extended_trends()
         .iter()
         .map(define_time_aggregate_trend)
         .collect();
@@ -381,6 +381,7 @@ fn define_part_time_aggregation(
         name,
         trends: aggregate_trends,
         generated_trends: vec![],
+        has_alias_column: source_part.has_alias_column,
     };
 
     Ok((materialization, target_trend_store_part))
@@ -789,6 +790,7 @@ fn define_aggregate_trend_store(
                 name: aggregate_part_def.name.clone(),
                 trends,
                 generated_trends,
+                has_alias_column: src_part.has_alias_column,
             })
         })
         .collect::<Result<Vec<TrendStorePart>, String>>()?;
@@ -942,7 +944,7 @@ fn entity_aggregation_function(
     relation_name: String,
 ) -> TrendMaterializationFunction {
     let trend_columns: Vec<String> = source_part
-        .trends
+        .extended_trends()
         .iter()
         .map(|trend| {
             format!(

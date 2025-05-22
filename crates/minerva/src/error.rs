@@ -2,6 +2,8 @@ use std::fmt;
 
 use tokio_postgres::{self, error::SqlState};
 
+use crate::entity::EntityMappingError;
+
 #[derive(Debug)]
 pub enum DatabaseErrorKind {
     Default,
@@ -136,5 +138,13 @@ impl From<String> for Error {
         Error::Runtime(RuntimeError {
             msg: err.to_string(),
         })
+    }
+}
+
+impl From<EntityMappingError> for Error {
+    fn from(err: EntityMappingError) -> Error {
+        Error::Runtime(RuntimeError {
+            msg: err.to_string(),
+        })  
     }
 }
