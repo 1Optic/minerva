@@ -130,6 +130,7 @@ pub struct TrendStorePartFull {
     pub id: i32,
     pub name: String,
     pub trend_store: i32,
+    pub has_name_column: bool,
     pub trends: Vec<TrendFull>,
     pub generated_trends: Vec<GeneratedTrendFull>,
 }
@@ -155,6 +156,7 @@ impl TrendStorePartData {
             name: self.name.clone(),
             trends,
             generated_trends,
+            has_alias_column: false,
         }
     }
 }
@@ -335,6 +337,7 @@ impl TrendStorePartCompleteData {
             trend_store: trend_store_id,
             trends,
             generated_trends,
+            has_name_column: false,
         };
 
         Ok(trendstorepart)
@@ -413,7 +416,7 @@ pub(super) async fn get_trend_store_parts(pool: Data<Pool>) -> Result<HttpRespon
 
     let trend_store_parts: Vec<TrendStorePartFull> = client
         .query(
-            "SELECT id, name, trend_store_id FROM trend_directory.trend_store_part",
+            "SELECT id, name, trend_store_id, primary_alias FROM trend_directory.trend_store_part",
             &[],
         )
         .await
@@ -442,6 +445,7 @@ pub(super) async fn get_trend_store_parts(pool: Data<Pool>) -> Result<HttpRespon
                         id: tspid,
                         name: row.get(1),
                         trend_store: row.get(2),
+                        has_name_column: row.get(3),
                         trends: my_trends,
                         generated_trends: my_generated_trends,
                     }
@@ -531,7 +535,7 @@ pub(super) async fn get_trend_store_part(
 
     let trendstorepart = client
         .query_one(
-            "SELECT name, trend_store_id FROM trend_directory.trend_store_part WHERE id = $1",
+            "SELECT name, trend_store_id, primary_alias FROM trend_directory.trend_store_part WHERE id = $1",
             &[&tsp_id],
         )
         .await
@@ -543,6 +547,7 @@ pub(super) async fn get_trend_store_part(
             id: tsp_id,
             name: row.get(0),
             trend_store: row.get(1),
+            has_name_column: row.get(2),
             trends,
             generated_trends,
         })?;
@@ -571,9 +576,9 @@ pub(super) async fn find_trend_store_part(
         message: String::new(),
     })?;
 
-    let (trend_store_part_id, trend_store_id): (i32, i32) = client
+    let (trend_store_part_id, trend_store_id, has_name_column): (i32, i32, bool) = client
         .query_one(
-            "SELECT id, trend_store_id FROM trend_directory.trend_store_part WHERE name = $1",
+            "SELECT id, trend_store_id, primary_alias FROM trend_directory.trend_store_part WHERE name = $1",
             &[&name],
         )
         .await
@@ -581,7 +586,7 @@ pub(super) async fn find_trend_store_part(
             code: 404,
             message: format!("Trend store part with name {} not found", &name),
         })
-        .map(|row| (row.get(0), row.get(1)))?;
+        .map(|row| (row.get(0), row.get(1), row.get(2)))?;
 
     let trends: Vec<TrendFull> = client
         .query(
@@ -643,6 +648,7 @@ pub(super) async fn find_trend_store_part(
         id: trend_store_part_id,
         name: name.to_string(),
         trend_store: trend_store_id,
+        has_name_column,
         trends,
         generated_trends,
     };
@@ -719,7 +725,7 @@ pub(super) async fn get_trend_stores(pool: Data<Pool>) -> Result<HttpResponse, S
 
     let parts: Vec<TrendStorePartFull> = client
         .query(
-            "SELECT id, name, trend_store_id FROM trend_directory.trend_store_part",
+            "SELECT id, name, trend_store_id, primary_alias FROM trend_directory.trend_store_part",
             &[],
         )
         .await
@@ -747,6 +753,7 @@ pub(super) async fn get_trend_stores(pool: Data<Pool>) -> Result<HttpResponse, S
                         id: tspid,
                         name: row.get(1),
                         trend_store: row.get(2),
+                        has_name_column: row.get(3),
                         trends: my_trends,
                         generated_trends: my_generated_trends,
                     }
@@ -875,7 +882,7 @@ pub(super) async fn get_trend_store(
     let parts: Vec<TrendStorePartFull> = client
         .query(
             concat!(
-                "SELECT id, name, trend_store_id ",
+                "SELECT id, name, trend_store_id, primary_alias ",
                 "FROM trend_directory.trend_store_part ",
                 "WHERE trend_store_id = $1"
             ),
@@ -906,6 +913,7 @@ pub(super) async fn get_trend_store(
                         id: tspid,
                         name: row.get(1),
                         trend_store: row.get(2),
+                        has_name_column: row.get(3),
                         trends: my_trends,
                         generated_trends: my_generated_trends,
                     }

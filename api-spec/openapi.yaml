@@ -1174,6 +1174,9 @@ components:
         name:
           type: string
           description: Name of the trend store part
+        has_name_column:
+          type: boolean
+          description: True iff the trend store part has a 'name' column specifying the name/alias of the entity
         trend_store:
           type: integer
           description: Id of the trend store to which the trend store part to which the trend store belongs
