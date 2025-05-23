@@ -241,7 +241,7 @@ impl fmt::Display for ModifyTrendDataType {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct ModifyTrendDataTypes {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
     pub modifications: Vec<ModifyTrendDataType>,
 }
 
@@ -250,7 +250,7 @@ impl fmt::Display for ModifyTrendDataTypes {
         writeln!(
             f,
             "ModifyTrendDataTypes({}, {}):",
-            &self.trend_store_part,
+            &self.trend_store_part_name,
             self.modifications.len()
         )?;
 
@@ -270,7 +270,7 @@ impl fmt::Debug for ModifyTrendDataTypes {
         write!(
             f,
             "ModifyTrendDataTypes({}, {})",
-            &self.trend_store_part,
+            &self.trend_store_part_name,
             &modifications.join(", "),
         )
     }
@@ -315,7 +315,7 @@ impl Change for ModifyTrendDataTypes {
                     query,
                     &[
                         &modification.to_type,
-                        &self.trend_store_part.name,
+                        &self.trend_store_part_name,
                         &modification.trend_name,
                     ],
                 )
@@ -344,8 +344,8 @@ impl Change for ModifyTrendDataTypes {
         let alter_type_parts_str = alter_type_parts.join(", ");
 
         let alter_query = format!(
-            "ALTER TABLE trend.\"{}\" {}",
-            &self.trend_store_part.name, &alter_type_parts_str
+            "ALTER TABLE trend.{} {}",
+            escape_identifier(&self.trend_store_part_name), &alter_type_parts_str
         );
 
         let alter_query_slice: &str = &alter_query;
@@ -370,13 +370,13 @@ impl Change for ModifyTrendDataTypes {
 
         Ok(format!(
             "Altered trend data types for trend store part '{}'",
-            &self.trend_store_part.name
+            &self.trend_store_part_name
         ))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
         vec![Box::new(TrendValueInformation {
-            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_store_part_name: self.trend_store_part_name.clone(),
             trend_names: self
                 .modifications
                 .iter()

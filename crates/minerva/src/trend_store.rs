@@ -1094,7 +1094,7 @@ impl TrendStorePart {
 
         if !alter_trend_data_types.is_empty() {
             changes.push(Box::new(ModifyTrendDataTypes {
-                trend_store_part: self.clone(),
+                trend_store_part_name: self.name.clone(),
                 modifications: alter_trend_data_types,
             }));
         }
