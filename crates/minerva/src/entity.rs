@@ -66,7 +66,7 @@ pub struct DbEntityMapping {}
 
 impl EntityMapping for DbEntityMapping {
     async fn uses_alias_column<T: GenericClient + Sync>(&self, entity_type: &EntityTypeName, client: &T) -> Result<bool, EntityMappingError> {
-        let query = "SELECT primary_alias FROM directory.entity_type WHERE name = $1";
+        let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
         let query_result = client
             .query_one(query, &[&entity_type])
             .await
@@ -125,7 +125,7 @@ impl EntityMapping for DbEntityMapping {
         names: &Vec<EntityName>,
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
 
-        let query = "SELECT primary_alias FROM directory.entity_type WHERE name = $1";
+        let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
         let result = client
             .query_one(query, &[&entity_type])
             .await
@@ -195,7 +195,7 @@ impl CachingEntityMapping {
 impl EntityMapping for CachingEntityMapping {
     async fn uses_alias_column<T: GenericClient + Sync>(&self, entity_type: &EntityTypeName, client: &T) -> Result<bool, EntityMappingError> {
         if self.primary_alias_cache.get(entity_type) == None {
-            let query = "SELECT primary_alias FROM directory.entity_type WHERE name = $1";
+            let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
             let result = client
                 .query_one(query, &[&entity_type])
                 .await
@@ -376,8 +376,18 @@ impl Change for AddEntityType {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
 
-        // TODO: This has not been implemented yet
-
+        let entity_type = &self.entity_type;
+        match &entity_type.primary_alias {
+            Some(primary_alias) => {
+                let query = "SELECT directory.create_entity_type($1, $2);";
+                tx.execute(query, &[&entity_type.name, &primary_alias]).await?;
+            }
+            None => {
+                let query = "SELECT directory.create_entity_type($1)";
+                tx.execute(query, &[&entity_type.name]).await?;
+            }
+        }
+        tx.commit().await?;
         Ok(format!("Created entity_type '{}'", &self.entity_type.name))
     }
 }

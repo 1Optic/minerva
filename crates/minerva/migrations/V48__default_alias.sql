@@ -2,7 +2,8 @@
 -- defining the relevant functions in a non-functional but non-failing way
 
 ALTER TABLE "directory"."entity_type"
-    ADD COLUMN "primary_alias" text DEFAULT NULL;
+    ADD COLUMN "primary_alias" text DEFAULT NULL,
+    ADD COLUMN "has_primary_alias" boolean GENERATED ALWAYS AS (primary_alias IS NOT NULL) STORED;
 
 CREATE FUNCTION "entity"."create_entity_table_sql"(directory.entity_type, primary_alias text)
     RETURNS text[]

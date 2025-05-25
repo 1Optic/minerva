@@ -17,7 +17,9 @@ mod tests {
     use minerva::meas_value::{DataType, MeasValue};
     use minerva::schema::create_schema;
     use minerva::trend_store::MeasurementStore;
-    use minerva::trend_store::{create_partitions_for_timestamp, DataPackage, TrendStore};
+    use minerva::trend_store::{create_partitions_for_timestamp, DataPackage, DataPackageWriteError, TrendStore};
+
+    use integration_tests::setup;
 
     const ENTITY_TYPE_DEFINITION: &str = r"
         name: Site
@@ -67,19 +69,32 @@ mod tests {
             mut writer: std::pin::Pin<&mut BinaryCopyInWriter>,
             values: &[(usize, DataType)],
             created_timestamp: &DateTime<chrono::Utc>,
-        ) -> Result<usize, minerva::error::Error> {
+        ) -> Result<usize, DataPackageWriteError> {
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                     vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
 
-                let row = self.rows.get(index).unwrap();
+                let row = self.rows.get(index).ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
+                })?;
 
                 for (column_index, _data_type) in values {
-                    let v = row.get(*column_index).unwrap();
+                    let v = row.get(*column_index).ok_or_else(|| {
+                        DataPackageWriteError::DataPreparation(format!(
+                            "No data column with index {column_index}"
+                        ))
+                    })?;
                     sql_values.push(v);
                 }
 
-                writer.as_mut().write(&sql_values).await?;
+                writer.as_mut().write(&sql_values).await.map_err(|e| {
+                    let db_error = e.as_db_error();
+
+                    match db_error {
+                        Some(db_e) => DataPackageWriteError::Generic(format!("dbe: {db_e}")),
+                        None => DataPackageWriteError::Generic(format!("{e}")),
+                    }
+                })?;
             }
 
             Ok(self.entity_ids.len())
@@ -112,13 +127,12 @@ mod tests {
             Ok(count)
         }
     }
-
     // This is a temporary form that does not use yaml, so the test can be done to the
     // database code before the Yaml definitions are included. Once the Yaml definitions
     // are included, this one can be removed as it is then implied by the next test.
     #[tokio::test]
     async fn default_alias_database_temporary() -> Result<(), Box<dyn std::error::Error>> {
-        crate::setup();
+        setup();
 
         let cluster_config = MinervaClusterConfig {
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
@@ -224,7 +238,7 @@ mod tests {
 
     #[tokio::test]
     async fn default_alias_database() -> Result<(), Box<dyn std::error::Error>> {
-        crate::setup();
+        setup();
 
         let cluster_config = MinervaClusterConfig {
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
@@ -310,7 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn default_alias_insert() -> Result<(), Box<dyn std::error::Error>> {
-        crate::setup();
+        setup();
 
         let cluster_config = MinervaClusterConfig {
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
