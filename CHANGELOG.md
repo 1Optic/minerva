@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.27.0] - 2025-05-27
+
+### Fixed
+
+- Library: Fixed bug in trend materialization logic update that caused errors
+  due to multiple attempts of removing views and functions.
+
+### Added
+
+- CLI/Library: Added option to show detailed diff for trend extra data change
+- CLI/Library: Added option to show detailed diff for trend materialization function SQL
+
+### Changed
+
+- Library: Use specific error types for trend data storage functions to allow handling of data type mismatches
+- Integration tests: Restructured integration tests so that they are compiled separately.
+
 ## [9.26.1] - 2025-04-25
 
 ### Fixed
@@ -399,4 +416,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.25.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.24.0...9.25.0
 [9.26.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.25.0...9.26.0
 [9.26.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.0...9.26.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...HEAD
+[9.27.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...9.27.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...HEAD
