@@ -345,7 +345,8 @@ impl Change for ModifyTrendDataTypes {
 
         let alter_query = format!(
             "ALTER TABLE trend.{} {}",
-            escape_identifier(&self.trend_store_part_name), &alter_type_parts_str
+            escape_identifier(&self.trend_store_part_name),
+            &alter_type_parts_str
         );
 
         let alter_query_slice: &str = &alter_query;
