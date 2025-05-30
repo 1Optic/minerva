@@ -1386,8 +1386,7 @@ where
         let mut transaction = client.transaction().await?;
 
         let message =
-            create_notifications(&mut transaction, &self.trigger_name, self.timestamp)
-                .await?;
+            create_notifications(&mut transaction, &self.trigger_name, self.timestamp).await?;
 
         transaction.commit().await?;
 
