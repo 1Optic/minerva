@@ -1,6 +1,6 @@
 use futures_util::pin_mut;
 use humantime::format_duration;
-use log::debug;
+use log::{debug, info};
 use postgres_protocol::escape::escape_identifier;
 use postgres_types::Type;
 use serde::{Deserialize, Serialize};
@@ -593,6 +593,7 @@ impl MeasurementStore for TrendStorePart {
     where
         U: DataPackage + std::marker::Sync,
     {
+        info!("Copying package");
         match self.store_copy_from_package(client, data_package).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
@@ -618,6 +619,8 @@ impl MeasurementStore for TrendStorePart {
                 _ => Err(StorePackageError::Database(e.to_string())),
             },
         }?;
+
+        info!("Package copied!");
 
         self.mark_modified(client, data_package.timestamp())
             .await
@@ -897,8 +900,10 @@ impl TrendStorePart {
         let mut value_types: Vec<Type> =
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
 
+        let extended_trends = self.extended_trends();
+
         // Filter trends that match the trend store parts trends and add corresponding types
-        for t in &self.trends {
+        for t in &extended_trends {
             let index = data_package
                 .trends()
                 .iter()
@@ -922,14 +927,22 @@ impl TrendStorePart {
             return Ok(());
         }
 
+        info!("AAA");
+
         let query = copy_from_query(self, &matched_trends);
+
+        info!("BBB");
 
         let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
             StoreCopyFromError::Generic(format!("Error starting COPY command: {e}"))
         })?;
 
+        info!("CCC");
+
         let binary_copy_writer = BinaryCopyInWriter::new(copy_in_sink, &value_types);
         pin_mut!(binary_copy_writer);
+
+        info!("DDD");
 
         // We cannot use the database now() function for COPY FROM queries, so the 'created'
         // timestamp for the trend data records is generated here.
@@ -945,6 +958,8 @@ impl TrendStorePart {
             .map_err(|e| {
                 StoreCopyFromError::Write(format!("Could not write package for COPY command: {e}"))
             })?;
+
+        info!("EEE");
 
         binary_copy_writer.finish().await.map_err(|e| {
             let error_text = e.to_string();
@@ -962,6 +977,8 @@ impl TrendStorePart {
                 StoreCopyFromError::Generic(error_text)
             }
         })?;
+
+        info!("FFF");
 
         Ok(())
     }
