@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use log::debug;
+    use log::{debug, info};
     use std::path::PathBuf;
 
     use async_trait::async_trait;
@@ -35,12 +35,12 @@ mod tests {
         retention_period: 1y
         parts:
           - name: sample_trend_store_part
-            primary_alias: true
+            has_alias_column: true
             trends:
               - name: value
                 data_type: numeric
           - name: sample_trend_store_part_2
-            primary_alias: false
+            has_alias_column: false
             trends:
               - name: value_2
                 data_type: numeric
@@ -71,12 +71,18 @@ mod tests {
             created_timestamp: &DateTime<chrono::Utc>,
         ) -> Result<usize, DataPackageWriteError> {
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
+                info!("DDE: {}", entity_id.to_string());
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                     vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+                info!("DDF");
+
+                info!("--- {:?}", self.entity_ids);
+                info!(">>> {:?}", self.rows);
 
                 let row = self.rows.get(index).ok_or_else(|| {
                     DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
                 })?;
+                info!("DDG");
 
                 for (column_index, _data_type) in values {
                     let v = row.get(*column_index).ok_or_else(|| {
@@ -86,6 +92,7 @@ mod tests {
                     })?;
                     sql_values.push(v);
                 }
+                info!("DDH");
 
                 writer.as_mut().write(&sql_values).await.map_err(|e| {
                     let db_error = e.as_db_error();
@@ -95,6 +102,7 @@ mod tests {
                         None => DataPackageWriteError::Generic(format!("{e}")),
                     }
                 })?;
+                info!("DDI");
             }
 
             Ok(self.entity_ids.len())
@@ -127,11 +135,9 @@ mod tests {
             Ok(count)
         }
     }
-    // This is a temporary form that does not use yaml, so the test can be done to the
-    // database code before the Yaml definitions are included. Once the Yaml definitions
-    // are included, this one can be removed as it is then implied by the next test.
+
     #[tokio::test]
-    async fn default_alias_database_temporary() -> Result<(), Box<dyn std::error::Error>> {
+    async fn default_alias_database() -> Result<(), Box<dyn std::error::Error>> {
         setup();
 
         let cluster_config = MinervaClusterConfig {
@@ -143,18 +149,22 @@ mod tests {
 
         let test_database = cluster.create_db().await?;
 
-        debug!("Created database '{}'", test_database.name);
+        info!("Created database '{}'", test_database.name);
 
         {
             let mut client = test_database.connect().await?;
             create_schema(&mut client).await?;
 
-            client.execute(
-                r"SELECT directory.create_entity_type('Site', 'substring(name from ''.*=(\d+)$'')')",
-                &[],
-            ).await?;
+            let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
+                .map_err(|e| format!("Could not read entity type definition: {e}"))?;
 
-            debug!("Created entity type");
+            let add_entity_type = AddEntityType {
+                entity_type: entity_type.clone(),
+            };
+
+            add_entity_type.apply(&mut client).await?;
+
+            info!("Created entity type");
 
             client
                 .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
@@ -171,40 +181,16 @@ mod tests {
 
             assert_eq!(alias, "100".to_string());
 
-            debug!("Alias checked");
+            let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
-            let query = concat!(
-                "SELECT id FROM trend_directory.define_trend_store(",
-                "directory.name_to_data_source('minerva'), ",
-                "directory.name_to_entity_type('Site'), ",
-                "'15m'::interval, '1d'::interval)",
-            );
+            let add_trend_store = AddTrendStore {
+                trend_store: trend_store.clone(),
+            };
 
-            let trend_store_row = client.query_one(query, &[]).await?;
+            add_trend_store.apply(&mut client).await?;
 
-            let trend_store_id = trend_store_row.get::<usize, i32>(0);
-
-            debug!("Trend store part created");
-
-            let query = concat!(
-                "SELECT trend_directory.assure_table_trends_exist(",
-                "$1, 'sample_trend_store_part', true, ",
-                "ARRAY[('value', 'integer', '', 'SUM', 'SUM', '{}'::jsonb)]::trend_directory.trend_descr[],",
-                "ARRAY[]::trend_directory.generated_trend_descr[]",
-                ")",
-            );
-
-            client.execute(query, &[&trend_store_id]).await?;
-
-            let query = concat!(
-                "SELECT trend_directory.assure_table_trends_exist(",
-                "$1, 'sample_trend_store_part_2', false, ",
-                "ARRAY[('value', 'integer', '', 'SUM', 'SUM', '{}'::jsonb)]::trend_directory.trend_descr[],",
-                "ARRAY[]::trend_directory.generated_trend_descr[]",
-                ")",
-            );
-
-            client.execute(query, &[&trend_store_id]).await?;
+            info!("Created trend store");
 
             let query = concat!(
                 "SELECT column_name FROM information_schema.columns ",
@@ -213,6 +199,7 @@ mod tests {
 
             let rows = client.query(query, &[]).await?;
             let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
+            let column_list = columns.join(", ");
             assert!(
                 columns.contains(&"name".to_string()),
                 "alias column not created"
@@ -237,92 +224,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn default_alias_database() -> Result<(), Box<dyn std::error::Error>> {
-        setup();
-
-        let cluster_config = MinervaClusterConfig {
-            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-            ..Default::default()
-        };
-
-        let cluster = MinervaCluster::start(&cluster_config).await?;
-
-        let test_database = cluster.create_db().await?;
-
-        debug!("Created database '{}'", test_database.name);
-
-        {
-            let mut client = test_database.connect().await?;
-            create_schema(&mut client).await?;
-
-            let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
-                .map_err(|e| format!("Could not read entity type definition: {e}"))?;
-
-            let add_entity_type = AddEntityType {
-                entity_type: entity_type.clone(),
-            };
-
-            add_entity_type.apply(&mut client).await?;
-
-            debug!("Created entity type");
-
-            client
-                .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
-                .await?;
-
-            let row = client
-                .query_one(
-                    "SELECT primary_alias FROM entity.\"Site\" WHERE name = 'name=Site20,number=100'",
-                    &[],
-                )
-                .await?;
-
-            let alias: String = row.get(0);
-
-            assert_eq!(alias, "100".to_string());
-
-            let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
-
-            let add_trend_store = AddTrendStore {
-                trend_store: trend_store.clone(),
-            };
-
-            add_trend_store.apply(&mut client).await?;
-
-            debug!("Created trend store");
-
-            let query = concat!(
-                "SELECT column_name FROM information_schema.columns ",
-                "WHERE table_schema = 'trend' AND table_name = 'sample_trend_store_part'",
-            );
-
-            let rows = client.query(query, &[]).await?;
-            let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
-            assert!(
-                columns.contains(&"alias".to_string()),
-                "alias column not created"
-            );
-
-            client.execute(query, &[]).await?;
-
-            let query = concat!(
-                "SELECT column_name FROM information_schema.columns ",
-                "WHERE table_schema = 'trend' AND table_name = 'sample_trend_store_part_2'",
-            );
-
-            let rows = client.query(query, &[]).await?;
-            let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
-            assert!(
-                !columns.contains(&"alias".to_string()),
-                "alias column created where it should not"
-            );
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn default_alias_insert() -> Result<(), Box<dyn std::error::Error>> {
         setup();
 
@@ -335,11 +236,13 @@ mod tests {
 
         let test_database = cluster.create_db().await?;
 
-        debug!("Created database '{}'", test_database.name);
+        info!("Created database '{}'", test_database.name);
 
         {
             let mut client = test_database.connect().await?;
             create_schema(&mut client).await?;
+
+            info!("Schema created");
 
             let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
                 .map_err(|e| format!("Could not read entity type definition: {e}"))?;
@@ -350,7 +253,7 @@ mod tests {
 
             add_entity_type.apply(&mut client).await?;
 
-            debug!("Created entity type");
+            info!("Created entity type");
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
                 .map_err(|e| format!("Could not read trend store definition: {e}"))?;
@@ -361,7 +264,7 @@ mod tests {
 
             add_trend_store.apply(&mut client).await?;
 
-            debug!("Created trend store");
+            info!("Created trend store");
 
             let timestamp = chrono::DateTime::parse_from_rfc3339("2025-03-25T14:00:00+00:00")
                 .unwrap()
@@ -383,6 +286,8 @@ mod tests {
                 .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
                 .await?;
 
+            info!("First site created");
+
             let names = vec![
                 "name=Site20,number=100",
                 "name=Site20,number=101",
@@ -401,15 +306,23 @@ mod tests {
             ];
 
             let mut entity_ids: Vec<i32> = vec![];
-            let query = "SELECT entity.\"create_Site\"($1)";
+            let query = "SELECT id FROM entity.\"create_Site\"($1)";
+
+            info!("All sites created");
 
             for target in names.iter() {
-                entity_ids.push(client.query_one(query, &[target]).await?.get(0));
+                let entity_id: i32 = client.query_one(query, &[target]).await?.get(0);
+                entity_ids.push(entity_id);
             }
 
-            let rows = vec![vec![MeasValue::Numeric(Some(
+            let row = vec![MeasValue::Numeric(Some(
                 rust_decimal::Decimal::from_f64(20.0).unwrap(),
-            ))]];
+            ))];
+
+            let rows = vec![
+                row.clone(), row.clone(), row.clone(), row.clone(), row.clone(),
+                row.clone(), row.clone(), row.clone(), row.clone(), row.clone(),
+            ];
 
             let package = RefinedDataPackage {
                 timestamp,
@@ -422,6 +335,8 @@ mod tests {
             trend_store_part
                 .store_package(&mut client, &package)
                 .await?;
+
+            info!("Package stored");
 
             let rows = client
                 .query("SELECT alias FROM trend.sample_trend_store_part", &[])
