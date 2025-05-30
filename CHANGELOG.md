@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.27.1] - 2025-05-30
+
+### Removed
+
+- DB Schema: Removed broken notification generation functions.
+
 ## [9.27.0] - 2025-05-27
 
 ### Fixed
@@ -417,4 +423,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.26.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.25.0...9.26.0
 [9.26.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.0...9.26.1
 [9.27.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...9.27.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...HEAD
+[9.27.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...9.27.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...HEAD

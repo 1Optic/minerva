@@ -1386,8 +1386,7 @@ where
         let mut transaction = client.transaction().await?;
 
         let message =
-            create_notifications(&mut transaction, &self.trigger_name, Some(self.timestamp))
-                .await?;
+            create_notifications(&mut transaction, &self.trigger_name, self.timestamp).await?;
 
         transaction.commit().await?;
 
@@ -1395,41 +1394,18 @@ where
     }
 }
 
-pub async fn create_notifications<T, Ts>(
+pub async fn create_notifications<T>(
     conn: &mut T,
     name: &str,
-    timestamp: Option<Ts>,
+    timestamp: chrono::DateTime<Utc>,
 ) -> Result<String, Error>
 where
     T: GenericClient + Send + Sync,
-    Ts: ToSql + Send + Sync,
 {
-    let outer_t: Ts;
-
-    let (query, query_args) = match timestamp {
-        None => {
-            let query = String::from("SELECT trigger.create_notifications($1::name)");
-
-            let query_args = vec![&name as &(dyn ToSql + Sync)];
-
-            (query, query_args)
-        }
-        Some(t) => {
-            outer_t = t;
-            let query =
-                String::from("SELECT trigger.create_notifications($1::name, $2::timestamptz)");
-
-            let query_args = vec![
-                &name as &(dyn ToSql + Sync),
-                &outer_t as &(dyn ToSql + Sync),
-            ];
-
-            (query, query_args)
-        }
-    };
+    let query = String::from("SELECT trigger.create_notifications($1::name, $2::timestamptz)");
 
     let row = conn
-        .query_one(&query, query_args.iter().as_slice())
+        .query_one(&query, &[&name, &timestamp])
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error checking for rule existance: {e}")))?;
 
