@@ -37,7 +37,7 @@ use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
-use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
+use super::virtual_entity::{load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity, VirtualEntity};
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum AggregationType {
@@ -758,7 +758,7 @@ fn load_virtual_entities_from(minerva_instance_root: &Path) -> impl Iterator<Ite
     ))
     .expect("Failed to read glob pattern");
 
-    sql_paths.filter_map(|entry| match entry {
+    let from_sql_definitions = sql_paths.filter_map(|entry| match entry {
         Ok(path) => match load_virtual_entity_from_file(&path) {
             Ok(virtual_entity) => Some(virtual_entity),
             Err(e) => {
@@ -767,7 +767,26 @@ fn load_virtual_entities_from(minerva_instance_root: &Path) -> impl Iterator<Ite
             }
         },
         Err(_) => None,
-    })
+    });
+
+    let yaml_paths = glob(&format!(
+        "{}/virtual-entity/*.yaml",
+        minerva_instance_root.to_string_lossy()
+    ))
+    .expect("Failed to read glob pattern");
+
+    let from_yaml_definitions = yaml_paths.filter_map(|entry| match entry {
+        Ok(path) => match load_virtual_entity_from_yaml_file(&path) {
+            Ok(virtual_entity) => Some(virtual_entity),
+            Err(e) => {
+                println!("Error loading virtual entity definition: {e}");
+                None
+            }
+        },
+        Err(_) => None,
+    });
+
+    from_sql_definitions.chain(from_yaml_definitions)
 }
 
 fn load_relations_from(minerva_instance_root: &Path) -> impl Iterator<Item = Relation> {
