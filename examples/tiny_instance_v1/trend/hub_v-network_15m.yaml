@@ -1,0 +1,10 @@
+data_source: hub
+entity_type: v-network
+granularity: 15m
+partition_size: 1d
+retention_period: 6months
+parts:
+  - name: hub_v-network_main_15m
+    trends:
+      - name: power_mwh
+        data_type: bigint

@@ -35,14 +35,19 @@ pub struct TrendMaterializationTrendSource {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendMaterializationAttributeSource {
-    pub data_source: String,
-    pub entity_type: String,
+    pub attribute_store: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrendMaterializationRelationSource {
+    pub relation: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
 pub enum TrendMaterializationSource {
     Trend(TrendMaterializationTrendSource),
-    Relation(String),
+    Relation(TrendMaterializationRelationSource),
     Attribute(TrendMaterializationAttributeSource)
 }
 
@@ -2306,5 +2311,47 @@ async fn drop_materialization_sources<T: GenericClient + Send + Sync>(
         Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
             "Error removing old sources: {e}"
         )))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trend_materialization_deserialization() {
+        let definition: &str = r#"target_trend_store_part: hub_v-network_main_15m
+enabled: true
+processing_delay: 30m
+stability_delay: 5m
+reprocessing_period: 3 days
+sources:
+- trend_store_part: hub_node_main_15m
+  mapping_function: trend.mapping_id
+- relation: "node->v-network"
+function:
+  return_type: ""
+  src: |-
+      SELECT
+        timestamp,
+        r.target_id AS entity_id, 
+        sum(power_kwh) * 1000 as power_mwh
+      FROM trend."hub_node_main_15m"
+      JOIN relation."node->v-network" r ON r.source_id = t.entity_id
+      GROUP BY timestamp, r.target_id
+      WHERE timestamp = $1
+  language: sql
+fingerprint_function: |
+  SELECT modified.last, format('{"hub_node_main_15m": "%s"}', modified.last)::jsonb
+  FROM trend_directory.modified
+  JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id
+  WHERE ttsp::name = 'hub_node_main_15m' AND modified.timestamp = $1;
+description: |
+  Aggregation materialization from node to network level (v-network)
+"#;
+
+        let materialization: TrendFunctionMaterialization = serde_yaml::from_str(definition).unwrap();
+
+        assert_eq!(materialization.target_trend_store_part, "hub_v-network_main_15m");
     }
 }

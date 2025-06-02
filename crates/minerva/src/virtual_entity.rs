@@ -20,10 +20,22 @@ impl fmt::Display for VirtualEntity {
     }
 }
 
+pub fn load_virtual_entity_from_yaml_file(path: &PathBuf) -> Result<VirtualEntity, Error> {
+    let f = std::fs::File::open(path).map_err(|e| {
+        ConfigurationError::from_msg(format!(
+            "Could not open virtual entity definition file '{}': {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    serde_yaml::from_reader(f).map_err(|e| Error::Runtime(crate::error::RuntimeError::from_msg(format!("Could not read virtual entity definition from file '{}': {}", path.display(), e))))
+}
+
 pub fn load_virtual_entity_from_file(path: &PathBuf) -> Result<VirtualEntity, Error> {
     let mut f = std::fs::File::open(path).map_err(|e| {
         ConfigurationError::from_msg(format!(
-            "Could not open relation definition file '{}': {}",
+            "Could not open virtual entity definition file '{}': {}",
             path.display(),
             e
         ))
