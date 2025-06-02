@@ -17,7 +17,7 @@ BEGIN
             RETURN 6;
         WHEN 'timestamp without time zone' THEN
             RETURN 7;
-        WHEN 'timestamptz' THEN
+        WHEN 'timestamp with time zone' THEN
             RETURN 7;
         WHEN 'smallint[]' THEN
             RETURN 8;
