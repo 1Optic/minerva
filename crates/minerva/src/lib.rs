@@ -9,6 +9,7 @@ pub mod cluster;
 pub mod database;
 pub mod entity;
 pub mod entity_set;
+pub mod entity_type;
 pub mod error;
 pub mod instance;
 pub mod interval;
