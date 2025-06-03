@@ -143,6 +143,7 @@ pub enum GraphNode {
     TrendViewMaterialization(String),
     TrendFunctionMaterialization(String),
     Relation(String),
+    VirtualEntity(String),
 }
 
 impl GraphNode {
@@ -174,6 +175,9 @@ impl Display for GraphNode {
             }
             GraphNode::Relation(name) => {
                 write!(f, "Relation({})", name)
+            }
+            GraphNode::VirtualEntity(name) => {
+                write!(f, "VirtualEntity({})", name)
             }
         }
     }
@@ -572,6 +576,51 @@ impl MinervaInstance {
                             source_index,
                             "".to_string(),
                         );
+                    }
+                }
+            }
+        }
+
+        for virtual_entity in &self.virtual_entities {
+            let virtual_entity_node_index =
+                graph.add_node(GraphNode::VirtualEntity(virtual_entity.name.clone()));
+
+            let table_name = format!("entity.{}", virtual_entity.name);
+
+            match table_node_map.get(&table_name) {
+                Some(entity_index) => {
+                    graph.add_edge(*entity_index, virtual_entity_node_index, "".to_string());
+                }
+                None => {
+                    error!(
+                        "Could not find entity table '{}' for virtual entity '{}'",
+                        table_name, virtual_entity.name
+                    );
+                }
+            }
+
+            // Parse the SQL with the relation definition to find what tables it has as
+            // dependencies
+            match pg_query::parse(&virtual_entity.sql) {
+                Err(e) => {
+                    error!(
+                        "Could not parse SQL of virtual entity '{}': {e}",
+                        virtual_entity.name
+                    );
+                }
+                Ok(parse_result) => {
+                    for table_name in parse_result.tables() {
+                        let source_index = match table_node_map.get(table_name.as_str()) {
+                            None => {
+                                let node = GraphNode::Table(table_name.clone());
+                                let table_node_index = graph.add_node(node);
+                                table_node_map.insert(table_name, table_node_index);
+                                table_node_index
+                            }
+                            Some(index) => *index,
+                        };
+
+                        graph.add_edge(virtual_entity_node_index, source_index, "".to_string());
                     }
                 }
             }
