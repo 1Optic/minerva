@@ -10,7 +10,8 @@ use utoipa::ToSchema;
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction, TrendMaterializationSource, TrendMaterializationTrendSource, TrendViewMaterialization
+    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction,
+    TrendMaterializationSource, TrendMaterializationTrendSource, TrendViewMaterialization,
 };
 use tokio_postgres::Transaction;
 

@@ -48,7 +48,7 @@ pub struct TrendMaterializationRelationSource {
 pub enum TrendMaterializationSource {
     Trend(TrendMaterializationTrendSource),
     Relation(TrendMaterializationRelationSource),
-    Attribute(TrendMaterializationAttributeSource)
+    Attribute(TrendMaterializationAttributeSource),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1622,10 +1622,12 @@ async fn load_sources<T: GenericClient + Send + Sync>(
         let trend_store_part: String = row.get(0);
         let mapping_function: String = row.get(1);
 
-        sources.push(TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
-            trend_store_part,
-            mapping_function,
-        }));
+        sources.push(TrendMaterializationSource::Trend(
+            TrendMaterializationTrendSource {
+                trend_store_part,
+                mapping_function,
+            },
+        ));
     }
 
     Ok(sources)
@@ -2069,13 +2071,14 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
                 if insert_count == 0 {
                     return Err(ConnectMaterializationSourcesError::NoLinkInserted);
                 }
-            },
-            TrendMaterializationSource::Relation(relation_name) => {
-            },
-            TrendMaterializationSource::Attribute(attribute_source) => {
+            }
+            TrendMaterializationSource::Relation(_relation_source) => {
+                // Todo: Register in the database
+            }
+            TrendMaterializationSource::Attribute(_attribute_source) => {
+                // Todo: Register in the database
             }
         }
-
     }
 
     Ok(())
@@ -2350,8 +2353,12 @@ description: |
   Aggregation materialization from node to network level (v-network)
 "#;
 
-        let materialization: TrendFunctionMaterialization = serde_yaml::from_str(definition).unwrap();
+        let materialization: TrendFunctionMaterialization =
+            serde_yaml::from_str(definition).unwrap();
 
-        assert_eq!(materialization.target_trend_store_part, "hub_v-network_main_15m");
+        assert_eq!(
+            materialization.target_trend_store_part,
+            "hub_v-network_main_15m"
+        );
     }
 }

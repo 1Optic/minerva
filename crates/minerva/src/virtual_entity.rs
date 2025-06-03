@@ -29,7 +29,13 @@ pub fn load_virtual_entity_from_yaml_file(path: &PathBuf) -> Result<VirtualEntit
         ))
     })?;
 
-    serde_yaml::from_reader(f).map_err(|e| Error::Runtime(crate::error::RuntimeError::from_msg(format!("Could not read virtual entity definition from file '{}': {}", path.display(), e))))
+    serde_yaml::from_reader(f).map_err(|e| {
+        Error::Runtime(crate::error::RuntimeError::from_msg(format!(
+            "Could not read virtual entity definition from file '{}': {}",
+            path.display(),
+            e
+        )))
+    })
 }
 
 pub fn load_virtual_entity_from_file(path: &PathBuf) -> Result<VirtualEntity, Error> {
