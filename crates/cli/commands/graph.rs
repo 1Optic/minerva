@@ -52,11 +52,15 @@ impl Cmd for GraphOpt {
             &|_graph, _edge_ref| "".to_string(),
             &|_graph, (_index, node)| match node {
                 GraphNode::Table(_) => "shape=box".to_string(),
+                GraphNode::VirtualEntity(_) => "shape=box,style=\"rounded\"".to_string(),
+                GraphNode::Relation(_) => "shape=box,style=\"rounded\"".to_string(),
                 GraphNode::TrendStorePart(_) => "shape=box".to_string(),
                 GraphNode::TrendFunctionMaterialization(_) => {
                     "shape=box,style=\"rounded\"".to_string()
                 }
-                _ => "".to_string(),
+                GraphNode::TrendViewMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
+                GraphNode::AttributeStore(_) => "shape=box".to_string(),
+                GraphNode::AttributeMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
             },
         );
 

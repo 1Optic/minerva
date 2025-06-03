@@ -150,5 +150,17 @@ pub async fn load_entity_types<T: GenericClient + Send + Sync>(
 ) -> Result<Vec<EntityType>, Error> {
     let mut entity_types: Vec<EntityType> = Vec::new();
 
+    let query = "SELECT name FROM directory.entity_type";
+
+    let rows = client.query(query, &[]).await?;
+
+    for row in rows {
+        let entity_type_name: String = row.get(0);
+
+        entity_types.push(EntityType {
+            name: entity_type_name,
+        });
+    }
+
     Ok(entity_types)
 }
