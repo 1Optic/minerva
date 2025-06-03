@@ -1,8 +1,8 @@
 use std::fmt;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
-use glob::glob;
 use async_trait::async_trait;
+use glob::glob;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::{Client, GenericClient};
 
@@ -79,7 +79,12 @@ impl Change for AddEntityType {
 
         create_entity_type(&mut tx, &self.entity_type)
             .await
-            .map_err(|e| format!("Could not create entity type '{}': {e}", self.entity_type.name))?;
+            .map_err(|e| {
+                format!(
+                    "Could not create entity type '{}': {e}",
+                    self.entity_type.name
+                )
+            })?;
 
         tx.commit().await?;
 
@@ -105,9 +110,10 @@ pub async fn create_entity_type<T: GenericClient>(
 ) -> Result<(), CreateEntityTypeError> {
     let query = "SELECT directory.create_entity_type($1)";
 
-    client.query(query, &[&entity_type.name]).await.map_err(|e| {
-        CreateEntityTypeError::Database(format!("Error creating entity type: {e}"))
-    })?;
+    client
+        .query(query, &[&entity_type.name])
+        .await
+        .map_err(|e| CreateEntityTypeError::Database(format!("Error creating entity type: {e}")))?;
 
     Ok(())
 }

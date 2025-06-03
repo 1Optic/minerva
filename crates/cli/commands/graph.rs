@@ -49,22 +49,14 @@ impl Cmd for GraphOpt {
         let dot = petgraph::dot::Dot::with_attr_getters(
             &graph,
             &[petgraph::dot::Config::EdgeNoLabel],
-            &|_graph, _edge_ref| {
-                "".to_string()
-            },
-            &|_graph, (_index, node)| {
-                match node {
-                    GraphNode::Table(_) => {
-                        "shape=box".to_string()
-                    },
-                    GraphNode::TrendStorePart(_) => {
-                        "shape=box".to_string()
-                    },
-                    GraphNode::TrendFunctionMaterialization(_) => {
-                        "shape=box,style=\"rounded\"".to_string()
-                    },
-                    _ => "".to_string()
+            &|_graph, _edge_ref| "".to_string(),
+            &|_graph, (_index, node)| match node {
+                GraphNode::Table(_) => "shape=box".to_string(),
+                GraphNode::TrendStorePart(_) => "shape=box".to_string(),
+                GraphNode::TrendFunctionMaterialization(_) => {
+                    "shape=box,style=\"rounded\"".to_string()
                 }
+                _ => "".to_string(),
             },
         );
 
