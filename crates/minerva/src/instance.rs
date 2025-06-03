@@ -528,10 +528,7 @@ impl MinervaInstance {
                     attribute_materialization.attribute_store.to_string(),
                 ));
 
-            let table_name = format!(
-                "attribute.{}",
-                attribute_materialization.attribute_store
-            );
+            let table_name = format!("attribute.{}", attribute_materialization.attribute_store);
 
             match table_node_map.get(&table_name) {
                 Some(attribute_store_index) => {
