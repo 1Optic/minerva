@@ -14,6 +14,7 @@ use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
+use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
 use crate::trend_materialization::TrendMaterializationSource;
 
 use super::attribute_materialization::{
@@ -185,6 +186,7 @@ impl Display for GraphNode {
 
 pub struct MinervaInstance {
     pub instance_root: Option<PathBuf>,
+    pub entity_types: Vec<EntityType>,
     pub trend_stores: Vec<TrendStore>,
     pub attribute_stores: Vec<AttributeStore>,
     pub notification_stores: Vec<NotificationStore>,
@@ -198,6 +200,8 @@ pub struct MinervaInstance {
 
 impl MinervaInstance {
     pub async fn load_from_db(client: &mut Client) -> Result<MinervaInstance, Error> {
+        let entity_types = load_entity_types(client).await?;
+
         let attribute_stores = load_attribute_stores(client).await?;
 
         let trend_stores = load_trend_stores(client).await?;
@@ -224,6 +228,7 @@ impl MinervaInstance {
 
         Ok(MinervaInstance {
             instance_root: None,
+            entity_types,
             trend_stores,
             attribute_stores,
             notification_stores,
@@ -237,6 +242,7 @@ impl MinervaInstance {
     }
 
     pub fn load_from(minerva_instance_root: &Path) -> Result<MinervaInstance, String> {
+        let entity_types = load_entity_types_from(minerva_instance_root).collect();
         let trend_stores = load_trend_stores_from(minerva_instance_root).collect();
         let notification_stores = load_notification_stores_from(minerva_instance_root).collect();
         let attribute_stores = load_attribute_stores_from(minerva_instance_root)
@@ -251,6 +257,7 @@ impl MinervaInstance {
 
         Ok(MinervaInstance {
             instance_root: Some(PathBuf::from(minerva_instance_root)),
+            entity_types,
             trend_stores,
             attribute_stores,
             notification_stores,
@@ -357,6 +364,14 @@ impl MinervaInstance {
         let mut graph = petgraph::Graph::new();
 
         let mut table_node_map: HashMap<String, petgraph::graph::NodeIndex> = HashMap::new();
+
+        for entity_type in &self.entity_types {
+            let table_name = format!("entity.{}", entity_type.name);
+            let node = GraphNode::Table(table_name.clone());
+            let node_idx = graph.add_node(node);
+
+            table_node_map.insert(table_name, node_idx);
+        }
 
         for trend_store in &self.trend_stores {
             for trend_store_part in &trend_store.parts {
