@@ -93,7 +93,7 @@ pub fn print_stdout<
                 break;
             };
 
-            print!("{prefix}{buffer}");
+            info!(target: &prefix, "{}", buffer);
             buffer.clear();
         }
     });
@@ -353,12 +353,12 @@ impl MinervaCluster {
         })?;
 
         print_stdout(
-            "Coordinator STDOUT: ".to_string(),
+            "db_out".to_string(),
             controller_container.stdout(true),
         );
 
         print_stdout(
-            "Coordinator STDERR: ".to_string(),
+            "db_err".to_string(),
             controller_container.stderr(true),
         );
 

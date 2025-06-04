@@ -10,6 +10,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use tokio::signal;
+use ratatui::Frame;
+use ratatui::{prelude::*, widgets::*};
+use futures::{future::FutureExt, StreamExt};
 
 use minerva::cluster::{BuildImageProvider, MinervaCluster, MinervaClusterConfig};
 use minerva::error::{Error, RuntimeError};
@@ -41,10 +44,68 @@ struct ClusterConfig {
     path: String,
 }
 
+fn render(frame: &mut Frame) {
+    let [output_area, log_area] = Layout::vertical([
+	Constraint::Fill(50),
+	Constraint::Fill(50),
+    ])
+    .areas(frame.area());
+
+
+    frame.render_widget("Hello world", output_area);
+
+    let filter_state = tui_logger::TuiWidgetState::new()
+        .set_default_display_level(tui_logger::LevelFilter::Off)
+        .set_level_for_target("db_err", tui_logger::LevelFilter::Off);
+
+    let logger_widget = tui_logger::TuiLoggerWidget::default().state(&filter_state);
+
+    frame.render_widget(logger_widget, log_area);
+}
+
+async fn gui() {
+    let mut reader = crossterm::event::EventStream::new();
+    let mut terminal = ratatui::init();
+
+    loop {
+        let mut delay = tokio::time::sleep(tokio::time::Duration::from_millis(100));
+        terminal.draw(render).unwrap();
+
+        let event = reader.next().fuse();
+
+        tokio::select! {
+            _ = delay => { },
+            maybe_event = event => {
+
+                match maybe_event {
+                    Some(Ok(crossterm::event::Event::Key(_))) => {
+                        break;
+                    },
+                    Some(Err(_)) => todo!(),
+       	            None => {
+                        //break;
+                    },
+                    _ => todo!(),
+                }
+            }
+        }
+     }
+
+     ratatui::restore();
+}
+
 #[async_trait]
 impl Cmd for StartOpt {
     async fn run(&self) -> CmdResult {
-        env_logger::init();
+        let drain = tui_logger::Drain::new();
+	env_logger::Builder::default()
+            .format(move |buf, record|
+                Ok(drain.log(record))
+            ).init();
+        //tui_logger::init_logger(tui_logger::LevelFilter::Trace).unwrap();
+        //tui_logger::set_default_level(tui_logger::LevelFilter::Trace);
+
+        tokio::spawn(gui());
 
         let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {
             Some(root) => Some(root.clone()),
@@ -122,7 +183,7 @@ impl Cmd for StartOpt {
             }
 
             if let Some(minerva_instance_root) = minerva_instance_root_option {
-                println!(
+                info!(
                     "Initializing from '{}'",
                     minerva_instance_root.to_string_lossy()
                 );
@@ -140,24 +201,24 @@ impl Cmd for StartOpt {
                     create_partitions(&mut client, None).await?;
                 }
 
-                println!("Initialized");
+                info!("Initialized");
             }
 
             let env_file_path = String::from("cluster.env");
             write_env_file(&env_file_path, &env);
         }
 
-        println!("Minerva cluster is running (press CTRL-C to stop)");
-        println!("Connect to the cluster on port {}", cluster.controller_port);
-        println!("");
-        println!(
+        info!("Minerva cluster is running (press CTRL-C to stop)");
+        info!("Connect to the cluster on port {}", cluster.controller_port);
+        info!("");
+        info!(
             "  psql -h localhost -p {} -d {} -U postgres",
             cluster.controller_port, test_database.name
         );
-        println!("");
-        println!("or:");
-        println!("");
-        println!(
+        info!("");
+        info!("or:");
+        info!("");
+        info!(
             "  PGHOST=localhost PGPORT={} PGDATABASE={} PGUSER=postgres PGSSLMODE=disable minerva",
             cluster.controller_port, test_database.name
         );
