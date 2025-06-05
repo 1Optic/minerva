@@ -1,8 +1,8 @@
+use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::borrow::Cow;
 
 use log::info;
 
@@ -11,10 +11,10 @@ use clap::Parser;
 use ratatui::widgets::{Block, Borders};
 use serde::{Deserialize, Serialize};
 
-use tokio::signal;
-use ratatui::Frame;
-use ratatui::prelude::*;
 use futures::{future::FutureExt, StreamExt};
+use ratatui::prelude::*;
+use ratatui::Frame;
+use tokio::signal;
 use tui_logger::*;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -49,22 +49,15 @@ struct ClusterConfig {
 }
 
 fn render(frame: &mut Frame) {
-    let [output_area, log_area] = Layout::vertical([
-        Constraint::Fill(50),
-        Constraint::Fill(50),
-    ])
-    .areas(frame.area());
+    let [output_area, log_area] =
+        Layout::vertical([Constraint::Fill(50), Constraint::Fill(50)]).areas(frame.area());
 
     frame.render_widget("Hello world", output_area);
 
     let formatter = Box::new(CustomFormatter::default());
 
     let logger_widget = tui_logger::TuiLoggerWidget::default()
-        .block(
-            Block::default()
-                .title("logs")
-                .borders(Borders::ALL)
-        )
+        .block(Block::default().title("logs").borders(Borders::ALL))
         .opt_formatter(Some(formatter));
 
     frame.render_widget(logger_widget, log_area);
@@ -79,7 +72,7 @@ async fn gui() {
         let draw_result = terminal.draw(render);
 
         match draw_result {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => {
                 println!("error in GUI: {e}");
             }
@@ -111,9 +104,9 @@ async fn gui() {
                 }
             }
         }
-     }
+    }
 
-     ratatui::restore();
+    ratatui::restore();
 }
 
 #[async_trait]

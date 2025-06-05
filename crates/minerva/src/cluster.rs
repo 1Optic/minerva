@@ -352,15 +352,9 @@ impl MinervaCluster {
             )
         })?;
 
-        print_stdout(
-            "db_out".to_string(),
-            controller_container.stdout(true),
-        );
+        print_stdout("db_out".to_string(), controller_container.stdout(true));
 
-        print_stdout(
-            "db_err".to_string(),
-            controller_container.stderr(true),
-        );
+        print_stdout("db_err".to_string(), controller_container.stderr(true));
 
         let controller_host = controller_container.get_host().await.map_err(|e| {
             crate::error::Error::Runtime(
