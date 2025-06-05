@@ -33,7 +33,7 @@ log = "0.4.27"
 url = { version = "2.5.4" }
 rand = { version = "0.9.1" }
 testcontainers = { version = "0.24.0" }
-quick_cache = "0.6.13"
+quick_cache = "0.6.14"
 refinery = { version = "0.8.16", features = ["tokio-postgres"] }
 bollard = "0.18.1"
 bollard-stubs = "=1.47.1-rc.27.3.1"
