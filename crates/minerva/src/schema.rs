@@ -1,6 +1,6 @@
+use log::info;
 use refinery::embed_migrations;
 use tokio_postgres::Client;
-use log::info;
 
 embed_migrations!("migrations");
 
