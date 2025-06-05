@@ -2532,6 +2532,7 @@ dependencies = [
  "tokio-postgres-rustls",
  "tokio-stream",
  "tui-logger",
+ "unicode-segmentation",
  "url",
 ]
 
