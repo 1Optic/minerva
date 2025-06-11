@@ -520,7 +520,9 @@ impl Change for UpdateFunction {
 
     fn existing_object(&self) -> Option<MinervaObjectRef> {
         Some(MinervaObjectRef::TrendFunctionMaterialization(
-            self.trend_function_materialization.target_trend_store_part.clone(),
+            self.trend_function_materialization
+                .target_trend_store_part
+                .clone(),
         ))
     }
 

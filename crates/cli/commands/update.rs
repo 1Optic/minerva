@@ -122,13 +122,18 @@ impl UpdatePlan {
     }
 }
 
-fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_options: DiffOptions) -> UpdatePlan {
+fn plan_update(
+    db_instance: &MinervaInstance,
+    other: &MinervaInstance,
+    diff_options: DiffOptions,
+) -> UpdatePlan {
     let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
     let changes = db_instance.diff(other, diff_options);
 
     // Split the changes between changes on existing objects and changes for new objects
-    let (mut changes_to_existing_objects, changes_to_new_objects): (Vec<_>, Vec<_>) =
-        changes.into_iter().partition(|c| c.existing_object().is_some());
+    let (mut changes_to_existing_objects, changes_to_new_objects): (Vec<_>, Vec<_>) = changes
+        .into_iter()
+        .partition(|c| c.existing_object().is_some());
 
     let db_instance_graph = db_instance.dependency_graph();
 
@@ -181,7 +186,7 @@ fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_opti
 
     UpdatePlan {
         dependency_graph: db_instance_graph,
-        changes: planned_changes
+        changes: planned_changes,
     }
 }
 

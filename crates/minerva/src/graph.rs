@@ -130,7 +130,6 @@ pub fn dependee_graph(
     result
 }
 
-
 pub fn render_graph(graph: &Graph<GraphNode, String>) -> String {
     petgraph::dot::Dot::with_attr_getters(
         graph,
@@ -141,24 +140,28 @@ pub fn render_graph(graph: &Graph<GraphNode, String>) -> String {
             GraphNode::VirtualEntity(_) => "shape=box,style=\"rounded\"".to_string(),
             GraphNode::Relation(_) => "shape=box,style=\"rounded\"".to_string(),
             GraphNode::TrendStorePart(_) => "shape=box".to_string(),
-            GraphNode::TrendFunctionMaterialization(_) => {
-                "shape=box,style=\"rounded\"".to_string()
-            }
+            GraphNode::TrendFunctionMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
             GraphNode::TrendViewMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
             GraphNode::AttributeStore(_) => "shape=box".to_string(),
             GraphNode::AttributeMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
         },
-    ).to_string()
+    )
+    .to_string()
 }
 
-pub fn render_graph_with_changes(graph: &Graph<GraphNode, String>, changes: &[Box<dyn Change + Send>]) -> String {
+pub fn render_graph_with_changes(
+    graph: &Graph<GraphNode, String>,
+    changes: &[Box<dyn Change + Send>],
+) -> String {
     petgraph::dot::Dot::with_attr_getters(
         graph,
         &[petgraph::dot::Config::EdgeNoLabel],
         &|_graph, _edge_ref| "".to_string(),
         &|_graph, (_index, node)| {
             let val = changes.iter().enumerate().find(|(_index, change)| {
-                change.existing_object().is_some_and(|o| o.to_string() == node.to_string())
+                change
+                    .existing_object()
+                    .is_some_and(|o| o.to_string() == node.to_string())
             });
 
             let attr = match node {
@@ -175,11 +178,15 @@ pub fn render_graph_with_changes(graph: &Graph<GraphNode, String>, changes: &[Bo
             };
 
             if let Some((change_index, _change)) = val {
-                format!("{},xlabel={},style=filled,fillcolor=lightblue", attr, change_index + 1)
+                format!(
+                    "{},xlabel={},style=filled,fillcolor=lightblue",
+                    attr,
+                    change_index + 1
+                )
             } else {
                 attr
             }
         },
-    ).to_string()
+    )
+    .to_string()
 }
-

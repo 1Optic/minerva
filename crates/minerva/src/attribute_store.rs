@@ -249,9 +249,10 @@ impl Change for ChangeAttribute {
     }
 
     fn existing_object(&self) -> Option<MinervaObjectRef> {
-        Some(MinervaObjectRef::AttributeStore(
-            format!("{}_{}", self.attribute_store.data_source, self.attribute_store.entity_type),
-        ))
+        Some(MinervaObjectRef::AttributeStore(format!(
+            "{}_{}",
+            self.attribute_store.data_source, self.attribute_store.entity_type
+        )))
     }
 }
 

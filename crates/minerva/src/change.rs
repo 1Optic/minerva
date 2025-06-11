@@ -28,7 +28,9 @@ impl Display for MinervaObjectRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TrendStorePart(name) => write!(f, "TrendStorePart({})", name),
-            Self::TrendFunctionMaterialization(name) => write!(f, "TrendFunctionMaterialization({})", name),
+            Self::TrendFunctionMaterialization(name) => {
+                write!(f, "TrendFunctionMaterialization({})", name)
+            }
             Self::AttributeStore(name) => write!(f, "AttributeStore({})", name),
             Self::AttributeMaterialization(name) => write!(f, "AttributeMaterialization({})", name),
             Self::TrendViewMaterialization(name) => write!(f, "TrendViewMaterialization({})", name),
