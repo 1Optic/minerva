@@ -49,7 +49,7 @@ async fn initialize() -> Result<(), Box<dyn std::error::Error>> {
 
     let trend_store_count: i64 = row.get(0);
 
-    assert_eq!(trend_store_count, 6);
+    assert_eq!(trend_store_count, 7);
 
     let row = client
         .query_one("SELECT count(*) FROM trigger.rule", &[])
