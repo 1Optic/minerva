@@ -100,6 +100,9 @@ async fn gui() {
                     None => {
                         //break;
                     },
+                    Some(Ok(crossterm::event::Event::Resize(_, _))) => {
+                        continue;
+                    },
                     _ => todo!("Unexpected event: {:?}", maybe_event),
                 }
             }
