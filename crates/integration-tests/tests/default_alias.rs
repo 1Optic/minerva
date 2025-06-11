@@ -50,8 +50,19 @@ mod tests {
         timestamp: DateTime<Utc>,
         trends: Vec<String>,
         entity_ids: Vec<i32>,
+        entity_names: Option<Vec<String>>,
         job_id: i64,
         rows: Vec<Vec<MeasValue>>,
+    }
+
+    impl RefinedDataPackage {
+        fn listed_entity_names(&self) -> Vec<Option<String>> {
+            match &self.entity_names {
+                Some(list) => list.iter().map(|name| Some(name.to_string())).collect(),
+                None => self.entity_ids.iter().map(|_| None).collect()
+            }
+        }
+
     }
 
     #[async_trait]
@@ -60,30 +71,46 @@ mod tests {
             &self.timestamp
         }
 
-        fn trends(&self) -> &Vec<String> {
-            &self.trends
-        }
-
+        fn trends(&self) -> Vec<String> {
+            match self.entity_names {
+                Some(_) => vec![vec!["name".to_string()], self.trends.clone()].concat(),
+                None => self.trends.clone()
+            }
+        }        
+        
         async fn write(
             &self,
             mut writer: std::pin::Pin<&mut BinaryCopyInWriter>,
             values: &[(usize, DataType)],
             created_timestamp: &DateTime<chrono::Utc>,
         ) -> Result<usize, DataPackageWriteError> {
+            info!("D1");
+            info!("{:?}", values);
+            info!("{:?}", self.rows);
+            let entity_names = self.listed_entity_names().clone();
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
-                info!("DDE: {}", entity_id.to_string());
-                let mut sql_values: Vec<&(dyn ToSql + Sync)> =
-                    vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
-                info!("DDF");
-
-                info!("--- {:?}", self.entity_ids);
-                info!(">>> {:?}", self.rows);
-
-                let row = self.rows.get(index).ok_or_else(|| {
-                    DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
+                let entity_name = entity_names.get(index).ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!("No entity name with index {index}"))
                 })?;
-                info!("DDG");
+                info!("D2");
 
+                let mut sql_values: Vec<&(dyn ToSql + Sync)> = vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+                if let Some(name) = entity_name {
+                    sql_values.push(name);
+                }
+
+                info!("D3");
+                let mut row = self.rows.get(index).ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
+                })?.clone();
+
+                if let Some(name) = entity_name {
+                    row.insert(0, MeasValue::Text(name.to_string()))
+                };
+
+                info!("D4");
+                info!("{:?}", values);
+                info!("{:?}", row);
                 for (column_index, _data_type) in values {
                     let v = row.get(*column_index).ok_or_else(|| {
                         DataPackageWriteError::DataPreparation(format!(
@@ -92,8 +119,7 @@ mod tests {
                     })?;
                     sql_values.push(v);
                 }
-                info!("DDH");
-
+                info!("D5");
                 writer.as_mut().write(&sql_values).await.map_err(|e| {
                     let db_error = e.as_db_error();
 
@@ -102,8 +128,9 @@ mod tests {
                         None => DataPackageWriteError::Generic(format!("{e}")),
                     }
                 })?;
-                info!("DDI");
+                info!("D6");
             }
+            info!("D7");
 
             Ok(self.entity_ids.len())
         }
@@ -116,10 +143,15 @@ mod tests {
             created_timestamp: &DateTime<chrono::Utc>,
         ) -> Result<usize, minerva::error::Error> {
             let mut count: usize = 0;
+            let entity_names = self.listed_entity_names().clone();
 
             for (row_index, entity_id) in self.entity_ids.iter().enumerate() {
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                     vec![entity_id, &self.timestamp, &created_timestamp, &self.job_id];
+                
+                if let Some(name) = entity_names.get(row_index).unwrap() {
+                    sql_values.push(name);
+                }
 
                 let row = self.rows.get(row_index).unwrap();
 
@@ -305,29 +337,38 @@ mod tests {
                 "100", "101", "102", "103", "104", "105", "106", "107", "108", "109",
             ];
 
+            
+
             let mut entity_ids: Vec<i32> = vec![];
-            let query = "SELECT id FROM entity.\"create_Site\"($1)";
+            let mut entity_names: Vec<String> = vec![];
+            let query = "SELECT id, primary_alias FROM entity.\"create_Site\"($1)";
 
             info!("All sites created");
 
             for target in names.iter() {
-                let entity_id: i32 = client.query_one(query, &[target]).await?.get(0);
-                entity_ids.push(entity_id);
+                let result = client.query_one(query, &[target]).await?;
+                entity_ids.push(result.get(0));
+                entity_names.push(result.get(1));
             }
 
-            let row = vec![MeasValue::Numeric(Some(
-                rust_decimal::Decimal::from_f64(20.0).unwrap(),
-            ))];
-
-            let rows = vec![
-                row.clone(), row.clone(), row.clone(), row.clone(), row.clone(),
-                row.clone(), row.clone(), row.clone(), row.clone(), row.clone(),
+            let rows:Vec<Vec<MeasValue>> = vec![
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.0).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.1).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.2).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.3).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.4).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.5).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.6).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.7).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.8).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.9).unwrap()))]
             ];
-
+            
             let package = RefinedDataPackage {
                 timestamp,
                 trends,
                 entity_ids,
+                entity_names: Some(entity_names),
                 job_id,
                 rows,
             };

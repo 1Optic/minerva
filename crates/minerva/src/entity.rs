@@ -51,14 +51,14 @@ pub trait EntityMapping {
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> impl Future<Output = Result<Vec<i32>, EntityMappingError>> + Send;
 
     fn names_to_aliases<T: GenericClient + Sync>(
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> impl Future<Output = Result<Vec<Option<String>>, EntityMappingError>> + Send;
 }
 
@@ -79,7 +79,7 @@ impl EntityMapping for DbEntityMapping {
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> Result<Vec<i32>, EntityMappingError> {
         let mut entity_ids: HashMap<String, i32> = HashMap::new();
 
@@ -108,7 +108,7 @@ impl EntityMapping for DbEntityMapping {
         }
 
         names
-            .into_iter()
+            .iter()
             .map(|name| -> Result<i32, EntityMappingError> {
                 entity_ids
                     .get(name)
@@ -122,7 +122,7 @@ impl EntityMapping for DbEntityMapping {
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
 
         let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
@@ -135,7 +135,7 @@ impl EntityMapping for DbEntityMapping {
         match has_primary_alias {
             true => {
                 // Ensure that all entities actually exist in the database
-                self.names_to_entity_ids(client, entity_type, &names).await?;
+                self.names_to_entity_ids(client, entity_type, names).await?;
 
                 let mut aliases: HashMap<String, Option<String>> = HashMap::new();
                 let query = format!(
@@ -158,7 +158,7 @@ impl EntityMapping for DbEntityMapping {
                 }
 
                 names
-                    .into_iter()
+                    .iter()
                     .map(|name| -> Result<Option<String>, EntityMappingError> {
                         aliases
                             .get(name)
@@ -194,7 +194,7 @@ impl CachingEntityMapping {
 
 impl EntityMapping for CachingEntityMapping {
     async fn uses_alias_column<T: GenericClient + Sync>(&self, entity_type: &EntityTypeName, client: &T) -> Result<bool, EntityMappingError> {
-        if self.primary_alias_cache.get(entity_type) == None {
+        if self.primary_alias_cache.get(entity_type).is_none() {
             let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
             let result = client
                 .query_one(query, &[&entity_type])
@@ -211,7 +211,7 @@ impl EntityMapping for CachingEntityMapping {
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> Result<Vec<i32>, EntityMappingError> {
         let mut entity_ids: HashMap<String, i32> = HashMap::new();
 
@@ -259,7 +259,7 @@ impl EntityMapping for CachingEntityMapping {
         }
 
         names
-            .into_iter()
+            .iter()
             .map(|name| -> Result<i32, EntityMappingError> {
                 entity_ids
                     .get(name)
@@ -273,12 +273,12 @@ impl EntityMapping for CachingEntityMapping {
         &self,
         client: &T,
         entity_type: &EntityTypeName,
-        names: &Vec<EntityName>,
+        names: &[EntityName],
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
         match &self.uses_alias_column(entity_type, client).await? {
             true => {
                 // Ensure that all entities actually exist in the database
-                self.names_to_entity_ids(client, entity_type, &names).await?;
+                self.names_to_entity_ids(client, entity_type, names).await?;
 
                 let mut aliases: HashMap<String, String> = HashMap::new();
 
@@ -322,7 +322,7 @@ impl EntityMapping for CachingEntityMapping {
                 }
 
                 names
-                    .into_iter()
+                    .iter()
                     .map(|name| -> Result<Option<String>, EntityMappingError> {
                         Ok(aliases
                             .get(name)
