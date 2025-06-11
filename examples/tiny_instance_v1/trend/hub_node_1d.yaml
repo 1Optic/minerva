@@ -26,7 +26,7 @@ parts:
     entity_aggregation: SUM
     extra_data: {}
   - name: power_kwh
-    data_type: bigint
+    data_type: numeric
     description: ''
     time_aggregation: SUM
     entity_aggregation: SUM
