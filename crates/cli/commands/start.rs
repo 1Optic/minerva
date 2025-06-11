@@ -351,7 +351,7 @@ impl LogFormatter for CustomFormatter {
             }
         }
         if self.format_output_target {
-            output.push_str(&evt.target());
+            output.push_str(evt.target());
             output.push(self.format_separator);
         }
         if with_loc {
