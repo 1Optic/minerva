@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use console::Style;
 use similar::{ChangeTag, TextDiff};
 
+use crate::change::MinervaObjectRef;
 use crate::error::ConfigurationError;
 
 use super::change::{Change, ChangeResult, InformationOption};
@@ -28,9 +29,27 @@ use super::interval::parse_interval;
 pub const MATERIALIZATION_FUNCTION_SCHEMA: &str = "trend";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TrendMaterializationSource {
+pub struct TrendMaterializationTrendSource {
     pub trend_store_part: String,
     pub mapping_function: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrendMaterializationAttributeSource {
+    pub attribute_store: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrendMaterializationRelationSource {
+    pub relation: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum TrendMaterializationSource {
+    Trend(TrendMaterializationTrendSource),
+    Relation(TrendMaterializationRelationSource),
+    Attribute(TrendMaterializationAttributeSource),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -496,6 +515,14 @@ impl Change for UpdateFunction {
         Ok(format!(
             "Updated function '{}'",
             &self.trend_function_materialization.target_trend_store_part
+        ))
+    }
+
+    fn existing_object(&self) -> Option<MinervaObjectRef> {
+        Some(MinervaObjectRef::TrendFunctionMaterialization(
+            self.trend_function_materialization
+                .target_trend_store_part
+                .clone(),
         ))
     }
 
@@ -1604,10 +1631,12 @@ async fn load_sources<T: GenericClient + Send + Sync>(
         let trend_store_part: String = row.get(0);
         let mapping_function: String = row.get(1);
 
-        sources.push(TrendMaterializationSource {
-            trend_store_part,
-            mapping_function,
-        });
+        sources.push(TrendMaterializationSource::Trend(
+            TrendMaterializationTrendSource {
+                trend_store_part,
+                mapping_function,
+            },
+        ));
     }
 
     Ok(sources)
@@ -2024,30 +2053,40 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
         .await?;
 
     for source in sources {
-        let source_trend_store_part_id: i32 =
-            get_trend_store_part_id(client, &source.trend_store_part)
-                .await?
-                .ok_or(
-                    ConnectMaterializationSourcesError::NoSuchSourceTrendStorePart(
-                        source.trend_store_part.clone(),
-                    ),
-                )?;
+        match source {
+            TrendMaterializationSource::Trend(trend_source) => {
+                let source_trend_store_part_id: i32 =
+                    get_trend_store_part_id(client, &trend_source.trend_store_part)
+                        .await?
+                        .ok_or(
+                            ConnectMaterializationSourcesError::NoSuchSourceTrendStorePart(
+                                trend_source.trend_store_part.clone(),
+                            ),
+                        )?;
 
-        let mapping_function = format!("{}(timestamptz)", &source.mapping_function);
+                let mapping_function = format!("{}(timestamptz)", &trend_source.mapping_function);
 
-        let insert_count = client
-            .execute(
-                &statement,
-                &[
-                    &mapping_function,
-                    &materialization_id,
-                    &source_trend_store_part_id,
-                ],
-            )
-            .await?;
+                let insert_count = client
+                    .execute(
+                        &statement,
+                        &[
+                            &mapping_function,
+                            &materialization_id,
+                            &source_trend_store_part_id,
+                        ],
+                    )
+                    .await?;
 
-        if insert_count == 0 {
-            return Err(ConnectMaterializationSourcesError::NoLinkInserted);
+                if insert_count == 0 {
+                    return Err(ConnectMaterializationSourcesError::NoLinkInserted);
+                }
+            }
+            TrendMaterializationSource::Relation(_relation_source) => {
+                // Todo: Register in the database
+            }
+            TrendMaterializationSource::Attribute(_attribute_source) => {
+                // Todo: Register in the database
+            }
         }
     }
 
@@ -2284,5 +2323,51 @@ async fn drop_materialization_sources<T: GenericClient + Send + Sync>(
         Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
             "Error removing old sources: {e}"
         )))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trend_materialization_deserialization() {
+        let definition: &str = r#"target_trend_store_part: hub_v-network_main_15m
+enabled: true
+processing_delay: 30m
+stability_delay: 5m
+reprocessing_period: 3 days
+sources:
+- trend_store_part: hub_node_main_15m
+  mapping_function: trend.mapping_id
+- relation: "node->v-network"
+function:
+  return_type: ""
+  src: |-
+      SELECT
+        timestamp,
+        r.target_id AS entity_id, 
+        sum(power_kwh) * 1000 as power_mwh
+      FROM trend."hub_node_main_15m"
+      JOIN relation."node->v-network" r ON r.source_id = t.entity_id
+      GROUP BY timestamp, r.target_id
+      WHERE timestamp = $1
+  language: sql
+fingerprint_function: |
+  SELECT modified.last, format('{"hub_node_main_15m": "%s"}', modified.last)::jsonb
+  FROM trend_directory.modified
+  JOIN trend_directory.trend_store_part ttsp ON ttsp.id = modified.trend_store_part_id
+  WHERE ttsp::name = 'hub_node_main_15m' AND modified.timestamp = $1;
+description: |
+  Aggregation materialization from node to network level (v-network)
+"#;
+
+        let materialization: TrendFunctionMaterialization =
+            serde_yaml::from_str(definition).unwrap();
+
+        assert_eq!(
+            materialization.target_trend_store_part,
+            "hub_v-network_main_15m"
+        );
     }
 }

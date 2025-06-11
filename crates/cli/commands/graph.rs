@@ -3,9 +3,11 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 
-use minerva::instance::MinervaInstance;
-
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
+use minerva::{
+    graph::{dependee_graph, dependency_graph, node_index_by_name, render_graph},
+    instance::MinervaInstance,
+};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct GraphOpt {
@@ -13,6 +15,10 @@ pub struct GraphOpt {
     from_dir: Option<PathBuf>,
     #[arg(long)]
     dependency_order: bool,
+    #[arg(long)]
+    dependencies: Option<String>,
+    #[arg(long)]
+    dependees: Option<String>,
 }
 
 #[async_trait]
@@ -29,8 +35,19 @@ impl Cmd for GraphOpt {
             }
         };
 
-        let graph = instance.dependency_graph();
-        let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
+        let full_graph = instance.dependency_graph();
+
+        let graph = if let Some(start) = &self.dependencies {
+            let start_index = node_index_by_name(&full_graph, start).unwrap();
+            dependency_graph(&full_graph, start_index)
+        } else if let Some(start) = &self.dependees {
+            let start_index = node_index_by_name(&full_graph, start).unwrap();
+            dependee_graph(&full_graph, start_index)
+        } else {
+            full_graph
+        };
+
+        let dot = render_graph(&graph);
 
         println!("{}", dot);
 

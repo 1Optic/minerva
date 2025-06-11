@@ -1,18 +1,21 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::io::{BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use glob::glob;
+use log::error;
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
+use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
+use crate::graph::GraphNode;
+use crate::trend_materialization::TrendMaterializationSource;
 
 use super::attribute_materialization::{
     load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
@@ -36,7 +39,10 @@ use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
 use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
-use super::virtual_entity::{load_virtual_entity_from_file, AddVirtualEntity, VirtualEntity};
+use super::virtual_entity::{
+    load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
+    VirtualEntity,
+};
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum AggregationType {
@@ -129,33 +135,9 @@ pub fn load_instance_config(
     Ok(image_config)
 }
 
-#[derive(Clone)]
-pub enum GraphNode {
-    TrendStorePart(String),
-    TrendMaterialization(String),
-}
-
-impl GraphNode {
-    pub fn matches_ref(&self, node_ref: &str) -> bool {
-        self.to_string().eq(node_ref)
-    }
-}
-
-impl Display for GraphNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GraphNode::TrendStorePart(name) => {
-                write!(f, "TrendStorePart({})", name)
-            }
-            GraphNode::TrendMaterialization(name) => {
-                write!(f, "TrendMaterialization({})", name)
-            }
-        }
-    }
-}
-
 pub struct MinervaInstance {
     pub instance_root: Option<PathBuf>,
+    pub entity_types: Vec<EntityType>,
     pub trend_stores: Vec<TrendStore>,
     pub attribute_stores: Vec<AttributeStore>,
     pub notification_stores: Vec<NotificationStore>,
@@ -169,6 +151,8 @@ pub struct MinervaInstance {
 
 impl MinervaInstance {
     pub async fn load_from_db(client: &mut Client) -> Result<MinervaInstance, Error> {
+        let entity_types = load_entity_types(client).await?;
+
         let attribute_stores = load_attribute_stores(client).await?;
 
         let trend_stores = load_trend_stores(client).await?;
@@ -195,6 +179,7 @@ impl MinervaInstance {
 
         Ok(MinervaInstance {
             instance_root: None,
+            entity_types,
             trend_stores,
             attribute_stores,
             notification_stores,
@@ -208,6 +193,7 @@ impl MinervaInstance {
     }
 
     pub fn load_from(minerva_instance_root: &Path) -> Result<MinervaInstance, String> {
+        let entity_types = load_entity_types_from(minerva_instance_root).collect();
         let trend_stores = load_trend_stores_from(minerva_instance_root).collect();
         let notification_stores = load_notification_stores_from(minerva_instance_root).collect();
         let attribute_stores = load_attribute_stores_from(minerva_instance_root)
@@ -222,6 +208,7 @@ impl MinervaInstance {
 
         Ok(MinervaInstance {
             instance_root: Some(PathBuf::from(minerva_instance_root)),
+            entity_types,
             trend_stores,
             attribute_stores,
             notification_stores,
@@ -327,50 +314,279 @@ impl MinervaInstance {
     pub fn dependency_graph(&self) -> petgraph::Graph<GraphNode, String> {
         let mut graph = petgraph::Graph::new();
 
-        let mut trend_store_part_node_map: HashMap<&str, petgraph::graph::NodeIndex> =
-            HashMap::new();
+        let mut table_node_map: HashMap<String, petgraph::graph::NodeIndex> = HashMap::new();
+
+        for entity_type in &self.entity_types {
+            let table_name = format!("entity.{}", entity_type.name);
+            let node = GraphNode::Table(table_name.clone());
+            let node_idx = graph.add_node(node);
+
+            table_node_map.insert(table_name, node_idx);
+        }
 
         for trend_store in &self.trend_stores {
             for trend_store_part in &trend_store.parts {
                 let node = GraphNode::TrendStorePart(trend_store_part.name.clone());
                 let node_idx = graph.add_node(node);
 
-                trend_store_part_node_map.insert(&trend_store_part.name, node_idx);
+                table_node_map.insert(format!("trend.{}", &trend_store_part.name), node_idx);
+            }
+        }
+
+        for attribute_store in &self.attribute_stores {
+            let attribute_store_name = format!(
+                "{}_{}",
+                attribute_store.data_source, attribute_store.entity_type
+            );
+            let node = GraphNode::AttributeStore(attribute_store_name.clone());
+            let node_idx = graph.add_node(node);
+
+            table_node_map.insert(format!("attribute.{}", &attribute_store_name), node_idx);
+        }
+
+        for relation in &self.relations {
+            let relation_node_index = graph.add_node(GraphNode::Relation(relation.name.clone()));
+
+            table_node_map.insert(format!("relation.{}", &relation.name), relation_node_index);
+
+            // Parse the SQL with the relation definition to find what tables it has as
+            // dependencies
+            match pg_query::parse(&relation.query) {
+                Err(e) => {
+                    error!("Could not parse SQL of relation '{}': {e}", relation.name);
+                }
+                Ok(parse_result) => {
+                    for table_name in parse_result.tables() {
+                        let source_index = match table_node_map.get(table_name.as_str()) {
+                            None => {
+                                let node = GraphNode::Table(table_name.clone());
+                                let table_node_index = graph.add_node(node);
+                                table_node_map.insert(table_name, table_node_index);
+                                table_node_index
+                            }
+                            Some(index) => *index,
+                        };
+
+                        graph.add_edge(relation_node_index, source_index, "".to_string());
+                    }
+                }
             }
         }
 
         for trend_materialization in &self.trend_materializations {
             match trend_materialization {
                 TrendMaterialization::View(m) => {
-                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
-                        m.target_trend_store_part.clone(),
-                    ));
-                    let source_index = trend_store_part_node_map
-                        .get(m.target_trend_store_part.as_str())
-                        .unwrap();
+                    let materialization_node_idx = graph.add_node(
+                        GraphNode::TrendViewMaterialization(m.target_trend_store_part.clone()),
+                    );
+                    let table_name = format!("trend.{}", m.target_trend_store_part);
+                    let source_index = table_node_map.get(&table_name).unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map
-                            .get(source.trend_store_part.as_str())
-                            .unwrap();
-                        graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                        match source {
+                            TrendMaterializationSource::Trend(trend_source) => {
+                                let table_name = format!("trend.{}", trend_source.trend_store_part);
+                                let target_index = table_node_map.get(&table_name).unwrap();
+                                graph.add_edge(
+                                    materialization_node_idx,
+                                    *target_index,
+                                    "".to_string(),
+                                );
+                            }
+                            TrendMaterializationSource::Attribute(attribute_source) => {
+                                let table_name =
+                                    format!("attribute.{}", attribute_source.attribute_store);
+                                match table_node_map.get(&table_name) {
+                                    Some(target_index) => {
+                                        graph.add_edge(
+                                            materialization_node_idx,
+                                            *target_index,
+                                            "".to_string(),
+                                        );
+                                    }
+                                    None => {
+                                        println!(
+                                            "Could not find attribute source table '{table_name}'"
+                                        );
+                                    }
+                                }
+                            }
+                            TrendMaterializationSource::Relation(relation_source) => {
+                                let table_name = format!("relation.{}", relation_source.relation);
+                                match table_node_map.get(&table_name) {
+                                    Some(target_index) => {
+                                        graph.add_edge(
+                                            materialization_node_idx,
+                                            *target_index,
+                                            "".to_string(),
+                                        );
+                                    }
+                                    None => {
+                                        println!(
+                                            "Could not find relation source table '{table_name}'"
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 TrendMaterialization::Function(m) => {
-                    let materialization_node_idx = graph.add_node(GraphNode::TrendMaterialization(
-                        m.target_trend_store_part.clone(),
-                    ));
-                    let source_index = trend_store_part_node_map
-                        .get(m.target_trend_store_part.as_str())
-                        .unwrap();
+                    let materialization_node_idx = graph.add_node(
+                        GraphNode::TrendFunctionMaterialization(m.target_trend_store_part.clone()),
+                    );
+                    let table_name = format!("trend.{}", m.target_trend_store_part);
+                    let source_index = table_node_map.get(&table_name).unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
                     for source in &m.sources {
-                        let target_index = trend_store_part_node_map
-                            .get(source.trend_store_part.as_str())
-                            .unwrap();
-                        graph.add_edge(materialization_node_idx, *target_index, "".to_string());
+                        match source {
+                            TrendMaterializationSource::Trend(trend_source) => {
+                                let table_name = format!("trend.{}", trend_source.trend_store_part);
+                                let target_index = table_node_map.get(&table_name).unwrap();
+                                graph.add_edge(
+                                    materialization_node_idx,
+                                    *target_index,
+                                    "".to_string(),
+                                );
+                            }
+                            TrendMaterializationSource::Attribute(attribute_source) => {
+                                let table_name =
+                                    format!("attribute.{}", attribute_source.attribute_store);
+                                match table_node_map.get(&table_name) {
+                                    Some(target_index) => {
+                                        graph.add_edge(
+                                            materialization_node_idx,
+                                            *target_index,
+                                            "".to_string(),
+                                        );
+                                    }
+                                    None => {
+                                        println!(
+                                            "Could not find attribute source table '{table_name}'"
+                                        );
+                                    }
+                                }
+                            }
+                            TrendMaterializationSource::Relation(relation_source) => {
+                                let table_name = format!("relation.{}", relation_source.relation);
+                                match table_node_map.get(&table_name) {
+                                    Some(target_index) => {
+                                        graph.add_edge(
+                                            materialization_node_idx,
+                                            *target_index,
+                                            "".to_string(),
+                                        );
+                                    }
+                                    None => {
+                                        println!(
+                                            "Could not find relation source table '{table_name}'"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for attribute_materialization in &self.attribute_materializations {
+            let attribute_materialization_node_index =
+                graph.add_node(GraphNode::AttributeMaterialization(
+                    attribute_materialization.attribute_store.to_string(),
+                ));
+
+            let table_name = format!("attribute.{}", attribute_materialization.attribute_store);
+
+            match table_node_map.get(&table_name) {
+                Some(attribute_store_index) => {
+                    graph.add_edge(
+                        *attribute_store_index,
+                        attribute_materialization_node_index,
+                        "".to_string(),
+                    );
+                }
+                None => {
+                    error!(
+                        "Could not find attribute store '{}' for attribute materialization '{}'",
+                        table_name, attribute_materialization
+                    );
+                }
+            }
+
+            // Parse the SQL with the relation definition to find what tables it has as
+            // dependencies
+            match pg_query::parse(&attribute_materialization.query) {
+                Err(e) => {
+                    error!(
+                        "Could not parse SQL of attribute materialization '{}': {e}",
+                        attribute_materialization
+                    );
+                }
+                Ok(parse_result) => {
+                    for table_name in parse_result.tables() {
+                        let source_index = match table_node_map.get(table_name.as_str()) {
+                            None => {
+                                let node = GraphNode::Table(table_name.clone());
+                                let table_node_index = graph.add_node(node);
+                                table_node_map.insert(table_name, table_node_index);
+                                table_node_index
+                            }
+                            Some(index) => *index,
+                        };
+
+                        graph.add_edge(
+                            attribute_materialization_node_index,
+                            source_index,
+                            "".to_string(),
+                        );
+                    }
+                }
+            }
+        }
+
+        for virtual_entity in &self.virtual_entities {
+            let virtual_entity_node_index =
+                graph.add_node(GraphNode::VirtualEntity(virtual_entity.name.clone()));
+
+            let table_name = format!("entity.{}", virtual_entity.name);
+
+            match table_node_map.get(&table_name) {
+                Some(entity_index) => {
+                    graph.add_edge(*entity_index, virtual_entity_node_index, "".to_string());
+                }
+                None => {
+                    error!(
+                        "Could not find entity table '{}' for virtual entity '{}'",
+                        table_name, virtual_entity.name
+                    );
+                }
+            }
+
+            // Parse the SQL with the relation definition to find what tables it has as
+            // dependencies
+            match pg_query::parse(&virtual_entity.sql) {
+                Err(e) => {
+                    error!(
+                        "Could not parse SQL of virtual entity '{}': {e}",
+                        virtual_entity.name
+                    );
+                }
+                Ok(parse_result) => {
+                    for table_name in parse_result.tables() {
+                        let source_index = match table_node_map.get(table_name.as_str()) {
+                            None => {
+                                let node = GraphNode::Table(table_name.clone());
+                                let table_node_index = graph.add_node(node);
+                                table_node_map.insert(table_name, table_node_index);
+                                table_node_index
+                            }
+                            Some(index) => *index,
+                        };
+
+                        graph.add_edge(virtual_entity_node_index, source_index, "".to_string());
                     }
                 }
             }
@@ -710,7 +926,7 @@ fn load_virtual_entities_from(minerva_instance_root: &Path) -> impl Iterator<Ite
     ))
     .expect("Failed to read glob pattern");
 
-    sql_paths.filter_map(|entry| match entry {
+    let from_sql_definitions = sql_paths.filter_map(|entry| match entry {
         Ok(path) => match load_virtual_entity_from_file(&path) {
             Ok(virtual_entity) => Some(virtual_entity),
             Err(e) => {
@@ -719,7 +935,26 @@ fn load_virtual_entities_from(minerva_instance_root: &Path) -> impl Iterator<Ite
             }
         },
         Err(_) => None,
-    })
+    });
+
+    let yaml_paths = glob(&format!(
+        "{}/virtual-entity/*.yaml",
+        minerva_instance_root.to_string_lossy()
+    ))
+    .expect("Failed to read glob pattern");
+
+    let from_yaml_definitions = yaml_paths.filter_map(|entry| match entry {
+        Ok(path) => match load_virtual_entity_from_yaml_file(&path) {
+            Ok(virtual_entity) => Some(virtual_entity),
+            Err(e) => {
+                println!("Error loading virtual entity definition: {e}");
+                None
+            }
+        },
+        Err(_) => None,
+    });
+
+    from_sql_definitions.chain(from_yaml_definitions)
 }
 
 fn load_relations_from(minerva_instance_root: &Path) -> impl Iterator<Item = Relation> {

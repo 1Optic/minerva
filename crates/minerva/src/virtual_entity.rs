@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use postgres_protocol::escape::escape_identifier;
 use std::fmt;
 use std::{io::Read, path::PathBuf};
 
@@ -20,10 +21,28 @@ impl fmt::Display for VirtualEntity {
     }
 }
 
+pub fn load_virtual_entity_from_yaml_file(path: &PathBuf) -> Result<VirtualEntity, Error> {
+    let f = std::fs::File::open(path).map_err(|e| {
+        ConfigurationError::from_msg(format!(
+            "Could not open virtual entity definition file '{}': {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    serde_yaml::from_reader(f).map_err(|e| {
+        Error::Runtime(crate::error::RuntimeError::from_msg(format!(
+            "Could not read virtual entity definition from file '{}': {}",
+            path.display(),
+            e
+        )))
+    })
+}
+
 pub fn load_virtual_entity_from_file(path: &PathBuf) -> Result<VirtualEntity, Error> {
     let mut f = std::fs::File::open(path).map_err(|e| {
         ConfigurationError::from_msg(format!(
-            "Could not open relation definition file '{}': {}",
+            "Could not open virtual entity definition file '{}': {}",
             path.display(),
             e
         ))
@@ -61,14 +80,18 @@ impl Change for AddVirtualEntity {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
 
-        tx.batch_execute(&self.virtual_entity.sql)
-            .await
-            .map_err(|e| {
-                DatabaseError::from_msg(format!(
-                    "Error creating virtual entity '{}': {e}",
-                    &self.virtual_entity.name
-                ))
-            })?;
+        let query = format!(
+            "CREATE OR REPLACE VIEW virtual_entity.{} AS {}",
+            escape_identifier(&self.virtual_entity.name),
+            self.virtual_entity.sql
+        );
+
+        tx.execute(&query, &[]).await.map_err(|e| {
+            DatabaseError::from_msg(format!(
+                "Error creating virtual entity '{}': {e}",
+                &self.virtual_entity.name
+            ))
+        })?;
 
         tx.commit().await?;
 
