@@ -446,10 +446,7 @@ impl<'a> SubPackageExtractor<'a> {
                 entity_id: *entity_id,
                 timestamp: *timestamp,
                 values: meas_values?,
-                alias: match alias {
-                    Some(v) => Some(v.to_string()),
-                    None => None
-                },
+                alias: alias.as_ref().map(|v| v.to_string()),
             });
         }
 
@@ -476,28 +473,26 @@ impl RawMeasurementStore for TrendStore {
                 &records
                     .iter()
                     .map(|(entity_name, _timestamp, _values)| entity_name.clone())
-                    .collect(),
+                    .collect::<Vec<String>>(),
             )
             .await
             .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
 
-        let aliases: Vec<Option<String>>;
-
-        if alias_column {
-            aliases = entity_mapping
+        let aliases: Vec<Option<String>> = if alias_column {
+            entity_mapping
                 .names_to_aliases(
                     client,
                     &self.entity_type,
                     &records
                         .iter()
                         .map(|(entity_name, _timestamp, _values)| entity_name.clone())
-                        .collect(),
+                        .collect::<Vec<String>>(),
                 )
                 .await
-                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string()))).map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
+                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string()))).map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?
         } else {
-            aliases = (&entity_ids).into_iter().map(|_| None ).collect()
-        }
+            entity_ids.iter().map(|_| None ).collect()
+        };
 
         let mut extractors: HashMap<&str, SubPackageExtractor> = HashMap::new();
 
@@ -593,7 +588,7 @@ impl MeasurementStore for TrendStorePart {
     where
         U: DataPackage + std::marker::Sync,
     {
-        info!("Copying package");
+        debug!("Copying package");
         match self.store_copy_from_package(client, data_package).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
@@ -603,7 +598,7 @@ impl MeasurementStore for TrendStorePart {
                     .map_err(|e| StorePackageError::Database(e.to_string())),
                 StoreCopyFromError::DataMismatch(e) => {
                     let data_type_mismatches = self
-                        .verify_data_types(client, data_package.trends())
+                        .verify_data_types(client, &data_package.trends())
                         .await
                         .unwrap();
 
@@ -620,7 +615,7 @@ impl MeasurementStore for TrendStorePart {
             },
         }?;
 
-        info!("Package copied!");
+        debug!("Package copied!");
 
         self.mark_modified(client, data_package.timestamp())
             .await
@@ -700,7 +695,7 @@ pub enum DataPackageWriteError {
 #[async_trait]
 pub trait DataPackage {
     fn timestamp(&self) -> &DateTime<Utc>;
-    fn trends(&self) -> &Vec<String>;
+    fn trends(&self) -> Vec<String>;
 
     async fn write(
         &self,
@@ -899,11 +894,13 @@ impl TrendStorePart {
 
         let mut value_types: Vec<Type> =
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
-
-        let extended_trends = self.extended_trends();
+        
+        info!("{:?}", data_package.trends());
+        info!("{:?}", self.trends);
+        info!("...");
 
         // Filter trends that match the trend store parts trends and add corresponding types
-        for t in &extended_trends {
+        for t in &self.trends {
             let index = data_package
                 .trends()
                 .iter()
@@ -927,26 +924,23 @@ impl TrendStorePart {
             return Ok(());
         }
 
-        info!("AAA");
-
         let query = copy_from_query(self, &matched_trends);
 
-        info!("BBB");
+        info!("B: {}", query);
 
         let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
             StoreCopyFromError::Generic(format!("Error starting COPY command: {e}"))
         })?;
 
-        info!("CCC");
+        info!("C");
 
         let binary_copy_writer = BinaryCopyInWriter::new(copy_in_sink, &value_types);
         pin_mut!(binary_copy_writer);
 
-        info!("DDD");
-
         // We cannot use the database now() function for COPY FROM queries, so the 'created'
         // timestamp for the trend data records is generated here.
         let created_timestamp = Utc::now();
+        info!("D");
 
         data_package
             .write(
@@ -958,8 +952,7 @@ impl TrendStorePart {
             .map_err(|e| {
                 StoreCopyFromError::Write(format!("Could not write package for COPY command: {e}"))
             })?;
-
-        info!("EEE");
+        info!("E");
 
         binary_copy_writer.finish().await.map_err(|e| {
             let error_text = e.to_string();
@@ -977,8 +970,7 @@ impl TrendStorePart {
                 StoreCopyFromError::Generic(error_text)
             }
         })?;
-
-        info!("FFF");
+        info!("F");
 
         Ok(())
     }

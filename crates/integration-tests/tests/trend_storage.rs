@@ -58,8 +58,8 @@ impl DataPackage for RefinedDataPackage {
         &self.timestamp
     }
 
-    fn trends(&self) -> &Vec<String> {
-        &self.trends
+    fn trends(&self) -> Vec<String> {
+        self.trends.clone()
     }
 
     async fn write(
