@@ -9,9 +9,12 @@ use clap::Parser;
 use minerva::change::Change;
 use minerva::graph::dependee_graph;
 use minerva::graph::node_index_by_name;
+use minerva::graph::render_graph_with_changes;
+use minerva::graph::GraphNode;
 use minerva::instance::DiffOptions;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::Dfs;
+use petgraph::Graph;
 use tokio_postgres::Client;
 
 use minerva::error::{ConfigurationError, Error};
@@ -34,7 +37,7 @@ pub struct UpdateOpt {
     #[arg(long)]
     ignore_deletions: bool,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
-    plan_only: bool,
+    plan_only: Option<String>,
 }
 
 #[async_trait]
@@ -42,10 +45,10 @@ impl Cmd for UpdateOpt {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        print!("Reading Minerva instance from database... ");
+        //print!("Reading Minerva instance from database... ");
         io::stdout().flush().unwrap();
         let instance_db = MinervaInstance::load_from_db(&mut client).await?;
-        println!("Ok");
+        //println!("Ok");
 
         let minerva_instance_root = match &self.instance_root {
             Some(root) => {
@@ -69,13 +72,13 @@ impl Cmd for UpdateOpt {
             },
         };
 
-        print!(
-            "Reading Minerva instance from '{}'... ",
-            &minerva_instance_root.to_string_lossy()
-        );
-        io::stdout().flush().unwrap();
+        //print!(
+        //    "Reading Minerva instance from '{}'... ",
+        //    &minerva_instance_root.to_string_lossy()
+        //);
+        //io::stdout().flush().unwrap();
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
-        println!("Ok");
+        //println!("Ok");
 
         let diff_options = DiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
@@ -83,12 +86,15 @@ impl Cmd for UpdateOpt {
             ignore_deletions: self.ignore_deletions,
         };
 
-        if self.plan_only {
-            println!("Planning update");
-            let planned_changes = plan_update(&instance_db, &instance_def, diff_options);
+        if let Some(plan_output_format) = &self.plan_only {
+            let update_plan = plan_update(&instance_db, &instance_def, diff_options);
 
-            for (index, change) in planned_changes.iter().enumerate() {
-                println!("{} {}", index, change);
+            if plan_output_format.eq("plain") {
+                for (index, change) in update_plan.changes.iter().enumerate() {
+                    println!("{} {}", index + 1, change);
+                }
+            } else if plan_output_format.eq("dot") {
+                println!("{}", update_plan.render_dot());
             }
 
             Ok(())
@@ -105,7 +111,18 @@ impl Cmd for UpdateOpt {
     }
 }
 
-fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_options: DiffOptions) -> Vec<Box<dyn Change + std::marker::Send>> {
+struct UpdatePlan {
+    dependency_graph: Graph<GraphNode, String>,
+    changes: Vec<Box<dyn Change + std::marker::Send>>,
+}
+
+impl UpdatePlan {
+    pub fn render_dot(&self) -> String {
+        render_graph_with_changes(&self.dependency_graph, &self.changes)
+    }
+}
+
+fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_options: DiffOptions) -> UpdatePlan {
     let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
     let changes = db_instance.diff(other, diff_options);
 
@@ -130,15 +147,16 @@ fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_opti
 
     for node_index in root_nodes {
         let node = db_instance_graph.node_weight(node_index).unwrap();
-        let start_index = node_index_by_name(&db_instance_graph, node.name()).unwrap();
-        let g = dependee_graph(&db_instance_graph, start_index);
+        let mut dep_graph = dependee_graph(&db_instance_graph, node_index);
 
         // Only traverse if the graph has more than 1 node
-        if g.raw_nodes().len() > 1 {
-            let mut dfs = Dfs::new(&g, node_index);
+        if dep_graph.raw_nodes().len() > 1 {
+            let dep_graph_root_node_index = node_index_by_name(&dep_graph, node.name()).unwrap();
+            dep_graph.reverse();
+            let mut dfs = Dfs::new(&dep_graph, dep_graph_root_node_index);
 
-            while let Some(nx) = dfs.next(&g) {
-                let w = g.node_weight(nx).unwrap();
+            while let Some(nx) = dfs.next(&dep_graph) {
+                let w = dep_graph.node_weight(nx).unwrap();
 
                 let matching_changes = changes_to_existing_objects.extract_if(.., |change| {
                     let o = change.existing_object().unwrap();
@@ -148,18 +166,23 @@ fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_opti
 
                 planned_changes.extend(matching_changes);
             }
+        } else {
+            // Check root node itself
         }
     }
 
     if !changes_to_existing_objects.is_empty() {
         for c in &changes_to_existing_objects {
-            println!("Change to existing: {}", c);
+            println!("Change to existing left: {}", c);
         }
     }
 
     planned_changes.extend(changes_to_new_objects);
 
-    planned_changes
+    UpdatePlan {
+        dependency_graph: db_instance_graph,
+        changes: planned_changes
+    }
 }
 
 async fn update(

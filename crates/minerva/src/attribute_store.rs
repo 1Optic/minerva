@@ -11,6 +11,7 @@ type PostgresName = String;
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
+use crate::change::MinervaObjectRef;
 use crate::meas_value::DataType;
 
 pub mod compact;
@@ -244,6 +245,12 @@ impl Change for ChangeAttribute {
         Ok(format!(
             "Changed type of attribute '{}' in store '{}'",
             &self.attribute, &self.attribute_store
+        ))
+    }
+
+    fn existing_object(&self) -> Option<MinervaObjectRef> {
+        Some(MinervaObjectRef::AttributeStore(
+            format!("{}_{}", self.attribute_store.data_source, self.attribute_store.entity_type),
         ))
     }
 }

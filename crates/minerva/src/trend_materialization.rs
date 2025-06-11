@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use console::Style;
 use similar::{ChangeTag, TextDiff};
 
+use crate::change::MinervaObjectRef;
 use crate::error::ConfigurationError;
 
 use super::change::{Change, ChangeResult, InformationOption};
@@ -514,6 +515,12 @@ impl Change for UpdateFunction {
         Ok(format!(
             "Updated function '{}'",
             &self.trend_function_materialization.target_trend_store_part
+        ))
+    }
+
+    fn existing_object(&self) -> Option<MinervaObjectRef> {
+        Some(MinervaObjectRef::TrendFunctionMaterialization(
+            self.trend_function_materialization.target_trend_store_part.clone(),
         ))
     }
 

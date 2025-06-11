@@ -5,7 +5,7 @@ use clap::Parser;
 
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
 use minerva::{
-    graph::{dependee_graph, dependency_graph, node_index_by_name, GraphNode},
+    graph::{dependee_graph, dependency_graph, node_index_by_name, render_graph},
     instance::MinervaInstance,
 };
 
@@ -49,23 +49,7 @@ impl Cmd for GraphOpt {
             full_graph
         };
 
-        let dot = petgraph::dot::Dot::with_attr_getters(
-            &graph,
-            &[petgraph::dot::Config::EdgeNoLabel],
-            &|_graph, _edge_ref| "".to_string(),
-            &|_graph, (_index, node)| match node {
-                GraphNode::Table(_) => "shape=box".to_string(),
-                GraphNode::VirtualEntity(_) => "shape=box,style=\"rounded\"".to_string(),
-                GraphNode::Relation(_) => "shape=box,style=\"rounded\"".to_string(),
-                GraphNode::TrendStorePart(_) => "shape=box".to_string(),
-                GraphNode::TrendFunctionMaterialization(_) => {
-                    "shape=box,style=\"rounded\"".to_string()
-                }
-                GraphNode::TrendViewMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
-                GraphNode::AttributeStore(_) => "shape=box".to_string(),
-                GraphNode::AttributeMaterialization(_) => "shape=box,style=\"rounded\"".to_string(),
-            },
-        );
+        let dot = render_graph(&graph);
 
         println!("{}", dot);
 
