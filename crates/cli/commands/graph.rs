@@ -1,12 +1,13 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use clap::Parser;
 
-use minerva::instance::{GraphNode, MinervaInstance};
-use petgraph::{graph::NodeIndex, visit::DfsEvent, Graph};
-
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
+use minerva::{
+    graph::{dependee_graph, dependency_graph, node_index_by_name, GraphNode},
+    instance::MinervaInstance,
+};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct GraphOpt {
@@ -39,9 +40,11 @@ impl Cmd for GraphOpt {
         let full_graph = instance.dependency_graph();
 
         let graph = if let Some(start) = &self.dependencies {
-            dependency_graph(&full_graph, start.clone())
+            let start_index = node_index_by_name(&full_graph, start).unwrap();
+            dependency_graph(&full_graph, start_index)
         } else if let Some(start) = &self.dependees {
-            dependee_graph(&full_graph, start.clone())
+            let start_index = node_index_by_name(&full_graph, start).unwrap();
+            dependee_graph(&full_graph, start_index)
         } else {
             full_graph
         };
@@ -68,61 +71,4 @@ impl Cmd for GraphOpt {
 
         Ok(())
     }
-}
-
-fn dependency_graph(graph: &Graph<GraphNode, String>, start: String) -> Graph<GraphNode, String> {
-    let start_index = graph.node_indices().find(|index| {
-        let node = graph.node_weight(*index);
-
-        match node {
-            Some(GraphNode::TrendStorePart(trend_store_part)) => trend_store_part.eq(&start),
-            Some(GraphNode::AttributeStore(attribute_store)) => attribute_store.eq(&start),
-            Some(GraphNode::Relation(relation)) => relation.eq(&start),
-            _ => false,
-        }
-    });
-
-    let mut subgraph: petgraph::Graph<GraphNode, String> = petgraph::Graph::new();
-    let mut node_set: HashMap<GraphNode, NodeIndex> = HashMap::new();
-
-    petgraph::visit::depth_first_search(&graph, start_index, |event| match event {
-        DfsEvent::CrossForwardEdge(parent, child)
-        | DfsEvent::BackEdge(parent, child)
-        | DfsEvent::TreeEdge(parent, child) => {
-            let p = graph.node_weight(parent).unwrap();
-
-            let pi = match node_set.get(p) {
-                None => {
-                    let i = subgraph.add_node(p.clone());
-                    node_set.insert(p.clone(), i);
-                    i
-                }
-                Some(index) => *index,
-            };
-
-            let c = graph.node_weight(child).unwrap();
-
-            let ci = match node_set.get(c) {
-                None => {
-                    let i = subgraph.add_node(c.clone());
-                    node_set.insert(c.clone(), i);
-                    i
-                }
-                Some(index) => *index,
-            };
-
-            subgraph.add_edge(pi, ci, "".to_string());
-        }
-        DfsEvent::Discover(_, _) | DfsEvent::Finish(_, _) => {}
-    });
-
-    subgraph
-}
-
-fn dependee_graph(graph: &Graph<GraphNode, String>, start: String) -> Graph<GraphNode, String> {
-    let mut reversed = graph.clone();
-    reversed.reverse();
-    let mut result = dependency_graph(&reversed, start);
-    result.reverse();
-    result
 }

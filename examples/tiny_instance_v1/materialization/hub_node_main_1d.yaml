@@ -26,8 +26,8 @@ function:
           (count(*))::smallint AS samples,
           SUM(t."outside_temp")::numeric AS "outside_temp",
           SUM(t."inside_temp")::numeric AS "inside_temp",
-          SUM(t."power_kwh")::numeric AS "power_kwh",
-          SUM(t."freq_power")::numeric AS "freq_power"
+          SUM(t."power_kwh")::bigint AS "power_kwh",
+          SUM(t."freq_power")::bigint AS "freq_power"
         FROM trend."hub_node_main_15m" AS t
         WHERE $1 < timestamp AND timestamp <= $2
         GROUP BY entity_id

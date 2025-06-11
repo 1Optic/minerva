@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::io::{BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -15,6 +14,7 @@ use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
+use crate::graph::GraphNode;
 use crate::trend_materialization::TrendMaterializationSource;
 
 use super::attribute_materialization::{
@@ -133,55 +133,6 @@ pub fn load_instance_config(
         .map_err(|e| InstanceConfigLoadError::Deserialize(format!("{e}")))?;
 
     Ok(image_config)
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum GraphNode {
-    Table(String),
-    TrendStorePart(String),
-    AttributeStore(String),
-    AttributeMaterialization(String),
-    TrendViewMaterialization(String),
-    TrendFunctionMaterialization(String),
-    Relation(String),
-    VirtualEntity(String),
-}
-
-impl GraphNode {
-    pub fn matches_ref(&self, node_ref: &str) -> bool {
-        self.to_string().eq(node_ref)
-    }
-}
-
-impl Display for GraphNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GraphNode::Table(name) => {
-                write!(f, "Table({})", name)
-            }
-            GraphNode::TrendStorePart(name) => {
-                write!(f, "TrendStorePart({})", name)
-            }
-            GraphNode::AttributeStore(name) => {
-                write!(f, "AttributeStore({})", name)
-            }
-            GraphNode::AttributeMaterialization(name) => {
-                write!(f, "AttributeMaterialization({})", name)
-            }
-            GraphNode::TrendViewMaterialization(name) => {
-                write!(f, "TrendViewMaterialization({})", name)
-            }
-            GraphNode::TrendFunctionMaterialization(name) => {
-                write!(f, "TrendFunctionMaterialization({})", name)
-            }
-            GraphNode::Relation(name) => {
-                write!(f, "Relation({})", name)
-            }
-            GraphNode::VirtualEntity(name) => {
-                write!(f, "VirtualEntity({})", name)
-            }
-        }
-    }
 }
 
 pub struct MinervaInstance {

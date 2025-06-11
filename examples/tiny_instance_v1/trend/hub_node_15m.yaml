@@ -8,13 +8,13 @@ parts:
   - name: hub_node_main_15m
     trends:
       - name: outside_temp
-        data_type: numeric
+        data_type: bigint
       - name: inside_temp
         data_type: numeric
       - name: power_kwh
-        data_type: numeric
+        data_type: bigint
       - name: freq_power
-        data_type: numeric
+        data_type: bigint 
     generated_trends:
       - name: power_Mwh
         data_type: numeric

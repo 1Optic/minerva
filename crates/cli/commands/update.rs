@@ -6,7 +6,12 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 
+use minerva::change::Change;
+use minerva::graph::dependee_graph;
+use minerva::graph::node_index_by_name;
 use minerva::instance::DiffOptions;
+use petgraph::graph::NodeIndex;
+use petgraph::visit::Dfs;
 use tokio_postgres::Client;
 
 use minerva::error::{ConfigurationError, Error};
@@ -28,6 +33,8 @@ pub struct UpdateOpt {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long, help = "Only generate a plan for the update steps and order")]
+    plan_only: bool,
 }
 
 #[async_trait]
@@ -76,15 +83,83 @@ impl Cmd for UpdateOpt {
             ignore_deletions: self.ignore_deletions,
         };
 
-        update(
-            &mut client,
-            &instance_db,
-            &instance_def,
-            !self.non_interactive,
-            diff_options,
-        )
-        .await
+        if self.plan_only {
+            println!("Planning update");
+            let planned_changes = plan_update(&instance_db, &instance_def, diff_options);
+
+            for (index, change) in planned_changes.iter().enumerate() {
+                println!("{} {}", index, change);
+            }
+
+            Ok(())
+        } else {
+            update(
+                &mut client,
+                &instance_db,
+                &instance_def,
+                !self.non_interactive,
+                diff_options,
+            )
+            .await
+        }
     }
+}
+
+fn plan_update(db_instance: &MinervaInstance, other: &MinervaInstance, diff_options: DiffOptions) -> Vec<Box<dyn Change + std::marker::Send>> {
+    let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
+    let changes = db_instance.diff(other, diff_options);
+
+    // Split the changes between changes on existing objects and changes for new objects
+    let (mut changes_to_existing_objects, changes_to_new_objects): (Vec<_>, Vec<_>) =
+        changes.into_iter().partition(|c| c.existing_object().is_some());
+
+    let db_instance_graph = db_instance.dependency_graph();
+
+    // First find all 'root' nodes of sub-dependency graphs
+    let root_nodes: Vec<NodeIndex> = db_instance_graph
+        .node_indices()
+        .filter(|n| {
+            db_instance_graph
+                .edges_directed(*n, petgraph::Direction::Outgoing)
+                .count()
+                == 0
+        })
+        .collect();
+
+    // First take the changes of existing elements
+
+    for node_index in root_nodes {
+        let node = db_instance_graph.node_weight(node_index).unwrap();
+        let start_index = node_index_by_name(&db_instance_graph, node.name()).unwrap();
+        let g = dependee_graph(&db_instance_graph, start_index);
+
+        // Only traverse if the graph has more than 1 node
+        if g.raw_nodes().len() > 1 {
+            let mut dfs = Dfs::new(&g, node_index);
+
+            while let Some(nx) = dfs.next(&g) {
+                let w = g.node_weight(nx).unwrap();
+
+                let matching_changes = changes_to_existing_objects.extract_if(.., |change| {
+                    let o = change.existing_object().unwrap();
+
+                    o.to_string() == w.to_string()
+                });
+
+                planned_changes.extend(matching_changes);
+            }
+        }
+    }
+
+    if !changes_to_existing_objects.is_empty() {
+        for c in &changes_to_existing_objects {
+            println!("Change to existing: {}", c);
+        }
+    }
+
+    planned_changes.extend(changes_to_new_objects);
+
+    planned_changes
 }
 
 async fn update(

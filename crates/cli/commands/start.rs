@@ -100,7 +100,7 @@ async fn gui() {
                     None => {
                         //break;
                     },
-                    _ => todo!(),
+                    _ => todo!("Unexpected event: {:?}", maybe_event),
                 }
             }
         }

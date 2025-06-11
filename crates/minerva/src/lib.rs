@@ -11,6 +11,7 @@ pub mod entity;
 pub mod entity_set;
 pub mod entity_type;
 pub mod error;
+pub mod graph;
 pub mod instance;
 pub mod interval;
 pub mod job;
