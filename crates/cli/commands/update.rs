@@ -6,7 +6,15 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 
+use minerva::change::Change;
+use minerva::graph::dependee_graph;
+use minerva::graph::node_index_by_name;
+use minerva::graph::render_graph_with_changes;
+use minerva::graph::GraphNode;
 use minerva::instance::DiffOptions;
+use petgraph::graph::NodeIndex;
+use petgraph::visit::Dfs;
+use petgraph::Graph;
 use tokio_postgres::Client;
 
 use minerva::error::{ConfigurationError, Error};
@@ -28,6 +36,8 @@ pub struct UpdateOpt {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long, help = "Only generate a plan for the update steps and order")]
+    plan_only: Option<String>,
 }
 
 #[async_trait]
@@ -35,10 +45,10 @@ impl Cmd for UpdateOpt {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        print!("Reading Minerva instance from database... ");
+        //print!("Reading Minerva instance from database... ");
         io::stdout().flush().unwrap();
         let instance_db = MinervaInstance::load_from_db(&mut client).await?;
-        println!("Ok");
+        //println!("Ok");
 
         let minerva_instance_root = match &self.instance_root {
             Some(root) => {
@@ -62,13 +72,13 @@ impl Cmd for UpdateOpt {
             },
         };
 
-        print!(
-            "Reading Minerva instance from '{}'... ",
-            &minerva_instance_root.to_string_lossy()
-        );
-        io::stdout().flush().unwrap();
+        //print!(
+        //    "Reading Minerva instance from '{}'... ",
+        //    &minerva_instance_root.to_string_lossy()
+        //);
+        //io::stdout().flush().unwrap();
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
-        println!("Ok");
+        //println!("Ok");
 
         let diff_options = DiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
@@ -76,14 +86,107 @@ impl Cmd for UpdateOpt {
             ignore_deletions: self.ignore_deletions,
         };
 
-        update(
-            &mut client,
-            &instance_db,
-            &instance_def,
-            !self.non_interactive,
-            diff_options,
-        )
-        .await
+        if let Some(plan_output_format) = &self.plan_only {
+            let update_plan = plan_update(&instance_db, &instance_def, diff_options);
+
+            if plan_output_format.eq("plain") {
+                for (index, change) in update_plan.changes.iter().enumerate() {
+                    println!("{} {}", index + 1, change);
+                }
+            } else if plan_output_format.eq("dot") {
+                println!("{}", update_plan.render_dot());
+            }
+
+            Ok(())
+        } else {
+            update(
+                &mut client,
+                &instance_db,
+                &instance_def,
+                !self.non_interactive,
+                diff_options,
+            )
+            .await
+        }
+    }
+}
+
+struct UpdatePlan {
+    dependency_graph: Graph<GraphNode, String>,
+    changes: Vec<Box<dyn Change + std::marker::Send>>,
+}
+
+impl UpdatePlan {
+    pub fn render_dot(&self) -> String {
+        render_graph_with_changes(&self.dependency_graph, &self.changes)
+    }
+}
+
+fn plan_update(
+    db_instance: &MinervaInstance,
+    other: &MinervaInstance,
+    diff_options: DiffOptions,
+) -> UpdatePlan {
+    let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
+    let changes = db_instance.diff(other, diff_options);
+
+    // Split the changes between changes on existing objects and changes for new objects
+    let (mut changes_to_existing_objects, changes_to_new_objects): (Vec<_>, Vec<_>) = changes
+        .into_iter()
+        .partition(|c| c.existing_object().is_some());
+
+    let db_instance_graph = db_instance.dependency_graph();
+
+    // First find all 'root' nodes of sub-dependency graphs
+    let root_nodes: Vec<NodeIndex> = db_instance_graph
+        .node_indices()
+        .filter(|n| {
+            db_instance_graph
+                .edges_directed(*n, petgraph::Direction::Outgoing)
+                .count()
+                == 0
+        })
+        .collect();
+
+    // First take the changes of existing elements
+
+    for node_index in root_nodes {
+        let node = db_instance_graph.node_weight(node_index).unwrap();
+        let mut dep_graph = dependee_graph(&db_instance_graph, node_index);
+
+        // Only traverse if the graph has more than 1 node
+        if dep_graph.raw_nodes().len() > 1 {
+            let dep_graph_root_node_index = node_index_by_name(&dep_graph, node.name()).unwrap();
+            dep_graph.reverse();
+            let mut dfs = Dfs::new(&dep_graph, dep_graph_root_node_index);
+
+            while let Some(nx) = dfs.next(&dep_graph) {
+                let w = dep_graph.node_weight(nx).unwrap();
+
+                let matching_changes = changes_to_existing_objects.extract_if(.., |change| {
+                    let o = change.existing_object().unwrap();
+
+                    o.to_string() == w.to_string()
+                });
+
+                planned_changes.extend(matching_changes);
+            }
+        } else {
+            // Check root node itself
+        }
+    }
+
+    if !changes_to_existing_objects.is_empty() {
+        for c in &changes_to_existing_objects {
+            println!("Change to existing left: {}", c);
+        }
+    }
+
+    planned_changes.extend(changes_to_new_objects);
+
+    UpdatePlan {
+        dependency_graph: db_instance_graph,
+        changes: planned_changes,
     }
 }
 

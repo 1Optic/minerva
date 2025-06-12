@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use console::Style;
 use similar::{ChangeTag, TextDiff};
 
-use crate::change::{Change, ChangeResult, InformationOption};
+use crate::change::{Change, ChangeResult, InformationOption, MinervaObjectRef};
 use crate::error::DatabaseError;
 use crate::interval::parse_interval;
 use crate::meas_value::DataType;
@@ -372,6 +372,12 @@ impl Change for ModifyTrendDataTypes {
         Ok(format!(
             "Altered trend data types for trend store part '{}'",
             &self.trend_store_part_name
+        ))
+    }
+
+    fn existing_object(&self) -> Option<MinervaObjectRef> {
+        Some(MinervaObjectRef::TrendStorePart(
+            self.trend_store_part_name.clone(),
         ))
     }
 
