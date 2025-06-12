@@ -15,7 +15,7 @@ use tokio_postgres::Client;
 use crate::attribute_materialization::AddAttributeMaterialization;
 use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
 use crate::graph::GraphNode;
-use crate::trend_materialization::TrendMaterializationSource;
+use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
 
 use super::attribute_materialization::{
     load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
@@ -680,6 +680,20 @@ impl MinervaInstance {
                 None => changes.push(Box::new(AddTrendMaterialization::from(
                     other_trend_materialization.clone(),
                 ))),
+            }
+        }
+
+        for my_trend_materializatin in &self.trend_materializations {
+            if !other
+                .trend_materializations
+                .iter()
+                .any(|other_trend_materialization| {
+                    other_trend_materialization.name() == my_trend_materializatin.name()
+                })
+            {
+                changes.push(Box::new(RemoveTrendMaterialization {
+                    name: my_trend_materializatin.name().to_string(),
+                }))
             }
         }
 
