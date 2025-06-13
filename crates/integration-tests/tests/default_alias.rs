@@ -84,22 +84,17 @@ mod tests {
             values: &[(usize, DataType)],
             created_timestamp: &DateTime<chrono::Utc>,
         ) -> Result<usize, DataPackageWriteError> {
-            info!("D1");
-            info!("{:?}", values);
-            info!("{:?}", self.rows);
             let entity_names = self.listed_entity_names().clone();
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
                 let entity_name = entity_names.get(index).ok_or_else(|| {
                     DataPackageWriteError::DataPreparation(format!("No entity name with index {index}"))
                 })?;
-                info!("D2");
 
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> = vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
                 if let Some(name) = entity_name {
                     sql_values.push(name);
                 }
 
-                info!("D3");
                 let mut row = self.rows.get(index).ok_or_else(|| {
                     DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
                 })?.clone();
@@ -108,9 +103,6 @@ mod tests {
                     row.insert(0, MeasValue::Text(name.to_string()))
                 };
 
-                info!("D4");
-                info!("{:?}", values);
-                info!("{:?}", row);
                 for (column_index, _data_type) in values {
                     let v = row.get(*column_index).ok_or_else(|| {
                         DataPackageWriteError::DataPreparation(format!(
@@ -119,7 +111,7 @@ mod tests {
                     })?;
                     sql_values.push(v);
                 }
-                info!("D5");
+
                 writer.as_mut().write(&sql_values).await.map_err(|e| {
                     let db_error = e.as_db_error();
 
@@ -128,9 +120,7 @@ mod tests {
                         None => DataPackageWriteError::Generic(format!("{e}")),
                     }
                 })?;
-                info!("D6");
             }
-            info!("D7");
 
             Ok(self.entity_ids.len())
         }
@@ -231,7 +221,6 @@ mod tests {
 
             let rows = client.query(query, &[]).await?;
             let columns: Vec<String> = rows.iter().map(|row| row.get(0)).collect();
-            let column_list = columns.join(", ");
             assert!(
                 columns.contains(&"name".to_string()),
                 "alias column not created"
@@ -380,7 +369,7 @@ mod tests {
             info!("Package stored");
 
             let rows = client
-                .query("SELECT alias FROM trend.sample_trend_store_part", &[])
+                .query("SELECT name FROM trend.sample_trend_store_part", &[])
                 .await?;
             let aliases: Vec<&str> = rows.iter().map(|row| row.get::<usize, &str>(0)).collect();
 

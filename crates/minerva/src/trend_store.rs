@@ -1,6 +1,6 @@
 use futures_util::pin_mut;
 use humantime::format_duration;
-use log::{debug, info};
+use log::debug;
 use postgres_protocol::escape::escape_identifier;
 use postgres_types::Type;
 use serde::{Deserialize, Serialize};
@@ -894,10 +894,10 @@ impl TrendStorePart {
 
         let mut value_types: Vec<Type> =
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
-        
-        info!("{:?}", data_package.trends());
-        info!("{:?}", self.trends);
-        info!("...");
+
+        if self.has_alias_column {
+            value_types.push(Type::TEXT);
+        }
 
         // Filter trends that match the trend store parts trends and add corresponding types
         for t in &self.trends {
@@ -926,13 +926,9 @@ impl TrendStorePart {
 
         let query = copy_from_query(self, &matched_trends);
 
-        info!("B: {}", query);
-
         let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
             StoreCopyFromError::Generic(format!("Error starting COPY command: {e}"))
         })?;
-
-        info!("C");
 
         let binary_copy_writer = BinaryCopyInWriter::new(copy_in_sink, &value_types);
         pin_mut!(binary_copy_writer);
@@ -940,7 +936,6 @@ impl TrendStorePart {
         // We cannot use the database now() function for COPY FROM queries, so the 'created'
         // timestamp for the trend data records is generated here.
         let created_timestamp = Utc::now();
-        info!("D");
 
         data_package
             .write(
@@ -952,7 +947,6 @@ impl TrendStorePart {
             .map_err(|e| {
                 StoreCopyFromError::Write(format!("Could not write package for COPY command: {e}"))
             })?;
-        info!("E");
 
         binary_copy_writer.finish().await.map_err(|e| {
             let error_text = e.to_string();
@@ -970,7 +964,6 @@ impl TrendStorePart {
                 StoreCopyFromError::Generic(error_text)
             }
         })?;
-        info!("F");
 
         Ok(())
     }
