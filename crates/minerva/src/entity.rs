@@ -44,7 +44,9 @@ impl fmt::Display for EntityType {
 
 pub trait EntityMapping {
     fn uses_alias_column<T: GenericClient + Sync>(
-        &self, entity_type: &EntityTypeName, client: &T
+        &self,
+        entity_type: &EntityTypeName,
+        client: &T,
     ) -> impl Future<Output = Result<bool, EntityMappingError>> + Send;
 
     fn names_to_entity_ids<T: GenericClient + Sync>(
@@ -65,7 +67,11 @@ pub trait EntityMapping {
 pub struct DbEntityMapping {}
 
 impl EntityMapping for DbEntityMapping {
-    async fn uses_alias_column<T: GenericClient + Sync>(&self, entity_type: &EntityTypeName, client: &T) -> Result<bool, EntityMappingError> {
+    async fn uses_alias_column<T: GenericClient + Sync>(
+        &self,
+        entity_type: &EntityTypeName,
+        client: &T,
+    ) -> Result<bool, EntityMappingError> {
         let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
         let query_result = client
             .query_one(query, &[&entity_type])
@@ -124,13 +130,12 @@ impl EntityMapping for DbEntityMapping {
         entity_type: &EntityTypeName,
         names: &[EntityName],
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
-
         let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
         let result = client
             .query_one(query, &[&entity_type])
             .await
             .map_err(EntityMappingError::DatabaseError)?;
-        
+
         let has_primary_alias: bool = result.get(0);
         match has_primary_alias {
             true => {
@@ -152,8 +157,10 @@ impl EntityMapping for DbEntityMapping {
 
                 for row in rows {
                     let name: String = row.get(0);
-                    let alias: Option<String> =
-                        Some(row.try_get::<usize, String>(1).map_err(EntityMappingError::DatabaseError)?);
+                    let alias: Option<String> = Some(
+                        row.try_get::<usize, String>(1)
+                            .map_err(EntityMappingError::DatabaseError)?,
+                    );
                     aliases.insert(name, alias);
                 }
 
@@ -166,12 +173,12 @@ impl EntityMapping for DbEntityMapping {
                             .ok_or(EntityMappingError::UnmappedEntityError)
                     })
                     .collect()
-            },
-            false => {
-                names.iter().map(|_| -> Result<Option<String>, EntityMappingError> {Ok(None)}).collect()
             }
+            false => names
+                .iter()
+                .map(|_| -> Result<Option<String>, EntityMappingError> { Ok(None) })
+                .collect(),
         }
-
     }
 }
 
@@ -193,7 +200,11 @@ impl CachingEntityMapping {
 }
 
 impl EntityMapping for CachingEntityMapping {
-    async fn uses_alias_column<T: GenericClient + Sync>(&self, entity_type: &EntityTypeName, client: &T) -> Result<bool, EntityMappingError> {
+    async fn uses_alias_column<T: GenericClient + Sync>(
+        &self,
+        entity_type: &EntityTypeName,
+        client: &T,
+    ) -> Result<bool, EntityMappingError> {
         if self.primary_alias_cache.get(entity_type).is_none() {
             let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
             let result = client
@@ -201,10 +212,13 @@ impl EntityMapping for CachingEntityMapping {
                 .await
                 .map_err(EntityMappingError::DatabaseError)?;
             let primary_alias: bool = result.get(0);
-            
-            self.primary_alias_cache.insert(entity_type.to_string(), primary_alias);
+
+            self.primary_alias_cache
+                .insert(entity_type.to_string(), primary_alias);
         };
-        self.primary_alias_cache.get(entity_type).ok_or(EntityMappingError::CacheError)
+        self.primary_alias_cache
+            .get(entity_type)
+            .ok_or(EntityMappingError::CacheError)
     }
 
     async fn names_to_entity_ids<T: GenericClient + Sync>(
@@ -317,22 +331,21 @@ impl EntityMapping for CachingEntityMapping {
                             .insert((entity_type.to_string(), name.clone()), alias.clone());
 
                         aliases.insert(name, alias);
-
                     }
                 }
 
                 names
                     .iter()
                     .map(|name| -> Result<Option<String>, EntityMappingError> {
-                        Ok(aliases
-                            .get(name)
-                            .cloned())
+                        Ok(aliases.get(name).cloned())
                     })
                     .collect()
-            },
-            false => names.iter().map(|_| -> Result<Option<String>, EntityMappingError> {Ok(None)}).collect()
+            }
+            false => names
+                .iter()
+                .map(|_| -> Result<Option<String>, EntityMappingError> { Ok(None) })
+                .collect(),
         }
-
     }
 }
 
@@ -380,7 +393,8 @@ impl Change for AddEntityType {
         match &entity_type.primary_alias {
             Some(primary_alias) => {
                 let query = "SELECT directory.create_entity_type($1, $2);";
-                tx.execute(query, &[&entity_type.name, &primary_alias]).await?;
+                tx.execute(query, &[&entity_type.name, &primary_alias])
+                    .await?;
             }
             None => {
                 let query = "SELECT directory.create_entity_type($1)";

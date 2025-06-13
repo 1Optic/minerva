@@ -223,19 +223,15 @@ pub struct AddAliasColumn {
 
 impl fmt::Display for AddAliasColumn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "AddAlias({}):",
-            &self.trend_store_part
-        )?;
-        
+        writeln!(f, "AddAlias({}):", &self.trend_store_part)?;
+
         Ok(())
     }
 }
 
 async fn add_alias_column<T: GenericClient>(
     client: &mut T,
-    trend_store_part_name: &str
+    trend_store_part_name: &str,
 ) -> Result<(), tokio_postgres::Error> {
     let query = concat!(
         "SELECT trend_directory.ensure_name_column(tsp) ",
@@ -255,7 +251,9 @@ impl Change for AddAliasColumn {
         add_alias_column(&mut tx, &self.trend_store_part.name)
             .await
             .map_err(|e| {
-                DatabaseError::from_msg(format!("Error adding alias column to trend store part: {e}"))
+                DatabaseError::from_msg(format!(
+                    "Error adding alias column to trend store part: {e}"
+                ))
             })?;
 
         tx.commit().await?;
@@ -275,19 +273,15 @@ pub struct RemoveAliasColumn {
 
 impl fmt::Display for RemoveAliasColumn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "RemoveAlias({}):",
-            &self.trend_store_part
-        )?;
-        
+        writeln!(f, "RemoveAlias({}):", &self.trend_store_part)?;
+
         Ok(())
     }
 }
 
 async fn remove_alias_column<T: GenericClient>(
     client: &mut T,
-    trend_store_part_name: &str
+    trend_store_part_name: &str,
 ) -> Result<(), tokio_postgres::Error> {
     let query = concat!(
         "SELECT trend_directory.remove_name_column(tsp) ",
@@ -307,7 +301,9 @@ impl Change for RemoveAliasColumn {
         remove_alias_column(&mut tx, &self.trend_store_part.name)
             .await
             .map_err(|e| {
-                DatabaseError::from_msg(format!("Error removing alias column to trend store part: {e}"))
+                DatabaseError::from_msg(format!(
+                    "Error removing alias column to trend store part: {e}"
+                ))
             })?;
 
         tx.commit().await?;
@@ -682,7 +678,12 @@ async fn create_base_table<T: GenericClient>(
     trend_store_part: &TrendStorePart,
 ) -> Result<(), tokio_postgres::Error> {
     let column_spec = std::iter::once("job_id bigint NOT NULL".to_string())
-        .chain(trend_store_part.extended_trends().iter().map(trend_column_spec))
+        .chain(
+            trend_store_part
+                .extended_trends()
+                .iter()
+                .map(trend_column_spec),
+        )
         .chain(
             trend_store_part
                 .generated_trends

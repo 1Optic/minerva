@@ -57,10 +57,9 @@ impl RefinedDataPackage {
     fn listed_entity_names(&self) -> Vec<Option<String>> {
         match &self.entity_names {
             Some(list) => list.iter().map(|name| Some(name.to_string())).collect(),
-            None => self.entity_ids.iter().map(|_| None).collect()
+            None => self.entity_ids.iter().map(|_| None).collect(),
         }
     }
-
 }
 
 #[async_trait]
@@ -72,10 +71,10 @@ impl DataPackage for RefinedDataPackage {
     fn trends(&self) -> Vec<String> {
         match self.entity_names {
             Some(_) => vec![vec!["name".to_string()], self.trends.clone()].concat(),
-            None => self.trends.clone()
+            None => self.trends.clone(),
         }
-    }        
-    
+    }
+
     async fn write(
         &self,
         mut writer: std::pin::Pin<&mut BinaryCopyInWriter>,
@@ -88,14 +87,21 @@ impl DataPackage for RefinedDataPackage {
                 DataPackageWriteError::DataPreparation(format!("No entity name with index {index}"))
             })?;
 
-            let mut sql_values: Vec<&(dyn ToSql + Sync)> = vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+            let mut sql_values: Vec<&(dyn ToSql + Sync)> =
+                vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
             if let Some(name) = entity_name {
                 sql_values.push(name);
             }
 
-            let mut row = self.rows.get(index).ok_or_else(|| {
-                DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
-            })?.clone();
+            let mut row = self
+                .rows
+                .get(index)
+                .ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!(
+                        "No data row with index {index}"
+                    ))
+                })?
+                .clone();
 
             if let Some(name) = entity_name {
                 row.insert(0, MeasValue::Text(name.to_string()))
@@ -136,7 +142,7 @@ impl DataPackage for RefinedDataPackage {
         for (row_index, entity_id) in self.entity_ids.iter().enumerate() {
             let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                 vec![entity_id, &self.timestamp, &created_timestamp, &self.job_id];
-            
+
             if let Some(name) = entity_names.get(row_index).unwrap() {
                 sql_values.push(name);
             }
