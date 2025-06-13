@@ -683,16 +683,16 @@ impl MinervaInstance {
             }
         }
 
-        for my_trend_materializatin in &self.trend_materializations {
+        for my_trend_materialization in &self.trend_materializations {
             if !other
                 .trend_materializations
                 .iter()
                 .any(|other_trend_materialization| {
-                    other_trend_materialization.name() == my_trend_materializatin.name()
+                    other_trend_materialization.name() == my_trend_materialization.name()
                 })
             {
                 changes.push(Box::new(RemoveTrendMaterialization {
-                    name: my_trend_materializatin.name().to_string(),
+                    name: my_trend_materialization.name().to_string(),
                 }))
             }
         }
