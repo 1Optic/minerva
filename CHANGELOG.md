@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.28.0] - 2025-06-13
+
+### Added
+
+- CLI/Library: Added support for defining entity types in YAML/JSON
+- CLI: Added support for generating subgraph of specific object with dependencies or dependees
+- CLI: Added support for generating update plan without altering the database
+
 ## [9.27.1] - 2025-05-30
 
 ### Removed
@@ -424,4 +432,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.26.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.0...9.26.1
 [9.27.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...9.27.0
 [9.27.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...9.27.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...HEAD
+[9.28.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...9.28.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.28.0...HEAD
