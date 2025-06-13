@@ -17,7 +17,9 @@ mod tests {
     use minerva::meas_value::{DataType, MeasValue};
     use minerva::schema::create_schema;
     use minerva::trend_store::MeasurementStore;
-    use minerva::trend_store::{create_partitions_for_timestamp, DataPackage, DataPackageWriteError, TrendStore};
+    use minerva::trend_store::{
+        create_partitions_for_timestamp, DataPackage, DataPackageWriteError, TrendStore,
+    };
 
     use integration_tests::setup;
 
@@ -59,10 +61,9 @@ mod tests {
         fn listed_entity_names(&self) -> Vec<Option<String>> {
             match &self.entity_names {
                 Some(list) => list.iter().map(|name| Some(name.to_string())).collect(),
-                None => self.entity_ids.iter().map(|_| None).collect()
+                None => self.entity_ids.iter().map(|_| None).collect(),
             }
         }
-
     }
 
     #[async_trait]
@@ -74,10 +75,10 @@ mod tests {
         fn trends(&self) -> Vec<String> {
             match self.entity_names {
                 Some(_) => vec![vec!["name".to_string()], self.trends.clone()].concat(),
-                None => self.trends.clone()
+                None => self.trends.clone(),
             }
-        }        
-        
+        }
+
         async fn write(
             &self,
             mut writer: std::pin::Pin<&mut BinaryCopyInWriter>,
@@ -87,17 +88,26 @@ mod tests {
             let entity_names = self.listed_entity_names().clone();
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
                 let entity_name = entity_names.get(index).ok_or_else(|| {
-                    DataPackageWriteError::DataPreparation(format!("No entity name with index {index}"))
+                    DataPackageWriteError::DataPreparation(format!(
+                        "No entity name with index {index}"
+                    ))
                 })?;
 
-                let mut sql_values: Vec<&(dyn ToSql + Sync)> = vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+                let mut sql_values: Vec<&(dyn ToSql + Sync)> =
+                    vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
                 if let Some(name) = entity_name {
                     sql_values.push(name);
                 }
 
-                let mut row = self.rows.get(index).ok_or_else(|| {
-                    DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
-                })?.clone();
+                let mut row = self
+                    .rows
+                    .get(index)
+                    .ok_or_else(|| {
+                        DataPackageWriteError::DataPreparation(format!(
+                            "No data row with index {index}"
+                        ))
+                    })?
+                    .clone();
 
                 if let Some(name) = entity_name {
                     row.insert(0, MeasValue::Text(name.to_string()))
@@ -138,7 +148,7 @@ mod tests {
             for (row_index, entity_id) in self.entity_ids.iter().enumerate() {
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                     vec![entity_id, &self.timestamp, &created_timestamp, &self.job_id];
-                
+
                 if let Some(name) = entity_names.get(row_index).unwrap() {
                     sql_values.push(name);
                 }
@@ -189,7 +199,10 @@ mod tests {
             debug!("Created entity type");
 
             client
-                .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
+                .execute(
+                    "SELECT entity.\"create_Site\"('name=Site20,number=100')",
+                    &[],
+                )
                 .await?;
 
             let row = client
@@ -304,7 +317,10 @@ mod tests {
                 .unwrap();
 
             client
-                .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
+                .execute(
+                    "SELECT entity.\"create_Site\"('name=Site20,number=100')",
+                    &[],
+                )
                 .await?;
 
             debug!("First site created");
@@ -326,8 +342,6 @@ mod tests {
                 "100", "101", "102", "103", "104", "105", "106", "107", "108", "109",
             ];
 
-            
-
             let mut entity_ids: Vec<i32> = vec![];
             let mut entity_names: Vec<String> = vec![];
             let query = "SELECT id, primary_alias FROM entity.\"create_Site\"($1)";
@@ -340,19 +354,39 @@ mod tests {
                 entity_names.push(result.get(1));
             }
 
-            let rows:Vec<Vec<MeasValue>> = vec![
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.0).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.1).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.2).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.3).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.4).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.5).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.6).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.7).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.8).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.9).unwrap()))]
+            let rows: Vec<Vec<MeasValue>> = vec![
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.0).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.1).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.2).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.3).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.4).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.5).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.6).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.7).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.8).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.9).unwrap(),
+                ))],
             ];
-            
+
             let package = RefinedDataPackage {
                 timestamp,
                 trends,
@@ -444,7 +478,10 @@ mod tests {
                 .unwrap();
 
             client
-                .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
+                .execute(
+                    "SELECT entity.\"create_Site\"('name=Site20,number=100')",
+                    &[],
+                )
                 .await?;
 
             debug!("First site created");
@@ -478,19 +515,39 @@ mod tests {
                 entity_names.push(result.get(1));
             }
 
-            let rows:Vec<Vec<MeasValue>> = vec![
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.0).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.1).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.2).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.3).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.4).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.5).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.6).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.7).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.8).unwrap()))],
-                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.9).unwrap()))]
+            let rows: Vec<Vec<MeasValue>> = vec![
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.0).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.1).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.2).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.3).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.4).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.5).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.6).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.7).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.8).unwrap(),
+                ))],
+                vec![MeasValue::Numeric(Some(
+                    rust_decimal::Decimal::from_f64(10.9).unwrap(),
+                ))],
             ];
-            
+
             let package = RefinedDataPackage {
                 timestamp,
                 trends,
@@ -527,7 +584,6 @@ mod tests {
                     target
                 );
             }
-
         }
         Ok(())
     }

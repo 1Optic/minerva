@@ -21,7 +21,8 @@ use rust_decimal::Decimal;
 use async_trait::async_trait;
 
 use crate::changes::trend_store::{
-    AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes, ModifyTrendExtraData, RemoveAliasColumn, RemoveTrends
+    AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
+    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrends,
 };
 use crate::entity::EntityMapping;
 use crate::meas_value::{
@@ -350,7 +351,7 @@ fn insert_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> String 
 
     let alias_part = match trend_store_part.has_alias_column {
         true => "name, ",
-        false => ""
+        false => "",
     };
 
     let insert_query = format!(
@@ -428,12 +429,14 @@ impl<'a> SubPackageExtractor<'a> {
         &self,
         entity_ids: &Vec<i32>,
         data_package: &'b [(String, DateTime<Utc>, Vec<String>)],
-        aliases: &Vec<Option<String>>
+        aliases: &Vec<Option<String>>,
     ) -> Result<(Vec<ValueRow>, Vec<&'b DateTime<Utc>>), Error> {
         let mut sub_package = Vec::new();
         let mut timestamps: HashSet<&DateTime<Utc>> = HashSet::new();
 
-        for ((entity_id, (_entity, timestamp, values)), alias) in zip(zip(entity_ids, data_package), aliases) {
+        for ((entity_id, (_entity, timestamp, values)), alias) in
+            zip(zip(entity_ids, data_package), aliases)
+        {
             let meas_values: Result<Vec<MeasValue>, Error> = self
                 .value_extractors
                 .iter()
@@ -465,7 +468,10 @@ impl RawMeasurementStore for TrendStore {
         records: &[(String, DateTime<chrono::Utc>, Vec<String>)],
         null_value: String,
     ) -> Result<(), RawMeasurementStoreError> {
-        let alias_column = entity_mapping.uses_alias_column(&self.entity_type, client).await.map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
+        let alias_column = entity_mapping
+            .uses_alias_column(&self.entity_type, client)
+            .await
+            .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
         let entity_ids: Vec<i32> = entity_mapping
             .names_to_entity_ids(
                 client,
@@ -489,9 +495,10 @@ impl RawMeasurementStore for TrendStore {
                         .collect::<Vec<String>>(),
                 )
                 .await
-                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string()))).map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?
+                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string())))
+                .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?
         } else {
-            entity_ids.iter().map(|_| None ).collect()
+            entity_ids.iter().map(|_| None).collect()
         };
 
         let mut extractors: HashMap<&str, SubPackageExtractor> = HashMap::new();
@@ -729,11 +736,11 @@ pub enum TrendStorePartStorageError {
 }
 
 impl TrendStorePart {
-    pub fn extended_trends(&self,) -> Vec<Trend> {
+    pub fn extended_trends(&self) -> Vec<Trend> {
         let mut result: Vec<Trend> = Vec::new();
 
         if self.has_alias_column {
-            result.push(Trend{
+            result.push(Trend {
                 name: "name".to_string(),
                 data_type: DataType::Text,
                 description: "".to_string(),
@@ -1063,7 +1070,7 @@ impl TrendStorePart {
             }
         }
 
-        let name_trend = Trend{
+        let name_trend = Trend {
             name: "name".to_string(),
             data_type: DataType::Text,
             description: "".to_string(),

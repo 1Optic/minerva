@@ -145,6 +145,6 @@ impl From<EntityMappingError> for Error {
     fn from(err: EntityMappingError) -> Error {
         Error::Runtime(RuntimeError {
             msg: err.to_string(),
-        })  
+        })
     }
 }
