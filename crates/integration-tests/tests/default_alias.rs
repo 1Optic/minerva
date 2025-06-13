@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use log::{debug, info};
+    use log::debug;
     use std::path::PathBuf;
 
     use async_trait::async_trait;
@@ -171,7 +171,7 @@ mod tests {
 
         let test_database = cluster.create_db().await?;
 
-        info!("Created database '{}'", test_database.name);
+        debug!("Created database '{}'", test_database.name);
 
         {
             let mut client = test_database.connect().await?;
@@ -186,7 +186,7 @@ mod tests {
 
             add_entity_type.apply(&mut client).await?;
 
-            info!("Created entity type");
+            debug!("Created entity type");
 
             client
                 .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
@@ -212,7 +212,7 @@ mod tests {
 
             add_trend_store.apply(&mut client).await?;
 
-            info!("Created trend store");
+            debug!("Created trend store");
 
             let query = concat!(
                 "SELECT column_name FROM information_schema.columns ",
@@ -257,13 +257,13 @@ mod tests {
 
         let test_database = cluster.create_db().await?;
 
-        info!("Created database '{}'", test_database.name);
+        debug!("Created database '{}'", test_database.name);
 
         {
             let mut client = test_database.connect().await?;
             create_schema(&mut client).await?;
 
-            info!("Schema created");
+            debug!("Schema created");
 
             let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
                 .map_err(|e| format!("Could not read entity type definition: {e}"))?;
@@ -274,7 +274,7 @@ mod tests {
 
             add_entity_type.apply(&mut client).await?;
 
-            info!("Created entity type");
+            debug!("Created entity type");
 
             let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
                 .map_err(|e| format!("Could not read trend store definition: {e}"))?;
@@ -285,7 +285,7 @@ mod tests {
 
             add_trend_store.apply(&mut client).await?;
 
-            info!("Created trend store");
+            debug!("Created trend store");
 
             let timestamp = chrono::DateTime::parse_from_rfc3339("2025-03-25T14:00:00+00:00")
                 .unwrap()
@@ -307,7 +307,7 @@ mod tests {
                 .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
                 .await?;
 
-            info!("First site created");
+            debug!("First site created");
 
             let names = vec![
                 "name=Site20,number=100",
@@ -332,7 +332,7 @@ mod tests {
             let mut entity_names: Vec<String> = vec![];
             let query = "SELECT id, primary_alias FROM entity.\"create_Site\"($1)";
 
-            info!("All sites created");
+            debug!("All sites created");
 
             for target in names.iter() {
                 let result = client.query_one(query, &[target]).await?;
@@ -366,7 +366,7 @@ mod tests {
                 .store_package(&mut client, &package)
                 .await?;
 
-            info!("Package stored");
+            debug!("Package stored");
 
             let rows = client
                 .query("SELECT name FROM trend.sample_trend_store_part", &[])
@@ -380,6 +380,154 @@ mod tests {
                     target
                 );
             }
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn default_alias_insert_delayed() -> Result<(), Box<dyn std::error::Error>> {
+        setup();
+
+        let cluster_config = MinervaClusterConfig {
+            config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
+            ..Default::default()
+        };
+
+        let cluster = MinervaCluster::start(&cluster_config).await?;
+
+        let test_database = cluster.create_db().await?;
+
+        debug!("Created database '{}'", test_database.name);
+
+        {
+            let mut client = test_database.connect().await?;
+            create_schema(&mut client).await?;
+
+            debug!("Schema created");
+
+            let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
+                .map_err(|e| format!("Could not read entity type definition: {e}"))?;
+
+            let add_entity_type = AddEntityType {
+                entity_type: entity_type.clone(),
+            };
+
+            add_entity_type.apply(&mut client).await?;
+
+            debug!("Created entity type");
+
+            let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
+                .map_err(|e| format!("Could not read trend store definition: {e}"))?;
+
+            let add_trend_store = AddTrendStore {
+                trend_store: trend_store.clone(),
+            };
+
+            add_trend_store.apply(&mut client).await?;
+
+            debug!("Created trend store");
+
+            let timestamp = chrono::DateTime::parse_from_rfc3339("2025-03-25T14:00:00+00:00")
+                .unwrap()
+                .to_utc();
+
+            create_partitions_for_timestamp(&mut client, timestamp).await?;
+
+            let job_id = 10;
+
+            let trends = vec!["value_2".to_string()];
+
+            let trend_store_part = trend_store
+                .parts
+                .iter()
+                .find(|p| p.name == "sample_trend_store_part_2")
+                .unwrap();
+
+            client
+                .execute("SELECT entity.\"create_Site\"('name=Site20,number=100')", &[])
+                .await?;
+
+            debug!("First site created");
+
+            let names = vec![
+                "name=Site20,number=100",
+                "name=Site20,number=101",
+                "name=Site20,number=102",
+                "name=Site20,number=103",
+                "name=Site20,number=104",
+                "name=Site20,number=105",
+                "name=Site20,number=106",
+                "name=Site20,number=107",
+                "name=Site20,number=108",
+                "name=Site20,number=109",
+            ];
+
+            let targets = vec![
+                "100", "101", "102", "103", "104", "105", "106", "107", "108", "109",
+            ];
+
+            let mut entity_ids: Vec<i32> = vec![];
+            let mut entity_names: Vec<String> = vec![];
+            let query = "SELECT id, primary_alias FROM entity.\"create_Site\"($1)";
+
+            debug!("All sites created");
+
+            for target in names.iter() {
+                let result = client.query_one(query, &[target]).await?;
+                entity_ids.push(result.get(0));
+                entity_names.push(result.get(1));
+            }
+
+            let rows:Vec<Vec<MeasValue>> = vec![
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.0).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.1).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.2).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.3).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.4).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.5).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.6).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.7).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.8).unwrap()))],
+                vec![MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(10.9).unwrap()))]
+            ];
+            
+            let package = RefinedDataPackage {
+                timestamp,
+                trends,
+                entity_ids,
+                entity_names: None,
+                job_id,
+                rows,
+            };
+
+            trend_store_part
+                .store_package(&mut client, &package)
+                .await?;
+
+            debug!("Package stored");
+
+            let query = concat!(
+                "SELECT trend_directory.ensure_name_column(tsp) ",
+                "FROM trend_directory.trend_store_part tsp ",
+                "WHERE tsp.name = 'sample_trend_store_part_2'",
+            );
+            client.execute(query, &[]).await?;
+
+            debug!("Given table alias column");
+
+            let rows = client
+                .query("SELECT name FROM trend.sample_trend_store_part_2", &[])
+                .await?;
+            let aliases: Vec<&str> = rows.iter().map(|row| row.get::<usize, &str>(0)).collect();
+
+            for target in targets.iter() {
+                assert!(
+                    aliases.contains(target),
+                    "No trend found for alias {} when alias column added later",
+                    target
+                );
+            }
+
         }
         Ok(())
     }
