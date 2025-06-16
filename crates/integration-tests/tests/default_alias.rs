@@ -74,7 +74,7 @@ mod tests {
 
         fn trends(&self) -> Vec<String> {
             match self.entity_names {
-                Some(_) => vec![vec!["name".to_string()], self.trends.clone()].concat(),
+                Some(_) => [vec!["name".to_string()], self.trends.clone()].concat(),
                 None => self.trends.clone(),
             }
         }
@@ -325,7 +325,7 @@ mod tests {
 
             debug!("First site created");
 
-            let names = vec![
+            let names = [
                 "name=Site20,number=100",
                 "name=Site20,number=101",
                 "name=Site20,number=102",
@@ -338,7 +338,7 @@ mod tests {
                 "name=Site20,number=109",
             ];
 
-            let targets = vec![
+            let targets = [
                 "100", "101", "102", "103", "104", "105", "106", "107", "108", "109",
             ];
 
@@ -486,7 +486,7 @@ mod tests {
 
             debug!("First site created");
 
-            let names = vec![
+            let names = [
                 "name=Site20,number=100",
                 "name=Site20,number=101",
                 "name=Site20,number=102",
@@ -499,7 +499,7 @@ mod tests {
                 "name=Site20,number=109",
             ];
 
-            let targets = vec![
+            let targets = [
                 "100", "101", "102", "103", "104", "105", "106", "107", "108", "109",
             ];
 

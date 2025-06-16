@@ -70,7 +70,7 @@ impl DataPackage for RefinedDataPackage {
 
     fn trends(&self) -> Vec<String> {
         match self.entity_names {
-            Some(_) => vec![vec!["name".to_string()], self.trends.clone()].concat(),
+            Some(_) => [vec!["name".to_string()], self.trends.clone()].concat(),
             None => self.trends.clone(),
         }
     }
