@@ -2408,20 +2408,3 @@ description: |
         );
     }
 }
-
-fn colored_diff(from: &str, to: &str) -> Vec<String> {
-    let diff = TextDiff::from_lines(from, to);
-
-    diff.iter_all_changes()
-        .map(|c| {
-            let (sign, s) = match c.tag() {
-                ChangeTag::Delete => ("-", Style::new().red().bold()),
-                ChangeTag::Insert => ("+", Style::new().green().bold()),
-                ChangeTag::Equal => (" ", Style::new().dim()),
-            };
-
-            s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
-                .to_string()
-        })
-        .collect()
-}
