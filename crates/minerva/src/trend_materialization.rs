@@ -209,6 +209,8 @@ impl TrendViewMaterialization {
 
         if this_view_fingerprint.hex != other_view_finerprint.hex {
             changes.push(Box::new(UpdateView {
+                original_definition: self.view.clone(),
+                new_definition: other.view.clone(),
                 trend_view_materialization: self.clone(),
             }));
         }
@@ -453,6 +455,8 @@ impl fmt::Display for UpdateTrendFunctionMaterializationAttributes {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct UpdateView {
+    pub original_definition: String,
+    pub new_definition: String,
     pub trend_view_materialization: TrendViewMaterialization,
 }
 
@@ -479,6 +483,13 @@ impl Change for UpdateView {
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         ))
     }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(ViewDiff {
+            from_src: self.original_definition.clone(),
+            to_src: self.new_definition.clone(),
+        })]
+    }
 }
 
 impl fmt::Display for UpdateView {
@@ -489,6 +500,28 @@ impl fmt::Display for UpdateView {
             &self.trend_view_materialization.target_trend_store_part,
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         )
+    }
+}
+
+pub struct ViewDiff {
+    pub from_src: String,
+    pub to_src: String,
+}
+
+#[async_trait]
+impl InformationOption for ViewDiff {
+    fn name(&self) -> String {
+        "Show diff".to_string()
+    }
+
+    async fn retrieve(&self, _client: &mut Client) -> Vec<String> {
+        colored_diff(&self.from_src, &self.to_src)
+    }
+}
+
+impl Display for ViewDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
     }
 }
 
@@ -557,20 +590,7 @@ impl InformationOption for FunctionDiff {
     }
 
     async fn retrieve(&self, _client: &mut Client) -> Vec<String> {
-        let diff = TextDiff::from_lines(&self.from_src, &self.to_src);
-
-        diff.iter_all_changes()
-            .map(|c| {
-                let (sign, s) = match c.tag() {
-                    ChangeTag::Delete => ("-", Style::new().red().bold()),
-                    ChangeTag::Insert => ("+", Style::new().green().bold()),
-                    ChangeTag::Equal => (" ", Style::new().dim()),
-                };
-
-                s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
-                    .to_string()
-            })
-            .collect()
+        colored_diff(&self.from_src, &self.to_src)
     }
 }
 
@@ -2326,6 +2346,23 @@ async fn drop_materialization_sources<T: GenericClient + Send + Sync>(
     }
 }
 
+fn colored_diff(from: &str, to: &str) -> Vec<String> {
+    let diff = TextDiff::from_lines(from, to);
+
+    diff.iter_all_changes()
+        .map(|c| {
+            let (sign, s) = match c.tag() {
+                ChangeTag::Delete => ("-", Style::new().red().bold()),
+                ChangeTag::Insert => ("+", Style::new().green().bold()),
+                ChangeTag::Equal => (" ", Style::new().dim()),
+            };
+
+            s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
+                .to_string()
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2370,4 +2407,21 @@ description: |
             "hub_v-network_main_15m"
         );
     }
+}
+
+fn colored_diff(from: &str, to: &str) -> Vec<String> {
+    let diff = TextDiff::from_lines(from, to);
+
+    diff.iter_all_changes()
+        .map(|c| {
+            let (sign, s) = match c.tag() {
+                ChangeTag::Delete => ("-", Style::new().red().bold()),
+                ChangeTag::Insert => ("+", Style::new().green().bold()),
+                ChangeTag::Equal => (" ", Style::new().dim()),
+            };
+
+            s.apply_to(format!("{}{}", sign, c.to_string().trim_end()))
+                .to_string()
+        })
+        .collect()
 }
