@@ -48,8 +48,18 @@ pub struct RefinedDataPackage {
     timestamp: DateTime<Utc>,
     trends: Vec<String>,
     entity_ids: Vec<i32>,
+    entity_names: Option<Vec<String>>,
     job_id: i64,
     rows: Vec<Vec<MeasValue>>,
+}
+
+impl RefinedDataPackage {
+    fn listed_entity_names(&self) -> Vec<Option<String>> {
+        match &self.entity_names {
+            Some(list) => list.iter().map(|name| Some(name.to_string())).collect(),
+            None => self.entity_ids.iter().map(|_| None).collect(),
+        }
+    }
 }
 
 #[async_trait]
@@ -58,8 +68,11 @@ impl DataPackage for RefinedDataPackage {
         &self.timestamp
     }
 
-    fn trends(&self) -> &Vec<String> {
-        &self.trends
+    fn trends(&self) -> Vec<String> {
+        match self.entity_names {
+            Some(_) => [vec!["name".to_string()], self.trends.clone()].concat(),
+            None => self.trends.clone(),
+        }
     }
 
     async fn write(
@@ -68,13 +81,31 @@ impl DataPackage for RefinedDataPackage {
         values: &[(usize, DataType)],
         created_timestamp: &DateTime<chrono::Utc>,
     ) -> Result<usize, DataPackageWriteError> {
+        let entity_names = self.listed_entity_names().clone();
         for (index, entity_id) in self.entity_ids.iter().enumerate() {
+            let entity_name = entity_names.get(index).ok_or_else(|| {
+                DataPackageWriteError::DataPreparation(format!("No entity name with index {index}"))
+            })?;
+
             let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                 vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+            if let Some(name) = entity_name {
+                sql_values.push(name);
+            }
 
-            let row = self.rows.get(index).ok_or_else(|| {
-                DataPackageWriteError::DataPreparation(format!("No data row with index {index}"))
-            })?;
+            let mut row = self
+                .rows
+                .get(index)
+                .ok_or_else(|| {
+                    DataPackageWriteError::DataPreparation(format!(
+                        "No data row with index {index}"
+                    ))
+                })?
+                .clone();
+
+            if let Some(name) = entity_name {
+                row.insert(0, MeasValue::Text(name.to_string()))
+            };
 
             for (column_index, _data_type) in values {
                 let v = row.get(*column_index).ok_or_else(|| {
@@ -106,10 +137,15 @@ impl DataPackage for RefinedDataPackage {
         created_timestamp: &DateTime<chrono::Utc>,
     ) -> Result<usize, minerva::error::Error> {
         let mut count: usize = 0;
+        let entity_names = self.listed_entity_names().clone();
 
         for (row_index, entity_id) in self.entity_ids.iter().enumerate() {
             let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                 vec![entity_id, &self.timestamp, &created_timestamp, &self.job_id];
+
+            if let Some(name) = entity_names.get(row_index).unwrap() {
+                sql_values.push(name);
+            }
 
             let row = self.rows.get(row_index).unwrap();
 
@@ -181,6 +217,7 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
             timestamp,
             trends: trends.clone(),
             entity_ids: entity_ids.clone(),
+            entity_names: None,
             job_id,
             rows,
         };
@@ -205,6 +242,7 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
             timestamp,
             trends: trends.clone(),
             entity_ids: entity_ids.clone(),
+            entity_names: None,
             job_id,
             rows: vec![vec![
                 MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(15.0).unwrap())), // inside_temp
@@ -234,6 +272,7 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
             timestamp,
             trends,
             entity_ids,
+            entity_names: None,
             job_id,
             rows: vec![vec![
                 MeasValue::Integer(Some(15)),  // inside_temp

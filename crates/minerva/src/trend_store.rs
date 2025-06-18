@@ -21,8 +21,8 @@ use rust_decimal::Decimal;
 use async_trait::async_trait;
 
 use crate::changes::trend_store::{
-    AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes, ModifyTrendExtraData,
-    RemoveTrends,
+    AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
+    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrends,
 };
 use crate::entity::EntityMapping;
 use crate::meas_value::{
@@ -298,8 +298,9 @@ pub struct TrendStorePartDiffOptions {
 #[postgres(name = "trend_store_part_descr")]
 pub struct TrendStorePart {
     pub name: PostgresName,
+    #[serde(default = "default_boolean")]
+    pub has_alias_column: bool,
     pub trends: Vec<Trend>,
-
     #[serde(default = "default_generated_trends")]
     pub generated_trends: Vec<GeneratedTrend>,
 }
@@ -318,6 +319,10 @@ impl Ord for TrendStorePart {
 
 fn default_generated_trends() -> Vec<GeneratedTrend> {
     Vec::new()
+}
+
+fn default_boolean() -> bool {
+    false
 }
 
 fn insert_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> String {
@@ -344,9 +349,15 @@ fn insert_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> String 
         .collect::<Vec<_>>()
         .join(", ");
 
+    let alias_part = match trend_store_part.has_alias_column {
+        true => "name, ",
+        false => "",
+    };
+
     let insert_query = format!(
-        "INSERT INTO trend.{}(entity_id, timestamp, created, job_id, {}) VALUES ({}) ON CONFLICT (entity_id, timestamp) DO UPDATE SET {}",
+        "INSERT INTO trend.{}(entity_id, timestamp, created, job_id, {}{}) VALUES ({}) ON CONFLICT (entity_id, timestamp) DO UPDATE SET {}",
         escape_identifier(&trend_store_part.name),
+        alias_part,
         &trend_names_part,
         &values_placeholders,
         update_part,
@@ -363,8 +374,12 @@ fn copy_from_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> Stri
         .join(", ");
 
     let query = format!(
-        "COPY trend.{}(entity_id, timestamp, created, job_id, {}) FROM STDIN BINARY",
+        "COPY trend.{}(entity_id, timestamp, created, job_id, {}{}) FROM STDIN BINARY",
         escape_identifier(&trend_store_part.name),
+        match trend_store_part.has_alias_column {
+            true => "name, ",
+            false => "",
+        },
         &trend_names_part
     );
 
@@ -414,11 +429,14 @@ impl<'a> SubPackageExtractor<'a> {
         &self,
         entity_ids: &Vec<i32>,
         data_package: &'b [(String, DateTime<Utc>, Vec<String>)],
+        aliases: &Vec<Option<String>>,
     ) -> Result<(Vec<ValueRow>, Vec<&'b DateTime<Utc>>), Error> {
         let mut sub_package = Vec::new();
         let mut timestamps: HashSet<&DateTime<Utc>> = HashSet::new();
 
-        for (entity_id, (_entity, timestamp, values)) in zip(entity_ids, data_package) {
+        for ((entity_id, (_entity, timestamp, values)), alias) in
+            zip(zip(entity_ids, data_package), aliases)
+        {
             let meas_values: Result<Vec<MeasValue>, Error> = self
                 .value_extractors
                 .iter()
@@ -431,6 +449,7 @@ impl<'a> SubPackageExtractor<'a> {
                 entity_id: *entity_id,
                 timestamp: *timestamp,
                 values: meas_values?,
+                alias: alias.as_ref().map(|v| v.to_string()),
             });
         }
 
@@ -449,17 +468,38 @@ impl RawMeasurementStore for TrendStore {
         records: &[(String, DateTime<chrono::Utc>, Vec<String>)],
         null_value: String,
     ) -> Result<(), RawMeasurementStoreError> {
+        let alias_column = entity_mapping
+            .uses_alias_column(&self.entity_type, client)
+            .await
+            .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
         let entity_ids: Vec<i32> = entity_mapping
             .names_to_entity_ids(
                 client,
                 &self.entity_type,
-                records
+                &records
                     .iter()
                     .map(|(entity_name, _timestamp, _values)| entity_name.clone())
-                    .collect(),
+                    .collect::<Vec<String>>(),
             )
             .await
             .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
+
+        let aliases: Vec<Option<String>> = if alias_column {
+            entity_mapping
+                .names_to_aliases(
+                    client,
+                    &self.entity_type,
+                    &records
+                        .iter()
+                        .map(|(entity_name, _timestamp, _values)| entity_name.clone())
+                        .collect::<Vec<String>>(),
+                )
+                .await
+                .map_err(|e| Error::Runtime(RuntimeError::from_msg(e.to_string())))
+                .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?
+        } else {
+            entity_ids.iter().map(|_| None).collect()
+        };
 
         let mut extractors: HashMap<&str, SubPackageExtractor> = HashMap::new();
 
@@ -482,7 +522,7 @@ impl RawMeasurementStore for TrendStore {
 
         for extractor in extractors.values() {
             let (sub_data_package, timestamps) = extractor
-                .extract_sub_package(&entity_ids, records)
+                .extract_sub_package(&entity_ids, records, &aliases)
                 .map_err(|e| RawMeasurementStoreError::ExtractSubPackage(e.to_string()))?;
 
             extractor
@@ -555,6 +595,7 @@ impl MeasurementStore for TrendStorePart {
     where
         U: DataPackage + std::marker::Sync,
     {
+        debug!("Copying package");
         match self.store_copy_from_package(client, data_package).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
@@ -564,7 +605,7 @@ impl MeasurementStore for TrendStorePart {
                     .map_err(|e| StorePackageError::Database(e.to_string())),
                 StoreCopyFromError::DataMismatch(e) => {
                     let data_type_mismatches = self
-                        .verify_data_types(client, data_package.trends())
+                        .verify_data_types(client, &data_package.trends())
                         .await
                         .unwrap();
 
@@ -580,6 +621,8 @@ impl MeasurementStore for TrendStorePart {
                 _ => Err(StorePackageError::Database(e.to_string())),
             },
         }?;
+
+        debug!("Package copied!");
 
         self.mark_modified(client, data_package.timestamp())
             .await
@@ -659,7 +702,7 @@ pub enum DataPackageWriteError {
 #[async_trait]
 pub trait DataPackage {
     fn timestamp(&self) -> &DateTime<Utc>;
-    fn trends(&self) -> &Vec<String>;
+    fn trends(&self) -> Vec<String>;
 
     async fn write(
         &self,
@@ -679,6 +722,7 @@ pub trait DataPackage {
 
 pub struct ValueRow {
     pub entity_id: i32,
+    pub alias: Option<String>,
     pub timestamp: DateTime<chrono::Utc>,
     pub values: Vec<MeasValue>,
 }
@@ -692,6 +736,23 @@ pub enum TrendStorePartStorageError {
 }
 
 impl TrendStorePart {
+    pub fn extended_trends(&self) -> Vec<Trend> {
+        let mut result: Vec<Trend> = Vec::new();
+
+        if self.has_alias_column {
+            result.push(Trend {
+                name: "name".to_string(),
+                data_type: DataType::Text,
+                description: "".to_string(),
+                time_aggregation: default_time_aggregation(),
+                entity_aggregation: default_entity_aggregation(),
+                extra_data: default_extra_data(),
+            })
+        };
+        result.append(&mut self.trends.clone());
+        result
+    }
+
     pub async fn store_copy_from<'a, I>(
         &self,
         client: &mut Client,
@@ -755,6 +816,10 @@ impl TrendStorePart {
                 &created_timestamp,
                 &job_id,
             ];
+
+            if let Some(alias) = &value_row.alias {
+                values.push(alias)
+            };
 
             values.extend(
                 index_trend_map
@@ -836,6 +901,10 @@ impl TrendStorePart {
 
         let mut value_types: Vec<Type> =
             vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
+
+        if self.has_alias_column {
+            value_types.push(Type::TEXT);
+        }
 
         // Filter trends that match the trend store parts trends and add corresponding types
         for t in &self.trends {
@@ -939,6 +1008,10 @@ impl TrendStorePart {
                 &job_id,
             ];
 
+            if let Some(alias) = &value_row.alias {
+                values.push(alias)
+            };
+
             for (i, t) in matched_trend_indexes.iter().zip(matched_trends.iter()) {
                 match i {
                     Some(index) => {
@@ -995,6 +1068,26 @@ impl TrendStorePart {
                 matched_trends.push(t);
                 values.push((i, t.data_type));
             }
+        }
+
+        let name_trend = Trend {
+            name: "name".to_string(),
+            data_type: DataType::Text,
+            description: "".to_string(),
+            time_aggregation: default_time_aggregation(),
+            entity_aggregation: default_entity_aggregation(),
+            extra_data: default_extra_data(),
+        };
+
+        let index = data_package
+            .trends()
+            .iter()
+            .position(|trend_name| trend_name == "name");
+
+        if let Some(i) = index {
+            matched_trend_indexes.push(index);
+            matched_trends.push(&name_trend);
+            values.push((i, DataType::Text));
         }
 
         let created_timestamp = Utc::now();
@@ -1083,6 +1176,18 @@ impl TrendStorePart {
                     removed_trends.push(my_trend.name.clone());
                 }
             }
+        }
+
+        if !self.has_alias_column && other.has_alias_column {
+            changes.push(Box::new(AddAliasColumn {
+                trend_store_part: self.clone(),
+            }))
+        }
+
+        if self.has_alias_column && !other.has_alias_column && !options.ignore_deletions {
+            changes.push(Box::new(RemoveAliasColumn {
+                trend_store_part: self.clone(),
+            }))
         }
 
         if !options.ignore_deletions && !removed_trends.is_empty() {
@@ -1350,6 +1455,7 @@ async fn load_trend_store_part<T: GenericClient>(conn: &T, name: &str) -> TrendS
         name: String::from(name),
         trends,
         generated_trends: Vec::new(),
+        has_alias_column: false,
     }
 }
 
@@ -1358,7 +1464,7 @@ async fn load_trend_store_parts<T: GenericClient>(
     trend_store_id: i32,
 ) -> Vec<TrendStorePart> {
     let trend_store_part_query =
-        "SELECT id, name FROM trend_directory.trend_store_part WHERE trend_store_id = $1";
+        "SELECT id, name, primary_alias FROM trend_directory.trend_store_part WHERE trend_store_id = $1";
 
     let trend_store_part_result = conn
         .query(trend_store_part_query, &[&trend_store_id])
@@ -1370,6 +1476,7 @@ async fn load_trend_store_parts<T: GenericClient>(
     for trend_store_part_row in trend_store_part_result {
         let trend_store_part_id: i32 = trend_store_part_row.get(0);
         let trend_store_part_name: &str = trend_store_part_row.get(1);
+        let has_alias_column: bool = trend_store_part_row.get(2);
 
         let trend_query = concat!(
             "SELECT name, data_type, description, entity_aggregation, time_aggregation, extra_data ",
@@ -1406,6 +1513,7 @@ async fn load_trend_store_parts<T: GenericClient>(
             name: String::from(trend_store_part_name),
             trends,
             generated_trends: Vec::new(),
+            has_alias_column,
         });
     }
 

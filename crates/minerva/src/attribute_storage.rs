@@ -154,10 +154,10 @@ impl RawAttributeStore for AttributeStore {
 
         let table_name = format!("{}_{}", self.data_source, self.entity_type);
 
-        let entity_names = rows.iter().map(|row| row.entity_name.clone()).collect();
+        let entity_names: Vec<String> = rows.iter().map(|row| row.entity_name.clone()).collect();
 
         let entity_ids: Vec<i32> = entity_mapping
-            .names_to_entity_ids(tx, &self.entity_type, entity_names)
+            .names_to_entity_ids(tx, &self.entity_type, &entity_names)
             .await
             .map_err(AttributeStorageError::EntityMappingError)?;
 
