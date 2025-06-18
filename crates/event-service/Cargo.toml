@@ -14,7 +14,7 @@ serde = "1.0.219"
 serde_json = "1.0.140"
 chrono = "0.4"
 humantime-serde = "1.1.1"
-utoipa = "5.3.1"
+utoipa = "5.4.0"
 postgres = { version = "0.19.10", features = ["with-serde_json-1"] }
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-postgres = { version = "0.7.13", features = ["with-chrono-0_4", "with-serde_json-1"] }
