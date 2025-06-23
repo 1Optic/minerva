@@ -22,7 +22,7 @@ based on changes. A few concrete examples:
 
 The change events are stored in a separate log table for each type of data.
 
-### Entity Relationship Diagram 
+### Entity Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -38,7 +38,7 @@ erDiagram
         name text UK
         created timestamptz
     }
-    
+
     trend_event_subscription {
         id serial PK
         name text
@@ -64,7 +64,7 @@ erDiagram
         attribute_store_id integer FK
         max_attribute_id bigint
     }
-    
+
     attribute_event_subscription {
         id serial PK
         name text
@@ -115,7 +115,7 @@ erDiagram
         timestamp timestamptz
         type_id integer FK
     }
-        
+
     relation_event_subscription {
         id serial PK
         name text
