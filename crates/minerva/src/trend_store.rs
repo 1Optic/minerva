@@ -34,6 +34,7 @@ use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use super::interval::parse_interval;
 
 pub mod create;
+pub mod remove;
 
 type PostgresName = String;
 

@@ -13,6 +13,7 @@ use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
+use crate::changes::trend_store::RemoveTrendStore;
 use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
 use crate::graph::GraphNode;
 use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
@@ -624,6 +625,19 @@ impl MinervaInstance {
                         trend_store: other_trend_store.clone(),
                     }));
                 }
+            }
+        }
+
+        // Check for trend stores that no longer exist in other
+        for my_trend_store in &self.trend_stores {
+            if !other.trend_stores.iter().any(|other_trend_store| {
+                my_trend_store.data_source == other_trend_store.data_source
+                    && my_trend_store.entity_type == other_trend_store.entity_type
+                    && my_trend_store.granularity == other_trend_store.granularity
+            }) {
+                changes.push(Box::new(RemoveTrendStore {
+                    trend_store: my_trend_store.clone(),
+                }));
             }
         }
 

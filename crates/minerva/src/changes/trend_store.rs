@@ -19,6 +19,7 @@ use crate::error::DatabaseError;
 use crate::interval::parse_interval;
 use crate::meas_value::DataType;
 use crate::trend_store::create::create_trend_store;
+use crate::trend_store::remove::remove_trend_store;
 use crate::trend_store::{GeneratedTrend, Trend, TrendStore, TrendStorePart};
 
 #[derive(Serialize, Deserialize)]
@@ -897,5 +898,38 @@ impl Change for AddTrendStore {
         tx.commit().await?;
 
         Ok(format!("Added trend store {}", &self.trend_store))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemoveTrendStore {
+    pub trend_store: TrendStore,
+}
+
+impl fmt::Display for RemoveTrendStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "RemoveTrendStore({})", &self.trend_store)?;
+
+        for part in &self.trend_store.parts {
+            writeln!(f, " - {}", &part.name)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Change for RemoveTrendStore {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        remove_trend_store(&mut tx, &self.trend_store)
+            .await
+            .map_err(|e| DatabaseError::from_msg(format!("Error removing trend store: {e}")))?;
+
+        tx.commit().await?;
+
+        Ok(format!("Removed trend store {}", &self.trend_store))
     }
 }
