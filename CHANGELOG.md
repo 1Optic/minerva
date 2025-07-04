@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.29.0] - 2025-07-04
+
+### Added
+
+- CLI/Library: Added support for compacting attribute stores with bigint type id column
+
 ## [9.28.0] - 2025-06-13
 
 ### Added
@@ -433,4 +439,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.27.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.26.1...9.27.0
 [9.27.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...9.27.1
 [9.28.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...9.28.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.28.0...HEAD
+[9.29.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.28.0...9.29.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.29.0...HEAD

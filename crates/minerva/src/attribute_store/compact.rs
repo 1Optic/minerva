@@ -43,6 +43,29 @@ impl From<CompactError> for Error {
     }
 }
 
+pub async fn get_column_type<T: GenericClient + Send + Sync>(
+    client: &T,
+    namespace: &str,
+    table: &str,
+    column: &str,
+) -> Result<String, tokio_postgres::Error> {
+    let query = concat!(
+        "SELECT format_type(atttypid, null) ",
+        "FROM pg_class ",
+        "JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid ",
+        "JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid ",
+        "WHERE relkind = 'r' AND nspname = $1 AND relname = $2 AND attname = $3 AND attnum >= 0"
+    );
+
+    let row = client
+        .query_one(query, &[&namespace, &table, &column])
+        .await?;
+
+    let column_type: String = row.get(0);
+
+    Ok(column_type)
+}
+
 pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_id: i32,
@@ -64,16 +87,31 @@ pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
 
     let attribute_store_name = row.get(0);
 
-    let create_tmp_table_query = r"
+    // Migration to the use of bigint for a lot of identifiers requires testing for the type in use
+    // for the id column of attribute data
+    let id_data_type = get_column_type(client, "attribute_history", attribute_store_name, "id")
+        .await
+        .map_err(|e| {
+            CompactError::Unexpected(format!(
+                "Could not get data type of attribute store id column: {e}"
+            ))
+        })?;
+
+    let create_tmp_table_query = format!(
+        r"
 CREATE TEMP TABLE compact_info (
-    id integer,
-    first_id integer,
-    last_id integer,
+    id {id_data_type},
+    first_id {id_data_type},
+    last_id {id_data_type},
     timestamp timestamptz,
     modified timestamptz
-) ON COMMIT DROP";
+) ON COMMIT DROP"
+    );
 
-    client.execute(create_tmp_table_query, &[]).await.unwrap();
+    client
+        .execute(&create_tmp_table_query, &[])
+        .await
+        .map_err(|e| CompactError::Unexpected(format!("Could not create temp table: {e}")))?;
 
     let insert_count = if let Some(max_records) = limit {
         let query = format!(
