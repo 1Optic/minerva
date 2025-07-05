@@ -21,6 +21,8 @@ pub struct AttributeStoreCompact {
     limit: Option<usize>,
     #[arg(long, help = "limit how many records to compact and loop until done")]
     limit_loop: Option<usize>,
+    #[arg(long, help = "statement timeout of the executed queries")]
+    statement_timeout: Option<String>,
 }
 
 #[async_trait]
@@ -31,6 +33,12 @@ impl Cmd for AttributeStoreCompact {
         client
             .execute("SET citus.max_intermediate_result_size = -1", &[])
             .await?;
+
+        if let Some(statement_timeout) = &self.statement_timeout {
+            let query = format!("SET statement_timeout = {statement_timeout}");
+
+            client.execute(&query, &[]).await?;
+        }
 
         let (limit, loop_until_done) = if self.limit_loop.is_some() {
             (self.limit_loop, true)
