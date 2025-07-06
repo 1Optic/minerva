@@ -6,6 +6,7 @@ mod check;
 mod create;
 mod dump;
 mod list;
+mod listchunks;
 mod populatesourcefingerprint;
 mod remove;
 mod resetsourcefingerprint;
@@ -17,6 +18,7 @@ use crate::commands::trendmaterialization::check::TrendMaterializationCheck;
 use crate::commands::trendmaterialization::create::TrendMaterializationCreate;
 use crate::commands::trendmaterialization::dump::TrendMaterializationDump;
 use crate::commands::trendmaterialization::list::TrendMaterializationList;
+use crate::commands::trendmaterialization::listchunks::TrendMaterializationChunkList;
 use crate::commands::trendmaterialization::populatesourcefingerprint::TrendMaterializationPopulateSourceFingerprint;
 use crate::commands::trendmaterialization::remove::TrendMaterializationRemove;
 use crate::commands::trendmaterialization::resetsourcefingerprint::TrendMaterializationResetSourceFingerprint;
@@ -44,6 +46,8 @@ pub enum TrendMaterializationOptCommand {
     Dump(TrendMaterializationDump),
     #[command(about = "list trend materializations")]
     List(TrendMaterializationList),
+    #[command(about = "list trend materialization chunks that are pending materialization")]
+    ListChunks(TrendMaterializationChunkList),
     #[command(about = "start materialization service")]
     Service(TrendMaterializationService),
     #[command(about = "check materializations for inconsistencies")]
@@ -73,6 +77,9 @@ impl TrendMaterializationOpt {
             )) => reset_source_fingerprint.run().await,
             Some(TrendMaterializationOptCommand::Dump(dump)) => dump.run().await,
             Some(TrendMaterializationOptCommand::List(list)) => list.run().await,
+            Some(TrendMaterializationOptCommand::ListChunks(list_chunks)) => {
+                list_chunks.run().await
+            }
             Some(TrendMaterializationOptCommand::Service(service)) => service.run().await,
             Some(TrendMaterializationOptCommand::Check(check)) => check.run().await,
             None => Ok(()),

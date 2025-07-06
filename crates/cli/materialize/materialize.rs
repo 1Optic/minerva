@@ -13,6 +13,7 @@ use thiserror::Error;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::time::Interval;
+use tokio_postgres::GenericClient;
 use tokio_postgres::NoTls;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -61,11 +62,21 @@ pub struct MaterializeConfig {
     pub max_materializations: i64,
 }
 
+impl Default for MaterializeConfig {
+    fn default() -> Self {
+        Self {
+            tags: None,
+            oldest_first: false,
+            max_materializations: 500,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MaterializationChunk {
-    materialization_id: i32,
-    name: String,
-    timestamp: chrono::DateTime<chrono::Local>,
+    pub materialization_id: i32,
+    pub name: String,
+    pub timestamp: chrono::DateTime<chrono::Local>,
 }
 
 impl std::fmt::Display for MaterializationChunk {
@@ -110,9 +121,9 @@ impl MaterializationChunk {
         })
     }
 
-    pub async fn check_statistics(
+    pub async fn check_statistics<T: GenericClient + Send + Sync>(
         &self,
-        client: &deadpool_postgres::ClientWrapper,
+        client: &T,
     ) -> Result<(), MaterializeError> {
         // Check if PostgreSQL statistics are up-to-date to prevent
         // inefficient query plans to be used.
@@ -204,9 +215,9 @@ struct PartitionStats {
 }
 
 impl PartitionStats {
-    pub async fn analyze_timestamp(
+    pub async fn analyze_timestamp<T: GenericClient + Send + Sync>(
         &self,
-        client: &deadpool_postgres::tokio_postgres::Client,
+        client: &T,
     ) -> Result<u64, deadpool_postgres::tokio_postgres::Error> {
         let materialize_query = format!("ANALYZE trend_partition.\"{}\"(timestamp)", &self.name);
 
@@ -242,9 +253,9 @@ impl MaterializationSource {
         })
     }
 
-    pub async fn empty_partition_statistics(
+    pub async fn empty_partition_statistics<T: GenericClient + Send + Sync>(
         &self,
-        client: &deadpool_postgres::ClientWrapper,
+        client: &T,
         timestamp: &chrono::DateTime<chrono::Local>,
     ) -> Result<PartitionStats, MaterializeError> {
         let name_query = concat!(
@@ -274,9 +285,9 @@ impl MaterializationSource {
         }
     }
 
-    pub async fn partition_statistics(
+    pub async fn partition_statistics<T: GenericClient + Send + Sync>(
         &self,
-        client: &deadpool_postgres::ClientWrapper,
+        client: &T,
         timestamp: &chrono::DateTime<chrono::Local>,
     ) -> Result<PartitionStats, MaterializeError> {
         let stats_query = "SELECT partition_name, stats FROM trend_directory.timestamp_statistics($1, $2) WHERE partition_name IS NOT NULL";
@@ -301,8 +312,8 @@ impl MaterializationSource {
     }
 }
 
-async fn load_materialization_chunks(
-    client: &deadpool_postgres::ClientWrapper,
+pub async fn load_materialization_chunks<T: GenericClient + Send + Sync>(
+    client: &T,
     config: &MaterializeConfig,
 ) -> Result<Vec<MaterializationChunk>, MaterializeError> {
     let mut query_parts: Vec<String> = Vec::new();
@@ -456,7 +467,7 @@ impl MaterializationFetcher {
 
             let mut guard = self.in_progress_mutex.lock().await;
 
-            match load_materialization_chunks(&client, &self.materialize_config).await {
+            match load_materialization_chunks(&**client, &self.materialize_config).await {
                 Ok(materializations) => {
                     let row_count = materializations.len();
                     let mut new = 0;
@@ -525,7 +536,7 @@ async fn materialize(
                 }
             }
             if check_statistics {
-                let check_result = materialization.check_statistics(&client).await;
+                let check_result = materialization.check_statistics(&**client).await;
 
                 if let Err(e) = check_result {
                     println!("Error checking statistics: {e}");

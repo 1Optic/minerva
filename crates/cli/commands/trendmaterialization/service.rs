@@ -34,14 +34,14 @@ pub struct TrendMaterializationService {
     #[arg(
         long = "max",
         help = "Maximum number of materializations to run",
-        default_value_t = 500
+        default_value_t = MaterializeConfig::default().max_materializations
     )]
     max_materializations: i64,
 
     #[arg(long, help = "Run only materializations with this tag")]
     tag: Option<Vec<String>>,
 
-    #[arg(long, help = "Work from oldest to newest", default_value_t = false)]
+    #[arg(long, help = "Work from oldest to newest", default_value_t = MaterializeConfig::default().oldest_first)]
     oldest_first: bool,
 }
 
