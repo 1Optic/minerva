@@ -137,15 +137,19 @@ pub async fn create_trend_store_part<T: GenericClient>(
     trend_store_part: &TrendStorePart,
 ) -> Result<(), CreateTrendStoreError> {
     let insert_trend_store_part_query = concat!(
-        "INSERT INTO trend_directory.trend_store_part (trend_store_id, name) ",
-        "VALUES ($1, $2) ",
+        "INSERT INTO trend_directory.trend_store_part (trend_store_id, name, primary_alias) ",
+        "VALUES ($1, $2, $3) ",
         "RETURNING id"
     );
 
     let rows = client
         .query(
             insert_trend_store_part_query,
-            &[&trend_store_id, &trend_store_part.name],
+            &[
+                &trend_store_id,
+                &trend_store_part.name,
+                &trend_store_part.has_alias_column,
+            ],
         )
         .await?;
 
@@ -220,6 +224,19 @@ pub async fn define_generated_trend<T: GenericClient>(
     Ok(())
 }
 
+fn trend_column_spec(trend: &Trend) -> String {
+    format!("{} {}", escape_identifier(&trend.name), trend.data_type)
+}
+
+fn generated_trend_column_spec(generated_trend: &GeneratedTrend) -> String {
+    format!(
+        "{} {} GENERATED ALWAYS AS ({}) STORED",
+        escape_identifier(&generated_trend.name),
+        generated_trend.data_type,
+        generated_trend.expression
+    )
+}
+
 pub async fn create_base_table<T: GenericClient>(
     client: &mut T,
     trend_store_part: &TrendStorePart,
@@ -227,33 +244,26 @@ pub async fn create_base_table<T: GenericClient>(
     let base_table_schema = "trend";
     let base_table_name = escape_identifier(&trend_store_part.name);
 
-    let column_specs: Vec<String> = trend_store_part
-        .extended_trends()
+    let mut column_specs: Vec<String> = trend_store_part
+        .base_columns()
         .iter()
-        .map(|trend| format!("{} {}", escape_identifier(&trend.name), trend.data_type))
-        .chain(
-            trend_store_part
-                .generated_trends
-                .iter()
-                .map(|generated_trend| {
-                    format!(
-                        "{} {} GENERATED ALWAYS AS ({}) STORED",
-                        generated_trend.name, generated_trend.data_type, generated_trend.expression
-                    )
-                }),
-        )
+        .map(|column| format!("{} {}", escape_identifier(&column.name), column.data_type))
         .collect();
+
+    column_specs.extend(trend_store_part.trends.iter().map(trend_column_spec));
+
+    column_specs.extend(
+        trend_store_part
+            .generated_trends
+            .iter()
+            .map(generated_trend_column_spec),
+    );
 
     let columns_part = column_specs.join(",");
 
-    //array_to_string(trend_directory.column_specs($1), ',')
     let create_table_query = format!(
         concat!(
             "CREATE TABLE {}.{} (",
-            "entity_id integer NOT NULL, ",
-            "\"timestamp\" timestamp with time zone NOT NULL, ",
-            "created timestamp with time zone NOT NULL, ",
-            "job_id bigint NOT NULL, ",
             "{}",
             ") PARTITION BY RANGE (\"timestamp\")"
         ),
@@ -296,16 +306,18 @@ pub async fn create_staging_table<T: GenericClient>(
     let staging_table_schema = "trend";
     let staging_table_name = escape_identifier(&format!("{}_staging", &trend_store_part.name));
 
-    let column_specs: Vec<String> = trend_store_part
-        .extended_trends()
+    let mut column_specs: Vec<String> = trend_store_part
+        .base_columns()
         .iter()
-        .map(|trend| format!("{} {}", escape_identifier(&trend.name), trend.data_type))
+        .map(|column| format!("{} {}", escape_identifier(&column.name), column.data_type))
         .collect();
+
+    column_specs.extend(trend_store_part.trends.iter().map(trend_column_spec));
 
     let columns_part = column_specs.join(",");
 
     let create_table_query = format!(
-        "CREATE UNLOGGED TABLE {staging_table_schema}.{staging_table_name}(entity_id integer, \"timestamp\" timestamp with time zone, created timestamp with time zone, job_id bigint, {columns_part})",
+        "CREATE UNLOGGED TABLE {staging_table_schema}.{staging_table_name}({columns_part})",
     );
 
     client.execute(&create_table_query, &[]).await?;

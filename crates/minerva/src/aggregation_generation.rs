@@ -358,7 +358,7 @@ fn define_part_time_aggregation(
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
-        .extended_trends()
+        .trends
         .iter()
         .map(define_time_aggregate_trend)
         .collect();
@@ -944,7 +944,7 @@ fn entity_aggregation_function(
     relation_name: String,
 ) -> TrendMaterializationFunction {
     let trend_columns: Vec<String> = source_part
-        .extended_trends()
+        .trends
         .iter()
         .map(|trend| {
             format!(

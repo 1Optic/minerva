@@ -735,22 +735,43 @@ pub enum TrendStorePartStorageError {
     UniqueViolation(String),
 }
 
+pub struct Column {
+    pub name: String,
+    pub data_type: String,
+}
+
 impl TrendStorePart {
-    pub fn extended_trends(&self) -> Vec<Trend> {
-        let mut result: Vec<Trend> = Vec::new();
+    pub fn base_columns(&self) -> Vec<Column> {
+        let mut columns = vec![
+            Column {
+                name: "entity_id".to_string(),
+                data_type: "integer".to_string(),
+            },
+            Column {
+                name: "timestamp".to_string(),
+                data_type: "timestamp with time zone".to_string(),
+            },
+        ];
 
         if self.has_alias_column {
-            result.push(Trend {
+            columns.push(Column {
                 name: "name".to_string(),
-                data_type: DataType::Text,
-                description: "".to_string(),
-                time_aggregation: default_time_aggregation(),
-                entity_aggregation: default_entity_aggregation(),
-                extra_data: default_extra_data(),
-            })
-        };
-        result.append(&mut self.trends.clone());
-        result
+                data_type: "text".to_string(),
+            });
+        }
+
+        columns.extend([
+            Column {
+                name: "created".to_string(),
+                data_type: "timestamp with time zone".to_string(),
+            },
+            Column {
+                name: "job_id".to_string(),
+                data_type: "bigint".to_string(),
+            },
+        ]);
+
+        columns
     }
 
     pub async fn store_copy_from<'a, I>(
@@ -1345,8 +1366,10 @@ pub async fn delete_trend_store(conn: &mut Client, id: i32) -> Result<(), Delete
 
 pub async fn get_trend_store_id<T: GenericClient>(
     conn: &T,
-    trend_store: &TrendStore,
-) -> Result<i32, Error> {
+    data_source: &str,
+    entity_type: &str,
+    granularity: &Duration,
+) -> Result<i32, tokio_postgres::Error> {
     let query = concat!(
         "SELECT trend_store.id ",
         "FROM trend_directory.trend_store ",
@@ -1355,17 +1378,10 @@ pub async fn get_trend_store_id<T: GenericClient>(
         "WHERE data_source.name = $1 AND entity_type.name = $2 AND granularity = $3::text::interval"
     );
 
-    let granularity_str: String = format_duration(trend_store.granularity).to_string();
+    let granularity_str: String = format_duration(*granularity).to_string();
 
     let result = conn
-        .query_one(
-            query,
-            &[
-                &trend_store.data_source,
-                &trend_store.entity_type,
-                &granularity_str,
-            ],
-        )
+        .query_one(query, &[&data_source, &entity_type, &granularity_str])
         .await?;
 
     let trend_store_id = result.get::<usize, i32>(0);

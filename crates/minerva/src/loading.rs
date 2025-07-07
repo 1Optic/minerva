@@ -122,9 +122,14 @@ pub async fn load_data<P: AsRef<Path>>(
         .await
         .map_err(|e| format!("Error loading trend store for data source '{data_source}', entity type '{}' and granularity '{}': {e}", parser_config.entity_type, parser_config.granularity))?;
 
-    let trend_store_id: i32 = get_trend_store_id(client, &trend_store)
-        .await
-        .map_err(|e| format!("Error loading trend store Id from database: {e}"))?;
+    let trend_store_id: i32 = get_trend_store_id(
+        client,
+        &trend_store.data_source,
+        &trend_store.entity_type,
+        &trend_store.granularity,
+    )
+    .await
+    .map_err(|e| format!("Error loading trend store Id from database: {e}"))?;
 
     if create_partitions {
         for record in &raw_data_package {

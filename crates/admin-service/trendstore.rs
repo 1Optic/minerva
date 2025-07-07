@@ -11,9 +11,11 @@ use actix_web::{get, post, web::Data, web::Path, web::Query, HttpResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use minerva::changes::trend_store::create_trend_store_part;
 use minerva::interval::parse_interval;
-use minerva::trend_store::{load_trend_store, GeneratedTrend, Trend, TrendStore, TrendStorePart};
+use minerva::trend_store::create::create_trend_store_part;
+use minerva::trend_store::{
+    get_trend_store_id, load_trend_store, GeneratedTrend, Trend, TrendStore, TrendStorePart,
+};
 
 use minerva::meas_value::DataType;
 
@@ -262,7 +264,19 @@ impl TrendStorePartCompleteData {
 
         let trend_store_part = self.trend_store_part().as_minerva();
 
-        create_trend_store_part(tx, &trend_store, &trend_store_part)
+        let trend_store_id = get_trend_store_id(
+            tx,
+            &trend_store.data_source,
+            &trend_store.entity_type,
+            &trend_store.granularity,
+        )
+        .await
+        .map_err(|e| Error {
+            code: 409,
+            message: format!("Creation of trend store part failed: {e}"),
+        })?;
+
+        create_trend_store_part(tx, trend_store_id, &trend_store_part)
             .await
             .map_err(|e| Error {
                 code: 409,

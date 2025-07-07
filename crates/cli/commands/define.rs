@@ -206,7 +206,7 @@ impl TrendStorePartHolder {
 }
 
 fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStorePart) -> u16 {
-    let num_columns = TryInto::<u16>::try_into(trend_store_part.extended_trends().len()).unwrap();
+    let num_columns = TryInto::<u16>::try_into(trend_store_part.trends.len()).unwrap();
 
     params.base_width + num_columns * params.column_size
 }

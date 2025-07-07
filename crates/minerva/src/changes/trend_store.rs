@@ -2,7 +2,6 @@ use chrono::Utc;
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
-use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -18,8 +17,8 @@ use crate::change::{Change, ChangeResult, InformationOption, MinervaObjectRef};
 use crate::error::DatabaseError;
 use crate::interval::parse_interval;
 use crate::meas_value::DataType;
-use crate::trend_store::create::create_trend_store;
-use crate::trend_store::{GeneratedTrend, Trend, TrendStore, TrendStorePart};
+use crate::trend_store::create::{create_trend_store, create_trend_store_part};
+use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -660,90 +659,6 @@ pub struct AddTrendStorePart {
 
 const BASE_TABLE_SCHEMA: &str = "trend";
 
-fn trend_column_spec(trend: &Trend) -> String {
-    format!("{} {}", escape_identifier(&trend.name), trend.data_type)
-}
-
-fn generated_trend_column_spec(generated_trend: &GeneratedTrend) -> String {
-    format!(
-        "{} {} GENERATED ALWAYS AS ({}) STORED",
-        escape_identifier(&generated_trend.name),
-        generated_trend.data_type,
-        generated_trend.expression
-    )
-}
-
-async fn create_base_table<T: GenericClient>(
-    client: &mut T,
-    trend_store_part: &TrendStorePart,
-) -> Result<(), tokio_postgres::Error> {
-    let column_spec = std::iter::once("job_id bigint NOT NULL".to_string())
-        .chain(
-            trend_store_part
-                .extended_trends()
-                .iter()
-                .map(trend_column_spec),
-        )
-        .chain(
-            trend_store_part
-                .generated_trends
-                .iter()
-                .map(generated_trend_column_spec),
-        )
-        .collect::<Vec<String>>()
-        .join(", ");
-
-    let create_table_query = format!(
-        concat!(
-            "CREATE TABLE {}.{} (",
-            "entity_id integer NOT NULL, ",
-            "\"timestamp\" timestamp with time zone NOT NULL, ",
-            "created timestamp with time zone NOT NULL, ",
-            "{}",
-            ") PARTITION BY RANGE (\"timestamp\")"
-        ),
-        BASE_TABLE_SCHEMA,
-        escape_identifier(&trend_store_part.name),
-        column_spec,
-    );
-
-    client.execute(&create_table_query, &[]).await?;
-
-    let primary_key_query = format!(
-        "ALTER TABLE {}.{} ADD PRIMARY KEY (entity_id, \"timestamp\");",
-        BASE_TABLE_SCHEMA,
-        escape_identifier(&trend_store_part.name),
-    );
-
-    client.execute(&primary_key_query, &[]).await?;
-
-    let create_job_id_index_query = format!(
-        "CREATE INDEX ON {}.{} USING btree (job_id)",
-        BASE_TABLE_SCHEMA,
-        escape_identifier(&trend_store_part.name),
-    );
-
-    client.execute(&create_job_id_index_query, &[]).await?;
-
-    let create_timestamp_index_query = format!(
-        "CREATE INDEX ON {}.{} USING btree (timestamp)",
-        BASE_TABLE_SCHEMA,
-        escape_identifier(&trend_store_part.name),
-    );
-
-    client.execute(&create_timestamp_index_query, &[]).await?;
-
-    let distribute_table_query = format!(
-        "SELECT create_distributed_table('{}.{}', 'entity_id')",
-        BASE_TABLE_SCHEMA,
-        escape_identifier(&trend_store_part.name),
-    );
-
-    client.execute(&distribute_table_query, &[]).await?;
-
-    Ok(())
-}
-
 async fn define_table_trends<T: GenericClient>(
     client: &mut T,
     trend_store_part_id: i32,
@@ -774,72 +689,20 @@ async fn define_table_trends<T: GenericClient>(
     Ok(())
 }
 
-pub async fn create_trend_store_part<T: GenericClient>(
-    client: &mut T,
-    trend_store: &TrendStore,
-    trend_store_part: &TrendStorePart,
-) -> Result<(), tokio_postgres::Error> {
-    let query = concat!(
-        "INSERT INTO trend_directory.trend_store_part(trend_store_id, name, primary_alias) ",
-        "SELECT trend_store.id, $4, $5 ",
-        "FROM trend_directory.trend_store ",
-        "JOIN directory.data_source ON data_source.id = trend_store.data_source_id ",
-        "JOIN directory.entity_type ON entity_type.id = trend_store.entity_type_id ",
-        "WHERE data_source.name = $1 AND entity_type.name = $2 AND granularity = $3::text::interval ",
-        "RETURNING id;"
-    );
-
-    let granularity_str: String = format_duration(trend_store.granularity).to_string();
-
-    let trend_store_part_rows = client
-        .query(
-            query,
-            &[
-                &trend_store.data_source,
-                &trend_store.entity_type,
-                &granularity_str,
-                &trend_store_part.name,
-                &trend_store_part.has_alias_column,
-            ],
-        )
-        .await?;
-
-    let trend_store_part_id: i32 = trend_store_part_rows.first().unwrap().get(0);
-
-    define_table_trends(client, trend_store_part_id, &trend_store_part.trends).await?;
-
-    let define_generated_trend_query = concat!(
-        "INSERT INTO trend_directory.generated_table_trend(trend_store_part_id, name, data_type, expression, extra_data, description) ",
-        "VALUES ($1, $2, $3, $4, $5, $6)"
-    );
-
-    for generated_trend in &trend_store_part.generated_trends {
-        client
-            .execute(
-                define_generated_trend_query,
-                &[
-                    &trend_store_part_id,
-                    &generated_trend.name,
-                    &generated_trend.data_type,
-                    &generated_trend.expression,
-                    &generated_trend.extra_data,
-                    &generated_trend.description,
-                ],
-            )
-            .await?;
-    }
-
-    create_base_table(client, trend_store_part).await?;
-
-    Ok(())
-}
-
 #[async_trait]
 impl Change for AddTrendStorePart {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        create_trend_store_part(&mut tx, &self.trend_store, &self.trend_store_part)
+        let trend_store_id = get_trend_store_id(
+            &tx,
+            &self.trend_store.data_source,
+            &self.trend_store.entity_type,
+            &self.trend_store.granularity,
+        )
+        .await?;
+
+        create_trend_store_part(&mut tx, trend_store_id, &self.trend_store_part)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
