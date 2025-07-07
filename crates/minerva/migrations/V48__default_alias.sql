@@ -2,8 +2,7 @@
 -- defining the relevant functions in a non-functional but non-failing way
 
 ALTER TABLE "directory"."entity_type"
-    ADD COLUMN "primary_alias" text DEFAULT NULL,
-    ADD COLUMN "has_primary_alias" boolean GENERATED ALWAYS AS (primary_alias IS NOT NULL) STORED;
+    ADD COLUMN "primary_alias" text DEFAULT NULL;
 
 CREATE FUNCTION "entity"."create_entity_table_sql"(directory.entity_type, primary_alias text)
     RETURNS text[]
@@ -176,101 +175,11 @@ AS $$
 $$ LANGUAGE plpgsql VOLATILE;
 
 
-CREATE OR REPLACE FUNCTION "trend_directory"."remove_extra_trends"("part" trend_directory.trend_store_part_descr)
-    RETURNS text[]
-AS $$
-    BEGIN
-        IF NOT $1.primary_alias THEN
-            SELECT trend_directory.remove_trend_column(tsp)
-            FROM trend_directory.trend_store_part tsp
-            WHERE name = $1.name;
-        END IF;
-        SELECT trend_directory.remove_extra_trends(
-            id,
-            $1.trends
-        )
-        FROM trend_directory.trend_store_part
-        WHERE name = $1.name;
-    END;
-$$ LANGUAGE plpgsql VOLATILE;
+DROP FUNCTION "trend_directory"."remove_extra_trends"("part" trend_directory.trend_store_part_descr);
 
-CREATE FUNCTION "trend_directory"."assure_table_trends_exist"("trend_store_id" integer, "trend_store_part_name" text, primary_alias boolean, trend_directory.trend_descr[], trend_directory.generated_trend_descr[])
-    RETURNS text[]
-AS $$
-DECLARE
-  tsp trend_directory.trend_store_part;
-  result text[];
-BEGIN
-    SELECT * FROM trend_directory.get_or_create_trend_store_part($1, $2) INTO tsp;
+DROP FUNCTION "trend_directory"."add_trends"(trend_directory.trend_store, "parts" trend_directory.trend_store_part_descr[]);
 
-    CREATE TEMP TABLE missing_trends(trend trend_directory.trend_descr);
-    CREATE TEMP TABLE missing_generated_trends(trend trend_directory.generated_trend_descr);
-
-    -- Normal trends
-    INSERT INTO missing_trends SELECT trend_directory.missing_table_trends(tsp, $4);
-
-    IF EXISTS (SELECT * FROM missing_trends LIMIT 1) THEN
-        PERFORM trend_directory.create_table_trends(tsp, ARRAY(SELECT trend FROM missing_trends));
-    END IF;
-
-    -- Generated trends
-    INSERT INTO missing_generated_trends SELECT trend_directory.missing_generated_table_trends(tsp, $5);
-
-    IF EXISTS (SELECT * FROM missing_generated_trends LIMIT 1) THEN
-        PERFORM trend_directory.create_generated_table_trends(tsp, missing_generated_trends);
-    END IF;
-
-    SELECT ARRAY(SELECT (mt).trend.name FROM missing_trends mt UNION SELECT (mt).trend.name FROM missing_generated_trends mt) INTO result;
-    DROP TABLE missing_trends;
-    DROP TABLE missing_generated_trends;
-
-    -- Name column
-    IF $3 AND NOT tsp.primary_alias THEN
-        PERFORM trend_directory.ensure_name_column(tsp);
-        SELECT result || ARRAY['name'] INTO result;
-    END IF;
-
-    RETURN result;
-END;
-$$ LANGUAGE plpgsql VOLATILE;
-
-
-CREATE OR REPLACE FUNCTION "trend_directory"."add_trends"(trend_directory.trend_store, "parts" trend_directory.trend_store_part_descr[])
-    RETURNS text[]
-AS $$
-    DECLARE
-        result text[];
-        partresult text[];
-    BEGIN
-        FOR partresult IN
-            SELECT trend_directory.assure_table_trends_exist(
-                $1.id,
-                name,
-                primary_alias,
-                trends,
-                generated_trends
-            )
-            FROM unnest($2)
-        LOOP
-            SELECT result || partresult INTO result;
-        END LOOP;
-        RETURN result;
-    END;
-$$ LANGUAGE plpgsql VOLATILE;
-
-CREATE OR REPLACE FUNCTION "trend_directory"."add_trends"("part" trend_directory.trend_store_part_descr)
-    RETURNS text[]
-AS $$
-SELECT trend_directory.assure_table_trends_exist(
-    trend_store_part.trend_store_id,
-    $1.name,
-    $1.primary_alias,
-    $1.trends,
-    $1.generated_trends
-)
-FROM trend_directory.trend_store_part
-WHERE name = $1.name;
-$$ LANGUAGE sql VOLATILE;
+DROP FUNCTION "trend_directory"."add_trends"("part" trend_directory.trend_store_part_descr);
 
 DROP FUNCTION "trend_directory"."assure_table_trends_exist"(integer, text, trend_directory.trend_descr[], trend_directory.generated_trend_descr[]);
 

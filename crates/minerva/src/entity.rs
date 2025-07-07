@@ -72,7 +72,7 @@ impl EntityMapping for DbEntityMapping {
         entity_type: &EntityTypeName,
         client: &T,
     ) -> Result<bool, EntityMappingError> {
-        let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
+        let query = "SELECT primary_alias IS NOT NULL FROM directory.entity_type WHERE name = $1";
         let query_result = client
             .query_one(query, &[&entity_type])
             .await
@@ -130,15 +130,16 @@ impl EntityMapping for DbEntityMapping {
         entity_type: &EntityTypeName,
         names: &[EntityName],
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
-        let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
+        let query = "SELECT primary_alias FROM directory.entity_type WHERE name = $1";
         let result = client
             .query_one(query, &[&entity_type])
             .await
             .map_err(EntityMappingError::DatabaseError)?;
 
-        let has_primary_alias: bool = result.get(0);
-        match has_primary_alias {
-            true => {
+        let primary_alias: Option<String> = result.get(0);
+
+        match primary_alias {
+            Some(_) => {
                 // Ensure that all entities actually exist in the database
                 self.names_to_entity_ids(client, entity_type, names).await?;
 
@@ -174,7 +175,7 @@ impl EntityMapping for DbEntityMapping {
                     })
                     .collect()
             }
-            false => names
+            None => names
                 .iter()
                 .map(|_| -> Result<Option<String>, EntityMappingError> { Ok(None) })
                 .collect(),
@@ -206,7 +207,8 @@ impl EntityMapping for CachingEntityMapping {
         client: &T,
     ) -> Result<bool, EntityMappingError> {
         if self.primary_alias_cache.get(entity_type).is_none() {
-            let query = "SELECT has_primary_alias FROM directory.entity_type WHERE name = $1";
+            let query =
+                "SELECT primary_alias IS NOT NULL FROM directory.entity_type WHERE name = $1";
             let result = client
                 .query_one(query, &[&entity_type])
                 .await
