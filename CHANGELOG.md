@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.30.0] - 2025-07-07
+
+### Added
+
+- CLI: Added list-chunks subcommand to check what trend materializations are pending
+
+### Removed 
+
+- DB: Removed the 'has_primary_alias' generated column
+- DB: Unused functions with logic that is now implemented in the CLI client/library
+
 ## [9.29.0] - 2025-07-04
 
 ### Added
@@ -440,4 +451,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.27.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.0...9.27.1
 [9.28.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...9.28.0
 [9.29.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.28.0...9.29.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.29.0...HEAD
+[9.30.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.29.0...9.30.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.30.0...HEAD
