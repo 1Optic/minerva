@@ -509,7 +509,7 @@ async fn create_trigger_fn(
                 }
             }
         })?;
-    debug!("Got template {:?}", template);
+    debug!("Got template {template:?}");
 
     let mut transaction: tokio_postgres::Transaction<'_> =
         client.transaction().await.map_err(|e| {
@@ -543,7 +543,7 @@ async fn create_trigger_fn(
         weight: data.weight,
         enabled: data.enabled,
     };
-    debug!("Got trigger {:?}", templated_trigger);
+    debug!("Got trigger {templated_trigger:?}");
 
     let trigger = templated_trigger
         .create_trigger(&mut transaction)
@@ -639,7 +639,7 @@ async fn create_trigger_fn(
                 }
             }
         })?;
-    debug!("Created trigger {:?}", trigger);
+    debug!("Created trigger {trigger:?}");
 
     transaction.commit().await?;
 
@@ -650,7 +650,7 @@ async fn create_trigger_fn(
 
     let message = change.apply(client).await?;
 
-    debug!("Returned message {}", message);
+    debug!("Returned message {message}");
 
     trace!("Transaction committed");
 

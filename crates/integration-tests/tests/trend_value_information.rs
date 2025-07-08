@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use minerva::change::Change;
 use minerva::change::InformationOption;
-use minerva::changes::trend_store::{AddTrendStore, TrendValueInformation};
+use minerva::changes::trend_store::{AddTrendStore, TrendRemoveValueInformation};
 use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
 use minerva::schema::create_schema;
 
@@ -55,7 +55,7 @@ async fn trend_value_information() -> Result<(), Box<dyn std::error::Error>> {
         create_schema(&mut client).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-            .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+            .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
         let add_trend_store = AddTrendStore {
             trend_store: trend_store.clone(),
@@ -71,7 +71,7 @@ async fn trend_value_information() -> Result<(), Box<dyn std::error::Error>> {
         client.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (3, '2024-12-12T09:15:00+00:00', now(), 42, 25.0, 36.1, 34, null)", &[]).await?;
         client.execute("INSERT INTO trend.\"hub_node_main_15m\"(entity_id, timestamp, created, job_id, outside_temp, inside_temp, power_kwh, freq_power) VALUES (4, '2024-12-12T09:15:00+00:00', now(), 42, 24.0, 31.9, 34, null)", &[]).await?;
 
-        let info_provider = TrendValueInformation {
+        let info_provider = TrendRemoveValueInformation {
             trend_store_part_name: "hub_node_main_15m".to_string(),
             trend_names: vec!["outside_temp".to_string(), "freq_power".to_string()],
         };
@@ -79,7 +79,7 @@ async fn trend_value_information() -> Result<(), Box<dyn std::error::Error>> {
         let info = info_provider.retrieve(&mut client).await;
 
         for line in info {
-            println!("{}", line);
+            println!("{line}");
         }
     }
 

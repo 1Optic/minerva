@@ -50,7 +50,7 @@ async fn db_connection_instability() -> Result<(), Box<dyn std::error::Error>> {
     let status = response.status();
     let response_data: serde_json::Value = response.json().await?;
 
-    println!("Response: {} {response_data}", status);
+    println!("Response: {status} {response_data}");
     assert_eq!(status, reqwest::StatusCode::INTERNAL_SERVER_ERROR);
 
     test_stack.db_conn_up().await?;
@@ -60,7 +60,7 @@ async fn db_connection_instability() -> Result<(), Box<dyn std::error::Error>> {
     let status = response.status();
     let response_data: serde_json::Value = response.json().await?;
 
-    println!("Response: {} {response_data}", status);
+    println!("Response: {status} {response_data}");
     assert_eq!(response_data, json!([]));
 
     Ok(())

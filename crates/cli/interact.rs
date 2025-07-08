@@ -36,7 +36,7 @@ pub async fn interact(client: &mut Client, change: &(dyn Change + Send)) -> Resu
 
             println!();
             for line in information {
-                println!("{}", line);
+                println!("{line}");
             }
             println!();
         } else {

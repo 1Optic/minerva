@@ -143,7 +143,7 @@ impl MinervaService {
         loop {
             let result = TcpStream::connect_timeout(&ipv4_addr, timeout);
 
-            debug!("Trying to connect to service at {}", ipv4_addr);
+            debug!("Trying to connect to service at {ipv4_addr}");
 
             if result.is_ok() {
                 return Ok(());
@@ -403,7 +403,7 @@ impl TestStack {
                 TestStackError::ToxiProxy(format!("Could not get ToxiProxy API port: {e}"))
             })?;
 
-        let toxi_client = ToxiClient::new(format!("{}:{}", toxiproxy_addr, toxiproxy_port));
+        let toxi_client = ToxiClient::new(format!("{toxiproxy_addr}:{toxiproxy_port}"));
 
         let db_internal_addr = cluster
             .controller_container

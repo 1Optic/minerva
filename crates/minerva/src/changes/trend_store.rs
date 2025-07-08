@@ -93,7 +93,7 @@ impl Change for RemoveTrends {
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
-        vec![Box::new(TrendValueInformation {
+        vec![Box::new(TrendRemoveValueInformation {
             trend_store_part_name: self.trend_store_part.name.clone(),
             trend_names: self.trends.to_vec(),
         })]
@@ -314,7 +314,7 @@ impl Change for RemoveAliasColumn {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct ModifyTrendDataType {
     pub trend_name: String,
@@ -342,15 +342,17 @@ impl fmt::Display for ModifyTrendDataType {
 pub struct ModifyTrendDataTypes {
     pub trend_store_part_name: String,
     pub modifications: Vec<ModifyTrendDataType>,
+    pub total_trend_count: usize,
 }
 
 impl fmt::Display for ModifyTrendDataTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "ModifyTrendDataTypes({}, {}):",
+            "ModifyTrendDataTypes({}, {}/{}):",
             &self.trend_store_part_name,
-            self.modifications.len()
+            self.modifications.len(),
+            self.total_trend_count,
         )?;
 
         for m in &self.modifications {
@@ -481,13 +483,9 @@ impl Change for ModifyTrendDataTypes {
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
-        vec![Box::new(TrendValueInformation {
+        vec![Box::new(TrendTypeChangeValueInformation {
             trend_store_part_name: self.trend_store_part_name.clone(),
-            trend_names: self
-                .modifications
-                .iter()
-                .map(|m| m.trend_name.clone())
-                .collect(),
+            trend_changes: self.modifications.clone(),
         })]
     }
 }
@@ -530,13 +528,13 @@ impl Display for TrendExtraDiff {
     }
 }
 
-pub struct TrendValueInformation {
+pub struct TrendTypeChangeValueInformation {
     pub trend_store_part_name: String,
-    pub trend_names: Vec<String>,
+    pub trend_changes: Vec<ModifyTrendDataType>,
 }
 
 #[async_trait]
-impl InformationOption for TrendValueInformation {
+impl InformationOption for TrendTypeChangeValueInformation {
     fn name(&self) -> String {
         "Show trend value information".to_string()
     }
@@ -551,9 +549,14 @@ impl InformationOption for TrendValueInformation {
         let granularity = parse_interval(&granularity_str).unwrap();
 
         let expressions: Vec<String> = self
-            .trend_names
+            .trend_changes
             .iter()
-            .map(|name| format!("max({})::numeric", escape_identifier(name)))
+            .map(|trend_change| {
+                format!(
+                    "max({})::numeric",
+                    escape_identifier(&trend_change.trend_name)
+                )
+            })
             .collect();
         let expressions_part: String = expressions.join(", ");
         let query = format!(
@@ -574,19 +577,94 @@ impl InformationOption for TrendValueInformation {
         table
             .load_preset(UTF8_FULL_CONDENSED)
             .apply_modifier(UTF8_ROUND_CORNERS)
-            .set_header(vec!["trend", "max"]);
+            .set_header(vec!["trend", "from", "to", "max"]);
 
-        for (index, trend_name) in self.trend_names.iter().enumerate() {
+        for (index, trend_change) in self.trend_changes.iter().enumerate() {
             let max = row.get::<usize, Option<Decimal>>(index);
 
-            table.add_row(vec![Cell::new(trend_name), Cell::new(format!("{max:?}"))]);
+            let value = match max {
+                Some(v) => format!("{v}"),
+                None => "-".to_string(),
+            };
+
+            table.add_row(vec![
+                Cell::new(trend_change.trend_name.clone()),
+                Cell::new(trend_change.from_type),
+                Cell::new(trend_change.to_type),
+                Cell::new(value).set_alignment(CellAlignment::Right),
+            ]);
         }
 
         table.lines().collect()
     }
 }
 
-impl Display for TrendValueInformation {
+impl Display for TrendTypeChangeValueInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
+    }
+}
+
+pub struct TrendRemoveValueInformation {
+    pub trend_store_part_name: String,
+    pub trend_names: Vec<String>,
+}
+
+#[async_trait]
+impl InformationOption for TrendRemoveValueInformation {
+    fn name(&self) -> String {
+        "Show trend value information".to_string()
+    }
+
+    async fn retrieve(&self, client: &mut Client) -> Vec<String> {
+        let trend_store_row = client
+            .query_one("SELECT granularity::text FROM trend_directory.trend_store ts JOIN trend_directory.trend_store_part tsp on tsp.trend_store_id = ts.id WHERE tsp.name = $1", &[&self.trend_store_part_name])
+            .await
+            .unwrap();
+
+        let granularity_str: String = trend_store_row.get(0);
+        let granularity = parse_interval(&granularity_str).unwrap();
+
+        let expressions: Vec<String> = self
+            .trend_names
+            .iter()
+            .map(|trend_name| format!("max({})::numeric", escape_identifier(trend_name)))
+            .collect();
+        let expressions_part: String = expressions.join(", ");
+        let query = format!(
+            "SELECT {} FROM trend.{} WHERE timestamp > $1",
+            expressions_part,
+            escape_identifier(&self.trend_store_part_name)
+        );
+
+        let timestamp_threshold = Utc::now() - (granularity * 10);
+
+        let row = client
+            .query_one(&query, &[&timestamp_threshold])
+            .await
+            .unwrap();
+
+        let mut table = Table::new();
+
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .apply_modifier(UTF8_ROUND_CORNERS)
+            .set_header(vec!["trend", "from", "to", "max"]);
+
+        for (index, trend_name) in self.trend_names.iter().enumerate() {
+            let max = row.get::<usize, Option<Decimal>>(index);
+
+            table.add_row(vec![
+                Cell::new(trend_name.clone()),
+                Cell::new(format!("{max:?}")),
+            ]);
+        }
+
+        table.lines().collect()
+    }
+}
+
+impl Display for TrendRemoveValueInformation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.name())
     }

@@ -27,15 +27,15 @@ pub enum MinervaObjectRef {
 impl Display for MinervaObjectRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TrendStorePart(name) => write!(f, "TrendStorePart({})", name),
+            Self::TrendStorePart(name) => write!(f, "TrendStorePart({name})"),
             Self::TrendFunctionMaterialization(name) => {
-                write!(f, "TrendFunctionMaterialization({})", name)
+                write!(f, "TrendFunctionMaterialization({name})")
             }
-            Self::AttributeStore(name) => write!(f, "AttributeStore({})", name),
-            Self::AttributeMaterialization(name) => write!(f, "AttributeMaterialization({})", name),
-            Self::TrendViewMaterialization(name) => write!(f, "TrendViewMaterialization({})", name),
-            Self::Relation(name) => write!(f, "Relation({})", name),
-            Self::VirtualEntity(name) => write!(f, "VirtualEntity({})", name),
+            Self::AttributeStore(name) => write!(f, "AttributeStore({name})"),
+            Self::AttributeMaterialization(name) => write!(f, "AttributeMaterialization({name})"),
+            Self::TrendViewMaterialization(name) => write!(f, "TrendViewMaterialization({name})"),
+            Self::Relation(name) => write!(f, "Relation({name})"),
+            Self::VirtualEntity(name) => write!(f, "VirtualEntity({name})"),
         }
     }
 }

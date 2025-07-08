@@ -40,28 +40,28 @@ impl Display for GraphNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             GraphNode::Table(name) => {
-                write!(f, "Table({})", name)
+                write!(f, "Table({name})")
             }
             GraphNode::TrendStorePart(name) => {
-                write!(f, "TrendStorePart({})", name)
+                write!(f, "TrendStorePart({name})")
             }
             GraphNode::AttributeStore(name) => {
-                write!(f, "AttributeStore({})", name)
+                write!(f, "AttributeStore({name})")
             }
             GraphNode::AttributeMaterialization(name) => {
-                write!(f, "AttributeMaterialization({})", name)
+                write!(f, "AttributeMaterialization({name})")
             }
             GraphNode::TrendViewMaterialization(name) => {
-                write!(f, "TrendViewMaterialization({})", name)
+                write!(f, "TrendViewMaterialization({name})")
             }
             GraphNode::TrendFunctionMaterialization(name) => {
-                write!(f, "TrendFunctionMaterialization({})", name)
+                write!(f, "TrendFunctionMaterialization({name})")
             }
             GraphNode::Relation(name) => {
-                write!(f, "Relation({})", name)
+                write!(f, "Relation({name})")
             }
             GraphNode::VirtualEntity(name) => {
-                write!(f, "VirtualEntity({})", name)
+                write!(f, "VirtualEntity({name})")
             }
         }
     }

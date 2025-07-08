@@ -11,6 +11,8 @@ pub enum CreateTrendStoreError {
     Unexpected(String),
     #[error("Database issue: {0}")]
     Database(#[from] tokio_postgres::Error),
+    #[error("Could not create date source '{0}': {1}")]
+    CreateDataSource(String, String),
 }
 
 pub async fn create_trend_store<T: GenericClient>(
@@ -65,13 +67,10 @@ pub async fn create_trend_store<T: GenericClient>(
         )
         .await?;
 
-    if rows.is_empty() {
-        return Err(CreateTrendStoreError::Unexpected(
-            "No trend store inserted".to_string(),
-        ));
-    }
-
-    let trend_store_id: i32 = rows.first().unwrap().get(0);
+    let trend_store_id: i32 = rows
+        .first()
+        .ok_or_else(|| CreateTrendStoreError::Unexpected("No trend store inserted".to_string()))?
+        .get(0);
 
     for trend_store_part in &trend_store.parts {
         create_trend_store_part(client, trend_store_id, trend_store_part).await?;
@@ -90,9 +89,18 @@ pub async fn create_data_source<T: GenericClient>(
 
     let rows = client
         .query(create_data_source_query, &[&name, &description])
-        .await?;
+        .await
+        .map_err(|e| CreateTrendStoreError::CreateDataSource(name.to_string(), e.to_string()))?;
 
-    Ok(rows.first().unwrap().get(0))
+    Ok(rows
+        .first()
+        .ok_or_else(|| {
+            CreateTrendStoreError::CreateDataSource(
+                name.to_string(),
+                "No Id returned after creating data source".to_string(),
+            )
+        })?
+        .get(0))
 }
 
 pub async fn create_entity_type<T: GenericClient>(

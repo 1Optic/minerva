@@ -13,7 +13,7 @@ mod tests {
     use minerva::change::Change;
     use minerva::changes::trend_store::AddTrendStore;
     use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
-    use minerva::entity::{AddEntityType, EntityType};
+    use minerva::entity_type::{AddEntityType, EntityType};
     use minerva::meas_value::{DataType, MeasValue};
     use minerva::schema::create_schema;
     use minerva::trend_store::MeasurementStore;
@@ -410,8 +410,7 @@ mod tests {
             for target in targets.iter() {
                 assert!(
                     aliases.contains(target),
-                    "No trend found for alias {}",
-                    target
+                    "No trend found for alias {target}"
                 );
             }
         }
@@ -580,8 +579,7 @@ mod tests {
             for target in targets.iter() {
                 assert!(
                     aliases.contains(target),
-                    "No trend found for alias {} when alias column added later",
-                    target
+                    "No trend found for alias {target} when alias column added later"
                 );
             }
         }

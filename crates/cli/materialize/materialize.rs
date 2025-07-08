@@ -386,7 +386,7 @@ pub async fn load_materialization_chunks<T: GenericClient + Send + Sync>(
         .filter_map(|x| match x {
             Ok(m) => Some(m),
             Err(e) => {
-                warn!("Error reading materialization chunk: {}", e);
+                warn!("Error reading materialization chunk: {e}");
 
                 None
             }

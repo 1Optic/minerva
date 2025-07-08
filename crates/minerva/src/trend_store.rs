@@ -1222,6 +1222,7 @@ impl TrendStorePart {
             changes.push(Box::new(ModifyTrendDataTypes {
                 trend_store_part_name: self.name.clone(),
                 modifications: alter_trend_data_types,
+                total_trend_count: self.trends.len(),
             }));
         }
 

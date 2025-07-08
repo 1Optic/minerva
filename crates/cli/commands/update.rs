@@ -86,9 +86,9 @@ impl Cmd for UpdateOpt {
             ignore_deletions: self.ignore_deletions,
         };
 
-        if let Some(plan_output_format) = &self.plan_only {
-            let update_plan = plan_update(&instance_db, &instance_def, diff_options);
+        let update_plan = plan_update(&instance_db, &instance_def, diff_options);
 
+        if let Some(plan_output_format) = &self.plan_only {
             if plan_output_format.eq("plain") {
                 for (index, change) in update_plan.changes.iter().enumerate() {
                     println!("{} {}", index + 1, change);
@@ -99,14 +99,7 @@ impl Cmd for UpdateOpt {
 
             Ok(())
         } else {
-            update(
-                &mut client,
-                &instance_db,
-                &instance_def,
-                !self.non_interactive,
-                diff_options,
-            )
-            .await
+            update(&mut client, update_plan, !self.non_interactive).await
         }
     }
 }
@@ -178,7 +171,7 @@ fn plan_update(
 
     if !changes_to_existing_objects.is_empty() {
         for c in &changes_to_existing_objects {
-            println!("Change to existing left: {}", c);
+            println!("Change to existing left: {c}");
         }
     }
 
@@ -190,20 +183,12 @@ fn plan_update(
     }
 }
 
-async fn update(
-    client: &mut Client,
-    db_instance: &MinervaInstance,
-    other: &MinervaInstance,
-    interactive: bool,
-    diff_options: DiffOptions,
-) -> CmdResult {
-    let changes = db_instance.diff(other, diff_options);
-
+async fn update(client: &mut Client, plan: UpdatePlan, interactive: bool) -> CmdResult {
     println!("Applying changes:");
 
-    let num_changes = changes.len();
+    let num_changes = plan.changes.len();
 
-    for (index, change) in changes.iter().enumerate() {
+    for (index, change) in plan.changes.iter().enumerate() {
         println!("\n\n* [{}/{num_changes}] {change}", index + 1);
 
         if !interactive || interact(client, change.as_ref()).await? {

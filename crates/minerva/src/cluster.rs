@@ -108,7 +108,7 @@ pub async fn connect_db(host: url::Host, port: u16) -> Client {
         .user(DEFAULT_POSTGRES_USER)
         .password("password");
 
-    debug!("Connecting to database host '{}' port '{}'", host, port);
+    debug!("Connecting to database host '{host}' port '{port}'");
 
     let (client, connection) = loop {
         let conn_result = config.connect(NoTls).await;
@@ -129,7 +129,7 @@ pub async fn connect_db(host: url::Host, port: u16) -> Client {
         }
     });
 
-    debug!("Connected to database host '{}' port '{}'", host, port);
+    debug!("Connected to database host '{host}' port '{port}'");
 
     client
 }

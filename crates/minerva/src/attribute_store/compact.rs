@@ -33,8 +33,10 @@ pub enum CompactError {
     Unexpected(String),
     #[error("Could not materialize curr_ptr data: {0}")]
     CurrPtr(#[from] MaterializeCurrPtrError),
-    #[error("Could mark attribute store with ID {0} as compacted: {1}")]
+    #[error("Could not mark attribute store with ID {0} as compacted: {1}")]
     MarkCompacted(i32, String),
+    #[error("Could not mark attribute store with ID {0} as modified: {1}")]
+    MarkModified(i32, String),
 }
 
 impl From<CompactError> for Error {
@@ -79,11 +81,9 @@ pub async fn compact_attribute_store_by_id<T: GenericClient + Send + Sync>(
         .await
         .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
 
-    if rows.is_empty() {
-        return Err(CompactError::NoSuchAttributeStoreId(attribute_store_id));
-    }
-
-    let row = rows.first().unwrap();
+    let row = rows
+        .first()
+        .ok_or(CompactError::NoSuchAttributeStoreId(attribute_store_id))?;
 
     let attribute_store_name = row.get(0);
 
@@ -159,7 +159,11 @@ CREATE TEMP TABLE compact_info (
         client
             .execute(&query, &[&(max_records as i64)])
             .await
-            .unwrap()
+            .map_err(|e| {
+                CompactError::Unexpected(format!(
+                    "Could not load computed compacting data into temp table: {e}"
+                ))
+            })?
     } else {
         let query = format!(
             r#"
@@ -202,7 +206,11 @@ CREATE TEMP TABLE compact_info (
     "#
         );
 
-        client.execute(&query, &[]).await.unwrap()
+        client.execute(&query, &[]).await.map_err(|e| {
+            CompactError::Unexpected(format!(
+                "Could not load computed compacting data into temp table: {e}"
+            ))
+        })?
     };
 
     println!("Inserted {insert_count} records to compact into temporary table");
@@ -216,7 +224,10 @@ WHERE compact_info.first_id = history.id AND compact_info.id = compact_info.last
         escape_identifier(attribute_store_name),
     );
 
-    let updated_count = client.execute(&update_history_query, &[]).await.unwrap();
+    let updated_count = client
+        .execute(&update_history_query, &[])
+        .await
+        .map_err(|e| CompactError::Unexpected(format!("Could not update history records: {e}")))?;
 
     let history_table = format!("attribute_history.\"{attribute_store_name}\"");
 
@@ -231,14 +242,17 @@ AND compact_info.id <> compact_info.first_id",
         escape_identifier(attribute_store_name),
     );
 
-    let delete_count = client.execute(&delete_query, &[]).await.unwrap();
+    let delete_count = client
+        .execute(&delete_query, &[])
+        .await
+        .map_err(|e| CompactError::Unexpected(format!("Could not delete history records: {e}")))?;
 
     println!("Deleted {delete_count} records from history table '{history_table}'");
 
     if updated_count > 0 || delete_count > 0 {
         mark_attribute_store_modified(client, attribute_store_id)
             .await
-            .unwrap();
+            .map_err(|e| CompactError::MarkModified(attribute_store_id, e.to_string()))?;
     }
 
     // Only if compacting is done without limit, we can be sure that everything is compacted
@@ -256,7 +270,7 @@ AND compact_info.id <> compact_info.first_id",
 async fn mark_attribute_store_modified<T: GenericClient + Send + Sync>(
     client: &T,
     attribute_store_id: i32,
-) -> Result<(), ()> {
+) -> Result<(), tokio_postgres::Error> {
     let query = r"
 INSERT INTO attribute_directory.attribute_store_modified (attribute_store_id, modified)
 VALUES ($1, now())
@@ -264,7 +278,7 @@ ON CONFLICT (attribute_store_id) DO UPDATE
 SET modified = EXCLUDED.modified
 RETURNING attribute_store_modified";
 
-    client.execute(query, &[&attribute_store_id]).await.unwrap();
+    client.execute(query, &[&attribute_store_id]).await?;
 
     Ok(())
 }
@@ -282,11 +296,9 @@ pub async fn compact_attribute_store_by_name<T: GenericClient + Send + Sync>(
         .await
         .map_err(|e| CompactError::Unexpected(format!("{e}")))?;
 
-    if rows.is_empty() {
-        return Err(CompactError::NoSuchAttributeStoreName(name.to_string()));
-    }
-
-    let row = rows.first().unwrap();
+    let row = rows
+        .first()
+        .ok_or_else(|| CompactError::NoSuchAttributeStoreName(name.to_string()))?;
 
     let attribute_store_id: i32 = row.get(0);
 

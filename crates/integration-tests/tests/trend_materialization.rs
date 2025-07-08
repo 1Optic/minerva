@@ -178,7 +178,7 @@ async fn materialize_service() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_check_handle = tokio::spawn(async move {
         while let Some(line) = buf_reader.next_line().await.unwrap() {
-            debug!("RUN1: {}", line);
+            debug!("RUN1: {line}");
 
             if line.contains("hub_node_main_1h: 1") {
                 return;

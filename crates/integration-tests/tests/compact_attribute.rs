@@ -254,7 +254,7 @@ async fn run_compact_cmd(cluster: &MinervaCluster, database_name: &str) -> io::R
 
     let _output_check_handle = tokio::spawn(async move {
         while let Some(line) = buf_reader.next_line().await.unwrap() {
-            info!("CMD: {}", line);
+            info!("CMD: {line}");
         }
     });
 

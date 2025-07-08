@@ -122,14 +122,14 @@ async fn trigger_trigger_notifications() -> Result<(), Box<dyn std::error::Error
             .await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
-            .map_err(|e| format!("Could not read trend store definition: {}", e))?;
+            .map_err(|e| format!("Could not read trend store definition: {e}"))?;
 
         let add_trend_store = AddTrendStore {
             trend_store: trend_store.clone(),
         };
 
         let trigger: Trigger = serde_yaml::from_str(TRIGGER_DEFINITION)
-            .map_err(|e| format!("Could not read trigger definition: {}", e))?;
+            .map_err(|e| format!("Could not read trigger definition: {e}"))?;
 
         let create_trigger = AddTrigger {
             trigger: trigger.clone(),

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 use glob::glob;
 use serde::{Deserialize, Serialize};
+use tokio_postgres::types::ToSql;
 use tokio_postgres::{Client, GenericClient};
 
 use crate::change::ChangeResult;
@@ -11,9 +12,13 @@ use crate::change::ChangeResult;
 use super::change::Change;
 use super::error::{ConfigurationError, Error, RuntimeError};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+pub type EntityTypeName = String;
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
 pub struct EntityType {
-    pub name: String,
+    pub name: EntityTypeName,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_alias: Option<String>,
 }
 
 impl fmt::Display for EntityType {
@@ -79,16 +84,10 @@ impl Change for AddEntityType {
 
         create_entity_type(&mut tx, &self.entity_type)
             .await
-            .map_err(|e| {
-                format!(
-                    "Could not create entity type '{}': {e}",
-                    self.entity_type.name
-                )
-            })?;
+            .map_err(|e| format!("Could not create entity type: {e}"))?;
 
         tx.commit().await?;
-
-        Ok(format!("Added entity type '{}'", &self.entity_type))
+        Ok(format!("Created entity_type '{}'", &self.entity_type.name))
     }
 }
 
@@ -108,14 +107,14 @@ pub async fn create_entity_type<T: GenericClient>(
     client: &mut T,
     entity_type: &EntityType,
 ) -> Result<(), CreateEntityTypeError> {
-    let query = "SELECT directory.create_entity_type($1)";
-
     client
-        .query(query, &[&entity_type.name])
+        .execute(
+            "SELECT directory.create_entity_type($1, $2);",
+            &[&entity_type.name, &entity_type.primary_alias],
+        )
         .await
-        .map_err(|e| CreateEntityTypeError::Database(format!("Error creating entity type: {e}")))?;
-
-    Ok(())
+        .map(|_| ())
+        .map_err(|e| CreateEntityTypeError::Database(format!("Error creating entity type: {e}")))
 }
 
 pub fn load_entity_types_from(minerva_instance_root: &Path) -> impl Iterator<Item = EntityType> {
@@ -148,19 +147,17 @@ pub fn load_entity_types_from(minerva_instance_root: &Path) -> impl Iterator<Ite
 pub async fn load_entity_types<T: GenericClient + Send + Sync>(
     client: &mut T,
 ) -> Result<Vec<EntityType>, Error> {
-    let mut entity_types: Vec<EntityType> = Vec::new();
-
-    let query = "SELECT name FROM directory.entity_type";
+    let query = "SELECT name, primary_alias FROM directory.entity_type";
 
     let rows = client.query(query, &[]).await?;
 
-    for row in rows {
-        let entity_type_name: String = row.get(0);
-
-        entity_types.push(EntityType {
-            name: entity_type_name,
-        });
-    }
+    let entity_types: Vec<EntityType> = rows
+        .iter()
+        .map(|row| EntityType {
+            name: row.get(0),
+            primary_alias: row.get(1),
+        })
+        .collect();
 
     Ok(entity_types)
 }

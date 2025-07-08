@@ -58,7 +58,7 @@ impl ToSql for AttributeValue<'_> {
         match self.inner_value {
             Some(value) => {
                 let meas_value = parse_meas_value(self.data_type, value);
-                debug!("meas_value: {:?}", meas_value);
+                debug!("meas_value: {meas_value:?}");
                 meas_value.to_sql_checked(ty, out)
             }
             None => MeasValue::null_value_of_type(self.data_type).to_sql_checked(ty, out),

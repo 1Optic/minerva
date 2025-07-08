@@ -510,8 +510,7 @@ impl MinervaInstance {
                 }
                 None => {
                     error!(
-                        "Could not find attribute store '{}' for attribute materialization '{}'",
-                        table_name, attribute_materialization
+                        "Could not find attribute store '{table_name}' for attribute materialization '{attribute_materialization}'"
                     );
                 }
             }
@@ -521,8 +520,7 @@ impl MinervaInstance {
             match pg_query::parse(&attribute_materialization.query) {
                 Err(e) => {
                     error!(
-                        "Could not parse SQL of attribute materialization '{}': {e}",
-                        attribute_materialization
+                        "Could not parse SQL of attribute materialization '{attribute_materialization}': {e}",
                     );
                 }
                 Ok(parse_result) => {
