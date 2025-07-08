@@ -951,7 +951,7 @@ fn entity_aggregation_function(
                 "  {}(\"{}\")::{} AS \"{}\"",
                 trend.entity_aggregation,
                 trend.name,
-                aggregate_data_type(trend.data_type, &trend.time_aggregation),
+                aggregate_data_type(trend.data_type, &trend.entity_aggregation),
                 trend.name
             )
         })
@@ -980,7 +980,7 @@ fn entity_aggregation_function(
         format!(
             "\"{}\" {}",
             trend.name,
-            aggregate_data_type(trend.data_type, &trend.time_aggregation)
+            aggregate_data_type(trend.data_type, &trend.entity_aggregation)
         )
     }));
 
