@@ -9,7 +9,7 @@ INSERT INTO trend_directory.table_trend_statistics(table_trend_id, min, max)
   SELECT id, NULL, NULL
   FROM trend_directory.table_trend;
 
-CREATE OR REPLACE FUNCTION trend_directory.get_lowest_value_in_column(tspname text, attname text)
+CREATE OR REPLACE FUNCTION trend_directory.get_lowest_trend_value(trend_store_part text, trend text)
   RETURNS numeric
   LANGUAGE plpgsql STABLE
 AS $function$
@@ -30,7 +30,7 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION trend_directory.get_highest_value_in_column(tspname text, attname text)
+CREATE OR REPLACE FUNCTION trend_directory.get_highest_trend_value(trend_store_part text, trend text)
   RETURNS numeric
   LANGUAGE plpgsql STABLE
 AS $function$
@@ -67,12 +67,12 @@ AS $function$
         EXECUTE FORMAT(
           'SELECT min(nullif(result, '''')) FROM run_command_on_shards('
           '''trend."%s"'', '
-          '$cmd$ SELECT trend_directory.get_lowest_value_in_column(''%s'', ''%s'') $cmd$)',
+          '$cmd$ SELECT trend_directory.get_lowest_trend_value(''%s'', ''%s'') $cmd$)',
           tspname, tspname, $1.name) INTO min;
         EXECUTE FORMAT(
           'SELECT max(nullif(result, '''')) FROM run_command_on_shards('
           '''trend."%s"'', '
-          '$cmd$ SELECT trend_directory.get_highest_value_in_column(''%s'', ''%s'') $cmd$)',
+          '$cmd$ SELECT trend_directory.get_highest_trend_value(''%s'', ''%s'') $cmd$)',
           tspname, tspname, $1.name) INTO max;
         IF min IS NOT NULL THEN
           IF min >=0 AND max <= 1 THEN
