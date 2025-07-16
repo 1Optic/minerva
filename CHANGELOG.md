@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.31.0] - 2025-07-16
+
+### Fixed
+
+- Library: Fixed handling of datatype mismatches
+- Library: Fixed issue with duplicate default alias data injection
+
 ## [9.30.0] - 2025-07-07
 
 ### Added
