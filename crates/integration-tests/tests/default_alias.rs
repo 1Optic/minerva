@@ -52,14 +52,14 @@ mod tests {
         timestamp: DateTime<Utc>,
         trends: Vec<String>,
         entity_ids: Vec<i32>,
-        entity_names: Option<Vec<String>>,
+        entity_aliases: Option<Vec<String>>,
         job_id: i64,
         rows: Vec<Vec<MeasValue>>,
     }
 
     impl RefinedDataPackage {
         fn listed_entity_names(&self) -> Vec<Option<String>> {
-            match &self.entity_names {
+            match &self.entity_aliases {
                 Some(list) => list.iter().map(|name| Some(name.to_string())).collect(),
                 None => self.entity_ids.iter().map(|_| None).collect(),
             }
@@ -72,11 +72,8 @@ mod tests {
             &self.timestamp
         }
 
-        fn trends(&self) -> Vec<String> {
-            match self.entity_names {
-                Some(_) => [vec!["name".to_string()], self.trends.clone()].concat(),
-                None => self.trends.clone(),
-            }
+        fn trends(&self) -> &[String] {
+            &self.trends
         }
 
         async fn write(
@@ -86,6 +83,7 @@ mod tests {
             created_timestamp: &DateTime<chrono::Utc>,
         ) -> Result<usize, DataPackageWriteError> {
             let entity_names = self.listed_entity_names().clone();
+
             for (index, entity_id) in self.entity_ids.iter().enumerate() {
                 let entity_name = entity_names.get(index).ok_or_else(|| {
                     DataPackageWriteError::DataPreparation(format!(
@@ -95,11 +93,12 @@ mod tests {
 
                 let mut sql_values: Vec<&(dyn ToSql + Sync)> =
                     vec![entity_id, &self.timestamp, created_timestamp, &self.job_id];
+
                 if let Some(name) = entity_name {
                     sql_values.push(name);
                 }
 
-                let mut row = self
+                let row = self
                     .rows
                     .get(index)
                     .ok_or_else(|| {
@@ -108,10 +107,6 @@ mod tests {
                         ))
                     })?
                     .clone();
-
-                if let Some(name) = entity_name {
-                    row.insert(0, MeasValue::Text(name.to_string()))
-                };
 
                 for (column_index, _data_type) in values {
                     let v = row.get(*column_index).ok_or_else(|| {
@@ -343,7 +338,7 @@ mod tests {
             ];
 
             let mut entity_ids: Vec<i32> = vec![];
-            let mut entity_names: Vec<String> = vec![];
+            let mut entity_aliases: Vec<String> = vec![];
             let query = "SELECT id, primary_alias FROM entity.\"create_Site\"($1)";
 
             debug!("All sites created");
@@ -351,7 +346,7 @@ mod tests {
             for target in names.iter() {
                 let result = client.query_one(query, &[target]).await?;
                 entity_ids.push(result.get(0));
-                entity_names.push(result.get(1));
+                entity_aliases.push(result.get(1));
             }
 
             let rows: Vec<Vec<MeasValue>> = vec![
@@ -391,14 +386,15 @@ mod tests {
                 timestamp,
                 trends,
                 entity_ids,
-                entity_names: Some(entity_names),
+                entity_aliases: Some(entity_aliases),
                 job_id,
                 rows,
             };
 
             trend_store_part
                 .store_package(&mut client, &package)
-                .await?;
+                .await
+                .unwrap();
 
             debug!("Package stored");
 
@@ -551,7 +547,7 @@ mod tests {
                 timestamp,
                 trends,
                 entity_ids,
-                entity_names: None,
+                entity_aliases: None,
                 job_id,
                 rows,
             };

@@ -1,15 +1,20 @@
-use serde::{Deserialize, Serialize};
 use std::boxed::Box;
 use std::fmt;
+use std::fmt::Display;
 use std::path::PathBuf;
+
+use async_trait::async_trait;
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL_CONDENSED;
+use comfy_table::*;
+use postgres_protocol::escape::escape_identifier;
+use serde::{Deserialize, Serialize};
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{Client, GenericClient};
 
-use async_trait::async_trait;
-
 type PostgresName = String;
 
-use super::change::{Change, ChangeResult};
+use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use crate::change::MinervaObjectRef;
 use crate::meas_value::DataType;
@@ -184,6 +189,81 @@ impl Change for RemoveAttributes {
             &self.attribute_store
         ))
     }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(AttributeRemoveValueInformation {
+            data_source: self.attribute_store.data_source.clone(),
+            entity_type: self.attribute_store.entity_type.clone(),
+            attribute_names: self.attributes.clone(),
+        })]
+    }
+}
+
+pub struct AttributeRemoveValueInformation {
+    pub data_source: String,
+    pub entity_type: String,
+    pub attribute_names: Vec<String>,
+}
+
+#[async_trait]
+impl InformationOption for AttributeRemoveValueInformation {
+    fn name(&self) -> String {
+        "Show attribute value information".to_string()
+    }
+
+    async fn retrieve(&self, client: &mut Client) -> Vec<String> {
+        let attribute_store_name = format!("{}_{}", &self.data_source, &self.entity_type);
+        let expressions: Vec<String> = self
+            .attribute_names
+            .iter()
+            .map(|attribute_name| format!("{}::text", escape_identifier(attribute_name)))
+            .collect();
+        let expressions_part: String = expressions.join(", ");
+        let query = format!(
+            "SELECT {} FROM attribute.{} LIMIT 1",
+            expressions_part,
+            escape_identifier(&attribute_store_name)
+        );
+
+        let rows = client.query(&query, &[]).await.unwrap();
+
+        if rows.is_empty() {
+            vec!["No data".to_string()]
+        } else {
+            let row = rows.first().unwrap();
+
+            let values: Vec<Option<String>> = self
+                .attribute_names
+                .iter()
+                .enumerate()
+                .map(|(index, _attribute_name)| row.get::<usize, Option<String>>(index))
+                .collect();
+
+            let mut table = Table::new();
+
+            table
+                .load_preset(UTF8_FULL_CONDENSED)
+                .apply_modifier(UTF8_ROUND_CORNERS)
+                .set_header(vec!["attribute", "value"]);
+
+            for (index, attribute_name) in self.attribute_names.iter().enumerate() {
+                let value = values.get(index);
+
+                table.add_row(vec![
+                    Cell::new(attribute_name.clone()),
+                    Cell::new(format!("{value:?}")),
+                ]);
+            }
+
+            table.lines().collect()
+        }
+    }
+}
+
+impl Display for AttributeRemoveValueInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -315,11 +395,9 @@ impl AttributeStore {
                 .find(|other_attribute| other_attribute.name == my_attribute.name)
             {
                 Some(_) => {
-                    //println!("Still exists: '{}' - '{}' - '{}'", self.data_source, self.entity_type, my_attribute.name);
                     // Ok, the attribute still exists
                 }
                 None => {
-                    //println!("No longer exists: '{}' - '{}' - '{}'", self.data_source, self.entity_type, my_attribute.name);
                     removed_attributes.push(my_attribute.name.clone());
                 }
             }

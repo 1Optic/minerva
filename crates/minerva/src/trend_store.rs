@@ -11,6 +11,7 @@ use std::fmt;
 use std::iter::zip;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio_postgres::error::SqlState;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{binary_copy::BinaryCopyInWriter, Client, GenericClient, Row, Transaction};
 
@@ -550,12 +551,61 @@ impl RawMeasurementStore for TrendStore {
 enum StoreCopyFromError {
     #[error("{0}")]
     DataMismatch(String),
+    #[error("Error starting COPY command: {0}")]
+    CopyIn(tokio_postgres::Error),
     #[error("{0}")]
     UniqueViolation(String),
-    #[error("{0}")]
-    Write(String),
+    #[error("Could not write package for COPY command: {0}")]
+    Write(DataPackageWriteError),
     #[error("{0}")]
     Generic(String),
+}
+
+impl StoreCopyFromError {
+    fn from_package_write(value: DataPackageWriteError) -> Self {
+        match value {
+            DataPackageWriteError::DatatypeMismatch(e) => StoreCopyFromError::DataMismatch(e),
+            _ => Self::Write(value),
+        }
+    }
+
+    fn from_copy_in(value: tokio_postgres::Error) -> Self {
+        StoreCopyFromError::CopyIn(value)
+    }
+
+    fn from_copy_finish(value: tokio_postgres::Error) -> Self {
+        if let Some(sqlstate) = value.code() {
+            let error_text = value.to_string();
+
+            match *sqlstate {
+                SqlState::PROTOCOL_VIOLATION => {
+                    if error_text.contains("insufficient data left in message") {
+                        StoreCopyFromError::DataMismatch(error_text)
+                    } else {
+                        StoreCopyFromError::Generic(error_text)
+                    }
+                }
+                SqlState::INTERNAL_ERROR => {
+                    // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
+                    // The string representation of the error does contain the 'duplicate key' violation
+                    // indication.
+                    if error_text.contains("duplicate key value violates unique constraint") {
+                        StoreCopyFromError::UniqueViolation(error_text)
+                    } else if error_text.contains("incorrect binary data format")
+                        || error_text.contains("unexpected EOF in COPY data")
+                        || error_text.contains("invalid scale in external \"numeric\" value")
+                    {
+                        StoreCopyFromError::DataMismatch(error_text)
+                    } else {
+                        StoreCopyFromError::Generic(error_text)
+                    }
+                }
+                _ => StoreCopyFromError::Generic(error_text),
+            }
+        } else {
+            StoreCopyFromError::Generic(value.to_string())
+        }
+    }
 }
 
 #[async_trait]
@@ -605,7 +655,7 @@ impl MeasurementStore for TrendStorePart {
                     .map_err(|e| StorePackageError::Database(e.to_string())),
                 StoreCopyFromError::DataMismatch(e) => {
                     let data_type_mismatches = self
-                        .verify_data_types(client, &data_package.trends())
+                        .verify_data_types(client, data_package.trends())
                         .await
                         .unwrap();
 
@@ -702,7 +752,7 @@ pub enum DataPackageWriteError {
 #[async_trait]
 pub trait DataPackage {
     fn timestamp(&self) -> &DateTime<Utc>;
-    fn trends(&self) -> Vec<String>;
+    fn trends(&self) -> &[String];
 
     async fn write(
         &self,
@@ -954,9 +1004,10 @@ impl TrendStorePart {
 
         let query = copy_from_query(self, &matched_trends);
 
-        let copy_in_sink = client.copy_in(&query).await.map_err(|e| {
-            StoreCopyFromError::Generic(format!("Error starting COPY command: {e}"))
-        })?;
+        let copy_in_sink = client
+            .copy_in(&query)
+            .await
+            .map_err(StoreCopyFromError::from_copy_in)?;
 
         let binary_copy_writer = BinaryCopyInWriter::new(copy_in_sink, &value_types);
         pin_mut!(binary_copy_writer);
@@ -972,26 +1023,12 @@ impl TrendStorePart {
                 &created_timestamp,
             )
             .await
-            .map_err(|e| {
-                StoreCopyFromError::Write(format!("Could not write package for COPY command: {e}"))
-            })?;
+            .map_err(StoreCopyFromError::from_package_write)?;
 
-        binary_copy_writer.finish().await.map_err(|e| {
-            let error_text = e.to_string();
-
-            // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
-            // The string representation of the error does contain the 'duplicate key' violation
-            // indication.
-            if error_text.contains("duplicate key value violates unique constraint") {
-                StoreCopyFromError::UniqueViolation(error_text)
-            } else if error_text.contains("insufficient data left in message")
-                || error_text.contains("incorrect binary data format")
-            {
-                StoreCopyFromError::DataMismatch(error_text)
-            } else {
-                StoreCopyFromError::Generic(error_text)
-            }
-        })?;
+        binary_copy_writer
+            .finish()
+            .await
+            .map_err(StoreCopyFromError::from_copy_finish)?;
 
         Ok(())
     }

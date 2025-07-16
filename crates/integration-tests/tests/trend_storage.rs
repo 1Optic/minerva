@@ -68,11 +68,8 @@ impl DataPackage for RefinedDataPackage {
         &self.timestamp
     }
 
-    fn trends(&self) -> Vec<String> {
-        match self.entity_names {
-            Some(_) => [vec!["name".to_string()], self.trends.clone()].concat(),
-            None => self.trends.clone(),
-        }
+    fn trends(&self) -> &[String] {
+        &self.trends
     }
 
     async fn write(
@@ -93,7 +90,7 @@ impl DataPackage for RefinedDataPackage {
                 sql_values.push(name);
             }
 
-            let mut row = self
+            let row = self
                 .rows
                 .get(index)
                 .ok_or_else(|| {
@@ -102,10 +99,6 @@ impl DataPackage for RefinedDataPackage {
                     ))
                 })?
                 .clone();
-
-            if let Some(name) = entity_name {
-                row.insert(0, MeasValue::Text(name.to_string()))
-            };
 
             for (column_index, _data_type) in values {
                 let v = row.get(*column_index).ok_or_else(|| {
@@ -121,7 +114,15 @@ impl DataPackage for RefinedDataPackage {
 
                 match db_error {
                     Some(db_e) => DataPackageWriteError::Generic(format!("dbe: {db_e}")),
-                    None => DataPackageWriteError::Generic(format!("{e}")),
+                    None => {
+                        let text = e.to_string();
+
+                        if text.contains("cannot convert between the Rust type") {
+                            DataPackageWriteError::DatatypeMismatch(text)
+                        } else {
+                            DataPackageWriteError::Generic(text)
+                        }
+                    }
                 }
             })?;
         }
@@ -245,7 +246,7 @@ async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
             entity_names: None,
             job_id,
             rows: vec![vec![
-                MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(15.0).unwrap())), // inside_temp
+                MeasValue::Int8(Some(15)), // inside_temp
                 MeasValue::Numeric(Some(rust_decimal::Decimal::from_f64(345.6).unwrap())), // power_kwh
             ]],
         };
