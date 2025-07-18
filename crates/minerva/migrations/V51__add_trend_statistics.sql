@@ -1,3 +1,5 @@
+SELECT create_reference_table('trend_directory.trend_partition');
+
 CREATE TABLE trend_directory.table_trend_statistics
 (
    table_trend_id integer references trend_directory.table_trend(id) on delete cascade,
@@ -21,8 +23,11 @@ BEGIN
       'SELECT unnest(stavalues1::text::numeric[] || stavalues2::text::numeric[] || stavalues3::text::numeric[] || stavalues4::text::numeric[] || stavalues5::text::numeric[]) AS value '
       'FROM pg_statistic s '
       'JOIN pg_class c ON s.starelid = c.oid '
+      'JOIN pg_namespace ns ON c.relnamespace = ns.oid '
+      'JOIN trend_directory.trend_partition p ON c.relname LIKE p.name || ''%'' '
+      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id'
       'JOIN pg_attribute a ON a.attrelid = s.starelid and a.attnum = s.staattnum '
-      'WHERE c.relname LIKE ''%s%%'' AND a.attname = ''%s'')'
+      'WHERE ns.nspname = ''trend_partition'' AND tsp.name = ''%s'' AND a.attname = ''%s'')'
     'SELECT FLOOR(MIN(VALUE)) FROM x',
     $1, $2
   ) INTO result;
@@ -42,9 +47,12 @@ BEGIN
       'SELECT unnest(stavalues1::text::numeric[] || stavalues2::text::numeric[] || stavalues3::text::numeric[] || stavalues4::text::numeric[] || stavalues5::text::numeric[]) AS value '
       'FROM pg_statistic s '
       'JOIN pg_class c ON s.starelid = c.oid '
+      'JOIN pg_namespace ns ON c.relnamespace = ns.oid '
+      'JOIN trend_directory.trend_partition p ON c.relname LIKE p.name || ''%%'' '
+      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id '
       'JOIN pg_attribute a ON a.attrelid = s.starelid and a.attnum = s.staattnum '
-      'WHERE c.relname LIKE ''%s%%'' AND a.attname = ''%s'')'
-    'SELECT CEIL(MAX(VALUE)) FROM x',
+      'WHERE ns.nspname = ''trend_partition'' AND tsp.name = ''%s'' AND a.attname = ''%s'')'
+   'SELECT CEIL(MAX(VALUE)) FROM x',
     $1, $2
   ) INTO result;
   RETURN result;
