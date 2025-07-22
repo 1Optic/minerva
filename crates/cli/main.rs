@@ -1,5 +1,7 @@
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
+use dotenv::dotenv;
+
 use std::io;
 use std::process::ExitCode;
 
@@ -29,6 +31,8 @@ use crate::commands::virtualentity::VirtualEntityOpt;
 struct Cli {
     #[arg(long = "generate", value_enum)]
     generator: Option<Shell>,
+    #[arg(long = "env-file", help = "Path to a custom .env file")]
+    env_file: Option<String>,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -79,6 +83,18 @@ async fn main() -> ExitCode {
         .install_default()
         .expect("Failed to install rustls crypto provider");
     let cli = Cli::parse();
+
+    if let Some(env_file) = &cli.env_file {
+        match dotenv::from_path(env_file) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("Failed to load .env file from {env_file}: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        dotenv().ok();
+    }
 
     if let Some(generator) = cli.generator {
         let mut cmd = Cli::command();

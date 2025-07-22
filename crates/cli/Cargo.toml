@@ -53,6 +53,7 @@ tokio-stream = "0.1.17"
 futures = "0.3.31"
 erased-serde = "0.4.6"
 petgraph = "0.8.2"
+dotenv = "0.15"
 
 [dev-dependencies]
 assert_cmd = "=2.0.17"

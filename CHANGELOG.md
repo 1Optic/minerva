@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CLI: Support loading environment variables from a file
+
 ## [9.31.0] - 2025-07-16
 
 ### Fixed
@@ -20,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CLI: Added list-chunks subcommand to check what trend materializations are pending
 
-### Removed 
+### Removed
 
 - DB: Removed the 'has_primary_alias' generated column
 - DB: Unused functions with logic that is now implemented in the CLI client/library
