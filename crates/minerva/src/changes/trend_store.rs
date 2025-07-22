@@ -17,7 +17,9 @@ use crate::change::{Change, ChangeResult, InformationOption, MinervaObjectRef};
 use crate::error::DatabaseError;
 use crate::interval::parse_interval;
 use crate::meas_value::DataType;
-use crate::trend_store::create::{create_trend_store, create_trend_store_part};
+use crate::trend_store::create::{
+    create_trend_store, create_trend_store_part, remove_trend_store_part,
+};
 use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart};
 
 #[derive(Serialize, Deserialize)]
@@ -805,6 +807,38 @@ impl fmt::Display for AddTrendStorePart {
             "AddTrendStorePart({}, {})",
             &self.trend_store, &self.trend_store_part
         )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemoveTrendStorePart {
+    pub name: String,
+}
+
+#[async_trait]
+impl Change for RemoveTrendStorePart {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        remove_trend_store_part(&mut tx, &self.name)
+            .await
+            .map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error removing trend store part '{}': {}",
+                    &self.name, e
+                ))
+            })?;
+
+        tx.commit().await?;
+
+        Ok(format!("Removed trend store part '{}'", &self.name,))
+    }
+}
+
+impl fmt::Display for RemoveTrendStorePart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoveTrendStorePart({})", &self.name)
     }
 }
 

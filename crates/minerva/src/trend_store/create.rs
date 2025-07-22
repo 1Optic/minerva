@@ -139,6 +139,41 @@ pub async fn create_entity_type<T: GenericClient>(
     Ok(id)
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum RemoveTrendStorePartError {
+    #[error("No such trend store part '{0}'")]
+    NoSuchTrendStorePart(String),
+    #[error("Unexpected database error '{0}'")]
+    Database(#[from] tokio_postgres::Error),
+}
+
+pub async fn remove_trend_store_part<T: GenericClient>(
+    client: &mut T,
+    name: &str,
+) -> Result<(), RemoveTrendStorePartError> {
+    let drop_table_query = format!(
+        "DROP TABLE IF EXISTS trend.{} CASCADE",
+        escape_identifier(name)
+    );
+
+    client.execute(&drop_table_query, &[]).await?;
+
+    let delete_trend_store_part_query =
+        "DELETE FROM trend_directory.trend_store_part WHERE name = $1";
+
+    let modified = client
+        .execute(delete_trend_store_part_query, &[&name])
+        .await?;
+
+    if modified == 0 {
+        Err(RemoveTrendStorePartError::NoSuchTrendStorePart(
+            name.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 pub async fn create_trend_store_part<T: GenericClient>(
     client: &mut T,
     trend_store_id: i32,

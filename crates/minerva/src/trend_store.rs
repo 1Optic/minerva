@@ -23,7 +23,7 @@ use async_trait::async_trait;
 
 use crate::changes::trend_store::{
     AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
-    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrends,
+    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
 };
 use crate::entity::EntityMapping;
 use crate::meas_value::{
@@ -1331,6 +1331,23 @@ impl TrendStore {
                     changes.push(Box::new(AddTrendStorePart {
                         trend_store: self.clone(),
                         trend_store_part: other_part.clone(),
+                    }));
+                }
+            }
+        }
+
+        for my_part in &self.parts {
+            match &other
+                .parts
+                .iter()
+                .find(|other_part| my_part.name == other_part.name)
+            {
+                Some(_) => {
+                    // Ok, the trend store part still exists
+                }
+                None => {
+                    changes.push(Box::new(RemoveTrendStorePart {
+                        name: my_part.name.clone(),
                     }));
                 }
             }
