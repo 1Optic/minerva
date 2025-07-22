@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.32.0] - 2025-07-22
+
 ### Added
 
 - CLI: Support loading environment variables from a file
+- CLI: Support detection of removed trend store parts in diff and update
+
+### Fixed
+
+- CLI/Library: Compare attribute store entity type name case insensitive in diff
 
 ## [9.31.0] - 2025-07-16
 
@@ -463,4 +470,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.28.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.27.1...9.28.0
 [9.29.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.28.0...9.29.0
 [9.30.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.29.0...9.30.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.30.0...HEAD
+[9.31.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.30.0...9.31.0
+[9.32.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.31.0...9.32.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.32.0...HEAD
