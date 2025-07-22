@@ -629,7 +629,8 @@ impl MinervaInstance {
         for other_attribute_store in &other.attribute_stores {
             match self.attribute_stores.iter().find(|my_attribute_store| {
                 my_attribute_store.data_source == other_attribute_store.data_source
-                    && my_attribute_store.entity_type == other_attribute_store.entity_type
+                    && my_attribute_store.entity_type.to_lowercase()
+                        == other_attribute_store.entity_type.to_lowercase()
             }) {
                 Some(my_attribute_store) => {
                     let attribute_store_diff_options = AttributeStoreDiffOptions {
