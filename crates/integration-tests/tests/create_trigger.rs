@@ -1,6 +1,7 @@
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
+use chrono::{TimeZone, Utc};
 use log::debug;
 
 use minerva::change::Change;
@@ -10,11 +11,11 @@ use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
 use minerva::schema::create_schema;
 use minerva::trend_materialization::get_function_def;
 use minerva::trend_store::TrendStore;
-//use reqwest::StatusCode;
+use minerva::trigger::create_notifications;
 use serde_json::json;
 
-use integration_tests::common::get_available_port;
-use integration_tests::common::{MinervaService, MinervaServiceConfig};
+use crate::common::get_available_port;
+use crate::common::{MinervaService, MinervaServiceConfig};
 
 const TREND_STORE_DEFINITION: &str = r"
 title: Raw node data
@@ -38,7 +39,7 @@ parts:
 
 #[tokio::test]
 async fn create_trigger() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
+    crate::setup();
 
     let cluster_config = MinervaClusterConfig {
         config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
@@ -171,13 +172,24 @@ async fn create_trigger() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(response_data, expected_response);
 
-    let (_, src): (String, String) = {
-        let mut client = test_database.connect().await?;
+    let mut client = test_database.connect().await?;
 
-        get_function_def(&mut client, "low_temperature")
-            .await
-            .unwrap()
-    };
+    let message = create_notifications(
+        &mut client,
+        "low_temperature",
+        Some(Utc.with_ymd_and_hms(2025, 3, 5, 12, 0, 0).unwrap()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        message,
+        "Created 0 notifications for trigger 'low_temperature'"
+    );
+
+    let (_, src): (String, String) = get_function_def(&mut client, "low_temperature")
+        .await
+        .unwrap();
 
     assert_eq!(
         src.trim(),
