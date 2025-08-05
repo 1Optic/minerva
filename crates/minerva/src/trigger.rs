@@ -975,6 +975,15 @@ impl Change for UpdateTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
+        if !trigger_exists(&self.trigger.name, &mut transaction).await? {
+            return Err(Error::Runtime(RuntimeError {
+                msg: format!(
+                    "Trigger {} does not exist. Use the create command to create the trigger.",
+                    &self.trigger.name
+                ),
+            }));
+        }
+
         // Tear down
         drop_notification_data_function(&self.trigger, &mut transaction).await?;
 
