@@ -1,12 +1,9 @@
 use postgres_protocol::escape::{escape_identifier, escape_literal};
 use serde_json::json;
 
-use integration_tests::common::{MinervaService, MinervaServiceConfig, TestStackConfig};
+use crate::common::{MinervaService, MinervaServiceConfig, TestStackConfig};
 
-#[tokio::test]
-async fn db_connection_instability() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
-
+pub async fn db_connection_instability() -> Result<(), Box<dyn std::error::Error>> {
     let test_stack_config = TestStackConfig::default();
 
     let test_stack = test_stack_config.start().await?;

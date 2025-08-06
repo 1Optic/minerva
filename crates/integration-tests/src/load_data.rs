@@ -1,6 +1,5 @@
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use std::env;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -11,7 +10,7 @@ use rust_decimal_macros::dec;
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
@@ -52,17 +51,7 @@ parts:
 
 ";
 
-#[tokio::test]
-async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn load_data(cluster: MinervaClusterConnector) -> Result<(), Box<dyn std::error::Error>> {
     let data_source_name = "hub";
 
     let test_database = cluster.create_db().await?;
@@ -89,8 +78,8 @@ async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("minerva")?;
     cmd.env("RUST_LOG", log_level)
         .env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env("PGHOST", cluster.coordinator_connector.host.to_string())
+        .env("PGPORT", cluster.coordinator_connector.port.to_string())
         .env("PGSSLMODE", "disable")
         .env("PGDATABASE", &test_database.name);
 
@@ -115,18 +104,10 @@ async fn load_data() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
-async fn load_data_twice() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
+pub async fn load_data_twice(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let data_source_name = "hub";
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
 
     let test_database = cluster.create_db().await?;
 
@@ -153,8 +134,8 @@ async fn load_data_twice() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("minerva")?;
     cmd.env("RUST_LOG", log_level.clone())
         .env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env("PGHOST", cluster.coordinator_connector.host.to_string())
+        .env("PGPORT", cluster.coordinator_connector.port.to_string())
         .env("PGSSLMODE", "disable")
         .env("PGDATABASE", &test_database.name);
 
@@ -174,8 +155,8 @@ async fn load_data_twice() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("minerva")?;
     cmd.env("RUST_LOG", log_level)
         .env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env("PGHOST", cluster.coordinator_connector.host.to_string())
+        .env("PGPORT", cluster.coordinator_connector.port.to_string())
         .env("PGSSLMODE", "disable")
         .env("PGDATABASE", &test_database.name);
 

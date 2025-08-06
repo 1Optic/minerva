@@ -1,17 +1,16 @@
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
 
 use log::debug;
 
 use minerva::change::Change;
 
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 use minerva::trend_store::TrendStore;
 
-use integration_tests::common::get_available_port;
-use integration_tests::common::{MinervaService, MinervaServiceConfig};
+use crate::common::{create_webservice_role, get_available_port};
+use crate::common::{MinervaService, MinervaServiceConfig};
 
 const TREND_STORE_DEFINITION_15M: &str = r"
 title: Raw node data
@@ -53,18 +52,10 @@ parts:
         data_type: numeric
 ";
 
-#[tokio::test]
-async fn create_kpi() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn create_kpi(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     use minerva::trend_materialization::get_function_def;
-
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
 
     let test_database = cluster.create_db().await?;
 
@@ -88,20 +79,15 @@ async fn create_kpi() -> Result<(), Box<dyn std::error::Error>> {
 
         add_trend_store.apply(&mut client).await?;
 
-        client
-            .execute(
-                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-                &[],
-            )
-            .await?;
+        create_webservice_role(&client).await?;
     }
 
     let service_address = Ipv4Addr::new(127, 0, 0, 1);
     let service_port = get_available_port(service_address).unwrap();
 
     let service_conf = MinervaServiceConfig {
-        pg_host: cluster.controller_host.to_string(),
-        pg_port: cluster.controller_port.to_string(),
+        pg_host: cluster.coordinator_connector.host.to_string(),
+        pg_port: cluster.coordinator_connector.port.to_string(),
         pg_sslmode: "disable".to_string(),
         pg_database: test_database.name.to_string(),
         pg_user: "webservice".to_string(),

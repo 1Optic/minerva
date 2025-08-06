@@ -1,6 +1,3 @@
-use std::env;
-use std::path::PathBuf;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use log::info;
@@ -10,7 +7,7 @@ use tokio_postgres::{binary_copy::BinaryCopyInWriter, GenericClient};
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::meas_value::{DataType, MeasValue};
 use minerva::schema::create_schema;
 use minerva::trend_store::{
@@ -163,17 +160,9 @@ impl DataPackage for RefinedDataPackage {
     }
 }
 
-#[tokio::test]
-async fn store_package() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn store_package(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     info!("Created database '{}'", test_database.name);

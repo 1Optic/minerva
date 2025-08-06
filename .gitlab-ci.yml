@@ -33,7 +33,7 @@ test-minerva-cli:cargo:
     - rustup default nightly
   script:
     - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --package minerva-cli --verbose -- --format=json  -Z unstable-options --report-time | cargo2junit > results.xml
+    - cargo test --package minerva-cli --verbose -- --format=json  -Z unstable-options | cargo2junit > results.xml
   artifacts:
     when: always
     reports:
@@ -49,7 +49,7 @@ integration-test:cargo:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo build --package minerva-cli
     - cargo build --package minerva-service
-    - RUST_LOG=info cargo test --package integration-tests --verbose -- --format=json  -Z unstable-options --report-time --test-threads=1 --nocapture | cargo2junit > results.xml
+    - RUST_LOG=info cargo test --package integration-tests --verbose -- --format=json  -Z unstable-options --nocapture | cargo2junit > results.xml
   artifacts:
     when: always
     reports:

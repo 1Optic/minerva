@@ -14,6 +14,7 @@ use testcontainers::core::{ContainerPort, ContainerRequest};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use tokio::io::AsyncBufReadExt;
+use tokio_postgres::GenericClient;
 use toxiproxy_rust::proxy::ProxyPack;
 
 use minerva::cluster::{MinervaCluster, MinervaClusterConfig, TestDatabase};
@@ -481,11 +482,19 @@ impl TestStack {
     }
 
     pub fn controller_host(&self) -> String {
-        self.cluster.controller_host.to_string()
+        self.cluster
+            .connector
+            .coordinator_connector
+            .host
+            .to_string()
     }
 
     pub fn controller_port(&self) -> String {
-        self.cluster.controller_port.to_string()
+        self.cluster
+            .connector
+            .coordinator_connector
+            .port
+            .to_string()
     }
 
     pub async fn db_conn_down(&self) -> Result<(), TestStackError> {
@@ -512,8 +521,14 @@ impl TestStack {
         let mut config = tokio_postgres::Config::new();
 
         config
-            .host(self.cluster.controller_host.to_string())
-            .port(self.cluster.controller_port)
+            .host(
+                self.cluster
+                    .connector
+                    .coordinator_connector
+                    .host
+                    .to_string(),
+            )
+            .port(self.cluster.connector.coordinator_connector.port)
             .user(user)
             .dbname(database)
             .ssl_mode(tokio_postgres::config::SslMode::Disable);
@@ -533,4 +548,32 @@ impl TestStack {
 
         config
     }
+}
+
+pub async fn create_webservice_role<T: GenericClient + Send + Sync>(
+    client: &T,
+) -> Result<(), tokio_postgres::Error> {
+    let create_role_sql = r#"
+DO
+$do$
+BEGIN
+   IF EXISTS (
+      SELECT FROM pg_catalog.pg_roles
+      WHERE rolname = 'webservice') THEN
+
+      RAISE NOTICE 'Role "webservice" already exists. Skipping.';
+   ELSE
+      BEGIN   -- nested block
+        CREATE ROLE webservice WITH login IN ROLE minerva_admin;
+      EXCEPTION
+         WHEN duplicate_object THEN
+            RAISE NOTICE 'Role "webservice" was just created by a concurrent transaction. Skipping.';
+      END;
+   END IF;
+END
+$do$;"#;
+
+    client.execute(create_role_sql, &[]).await?;
+
+    Ok(())
 }

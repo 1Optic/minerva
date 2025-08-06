@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use log::debug;
@@ -6,29 +5,19 @@ use log::debug;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 
-#[tokio::test]
-async fn initialize() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
-    debug!("Containers started");
-
+pub async fn initialize(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     debug!("Created database '{}'", test_database.name);
 
     let mut cmd = Command::cargo_bin("minerva")?;
     cmd.env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env("PGHOST", cluster.coordinator_connector.host.to_string())
+        .env("PGPORT", cluster.coordinator_connector.port.to_string())
         .env("PGSSLMODE", "disable")
         .env("PGDATABASE", &test_database.name);
 

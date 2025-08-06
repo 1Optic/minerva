@@ -2,12 +2,10 @@ use log::info;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 use minerva::trigger::{AddTrigger, CreateNotifications, Trigger};
 use serde_json::{json, Value};
-use std::env;
-use std::path::PathBuf;
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 
 const TREND_STORE_DEFINITION: &str = r###"
@@ -95,17 +93,9 @@ description: Test trigger
 enabled: true
 "###;
 
-#[tokio::test]
-async fn trigger_trigger_notifications() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn trigger_trigger_notifications(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     info!("Created database '{}'", test_database.name);

@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
 use log::info;
+use std::io;
 use std::iter::zip;
-use std::path::PathBuf;
 use std::process::ExitStatus;
-use std::{env, io};
 
 use assert_cmd::cargo::cargo_bin;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -11,7 +10,7 @@ use tokio::process::Command;
 
 use minerva::attribute_store::{AddAttributeStore, AttributeStore};
 use minerva::change::Change;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 
 const ATTRIBUTE_STORE_DEFINITION: &str = r"
@@ -45,17 +44,9 @@ attributes:
   extra_data: null
 ";
 
-#[tokio::test]
-async fn compact_attribute() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn compact_attribute(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     info!("Created database '{}'", test_database.name);
@@ -227,7 +218,10 @@ INSERT INTO attribute_history."hub_node"(entity_id, timestamp, first_appearance,
     Ok(())
 }
 
-async fn run_compact_cmd(cluster: &MinervaCluster, database_name: &str) -> io::Result<ExitStatus> {
+async fn run_compact_cmd(
+    cluster_connector: &MinervaClusterConnector,
+    database_name: &str,
+) -> io::Result<ExitStatus> {
     let log_level = std::env::var("RUST_LOG").unwrap_or("error".to_string());
 
     let executable_path = cargo_bin("minerva");
@@ -236,8 +230,14 @@ async fn run_compact_cmd(cluster: &MinervaCluster, database_name: &str) -> io::R
         .stdout(std::process::Stdio::piped())
         .env("RUST_LOG", log_level)
         .env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env(
+            "PGHOST",
+            cluster_connector.coordinator_connector.host.to_string(),
+        )
+        .env(
+            "PGPORT",
+            cluster_connector.coordinator_connector.port.to_string(),
+        )
         .env("PGSSLMODE", "disable")
         .env("PGDATABASE", database_name)
         .arg("attribute-store")

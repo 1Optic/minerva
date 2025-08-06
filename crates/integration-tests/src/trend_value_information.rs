@@ -1,12 +1,10 @@
 use log::info;
+use minerva::cluster::MinervaClusterConnector;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
-use std::env;
-use std::path::PathBuf;
 
 use minerva::change::Change;
 use minerva::change::InformationOption;
 use minerva::changes::trend_store::{AddTrendStore, TrendRemoveValueInformation};
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
 use minerva::schema::create_schema;
 
 const TREND_STORE_DEFINITION: &str = r###"
@@ -35,17 +33,9 @@ parts:
 
 "###;
 
-#[tokio::test]
-async fn trend_value_information() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn trend_value_information(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     info!("Created database '{}'", test_database.name);

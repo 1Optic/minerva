@@ -1,15 +1,16 @@
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
 
 use log::debug;
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
-use integration_tests::common::{get_available_port, MinervaService, MinervaServiceConfig};
+use crate::common::{
+    create_webservice_role, get_available_port, MinervaService, MinervaServiceConfig,
+};
 
 const TREND_STORE_DEFINITION: &str = r"
 title: Raw node data
@@ -37,19 +38,9 @@ parts:
 
 ";
 
-#[tokio::test]
-async fn get_entity_types() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
-    debug!("Containers started");
-
+pub async fn get_entity_types(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     debug!("Created database '{}'", test_database.name);
@@ -66,12 +57,7 @@ async fn get_entity_types() -> Result<(), Box<dyn std::error::Error>> {
 
         add_trend_store.apply(&mut client).await?;
 
-        client
-            .execute(
-                "CREATE ROLE webservice WITH login IN ROLE minerva_admin",
-                &[],
-            )
-            .await?;
+        create_webservice_role(&client).await?;
 
         let timestamp = chrono::DateTime::parse_from_rfc3339("2023-03-25T14:00:00+00:00").unwrap();
         create_partitions_for_timestamp(&mut client, timestamp.into()).await?;
@@ -82,8 +68,8 @@ async fn get_entity_types() -> Result<(), Box<dyn std::error::Error>> {
         let service_port = get_available_port(service_address).unwrap();
 
         let service_conf = MinervaServiceConfig {
-            pg_host: cluster.controller_host.to_string(),
-            pg_port: cluster.controller_port.to_string(),
+            pg_host: cluster.coordinator_connector.host.to_string(),
+            pg_port: cluster.coordinator_connector.port.to_string(),
             pg_sslmode: "disable".to_string(),
             pg_database: test_database.name.to_string(),
             pg_user: "webservice".to_string(),

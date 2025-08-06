@@ -3,8 +3,6 @@ use log::{debug, info};
 use minerva::trend_materialization::{
     AddTrendMaterialization, TrendFunctionMaterialization, TrendMaterialization,
 };
-use std::env;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use assert_cmd::cargo::cargo_bin;
@@ -13,7 +11,7 @@ use tokio::process::Command;
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig};
+use minerva::cluster::MinervaClusterConnector;
 use minerva::schema::create_schema;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
@@ -102,17 +100,9 @@ fingerprint_function: |
 description: {}
 "#;
 
-#[tokio::test]
-async fn materialize_service() -> Result<(), Box<dyn std::error::Error>> {
-    integration_tests::setup();
-
-    let cluster_config = MinervaClusterConfig {
-        config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
-        ..Default::default()
-    };
-
-    let cluster = MinervaCluster::start(&cluster_config).await?;
-
+pub async fn materialize_service(
+    cluster: MinervaClusterConnector,
+) -> Result<(), Box<dyn std::error::Error>> {
     let test_database = cluster.create_db().await?;
 
     info!("Created database '{}'", test_database.name);
@@ -163,8 +153,8 @@ async fn materialize_service() -> Result<(), Box<dyn std::error::Error>> {
         .env("RUST_LOG", "info")
         .env("PGSSLMODE", "disable")
         .env("PGUSER", "postgres")
-        .env("PGHOST", cluster.controller_host.to_string())
-        .env("PGPORT", cluster.controller_port.to_string())
+        .env("PGHOST", cluster.coordinator_connector.host.to_string())
+        .env("PGPORT", cluster.coordinator_connector.port.to_string())
         .env("PGDATABASE", &test_database.name)
         .arg("trend-materialization")
         .arg("service")
