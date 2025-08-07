@@ -127,7 +127,7 @@ impl EntityMapping for DbEntityMapping {
 
                 let mut aliases: HashMap<String, Option<String>> = HashMap::new();
                 let query = format!(
-                    "WITH lookup_list AS (SELECT unnest($1::integer[]) AS id) \
+                    "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
                     SELECT l.name, e.primary_alias FROM lookup_list l \
                     LEFT JOIN entity.{} e ON l.name = e.name ",
                     escape_identifier(entity_type)

@@ -71,20 +71,23 @@ AS $$
         etype directory.entity_type;
     BEGIN
         SELECT * FROM directory.entity_type WHERE name = $1 INTO etype;
-        IF etype IS NOT NULL THEN
-            UPDATE directory.entity_type SET primary_alias = $2, description = $3 WHERE name = $1;
-            EXECUTE FORMAT(
-                "ALTER TABLE entity.%I DROP COLUMN IF EXISTS primary_alias",
-                $1
-            );
-            IF $2 IS NOT NULL THEN
-                EXECUTE FORMAT (
-                    'ALTER TABLE entity.%I '
-                    'ADD COLUMN primary_alias text GENERATED ALWAYS AS (%s) STORED',
-                    $1, $2
-                );
-            END IF;
+        IF etype IS NULL THEN
+            RETURN NULL;
         END IF;
+        UPDATE directory.entity_type SET primary_alias = $2, description = $3 WHERE name = $1;
+        EXECUTE FORMAT(
+            'ALTER TABLE entity.%I DROP COLUMN IF EXISTS primary_alias',
+            $1
+        );
+        IF $2 IS NOT NULL THEN
+            EXECUTE FORMAT (
+                'ALTER TABLE entity.%I '
+                'ADD COLUMN primary_alias text GENERATED ALWAYS AS (%s) STORED',
+                $1, $2
+            );
+        END IF;
+        SELECT * FROM directory.entity_type WHERE name = $1 INTO etype;
+        RETURN etype;
     END;
 $$ LANGUAGE plpgsql VOLATILE;
 
