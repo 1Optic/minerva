@@ -1,16 +1,18 @@
-SELECT create_reference_table('directory.entity_type');
-SELECT create_reference_table('trend_directory.trend_store');
-SELECT create_reference_table('trend_directory.trend_store_part');
-SELECT create_reference_table('trend_directory.partition');
-
-CREATE TABLE trend_directory.table_trend_statistics
+CREATE TABLE "trend_directory"."table_trend_statistics"
 (
-   table_trend_id integer references trend_directory.table_trend(id) on delete cascade,
+   table_trend_id integer NOT NULL,
    min numeric DEFAULT NULL,
    max numeric DEFAULT NULL
 );
 
-INSERT INTO trend_directory.table_trend_statistics(table_trend_id, min, max)
+ALTER TABLE "trend_directory"."table_trend_statistics"
+  ADD CONSTRAINT "table_trend_statistics_table_trend_id_fkey"
+  FOREIGN KEY (table_trend_id)
+  REFERENCES "trend_directory"."table_trend" (id) ON DELETE CASCADE;
+
+SELECT citus_add_local_table_to_metadata($$trend_directory.table_trend_statistics$$, cascade_via_foreign_keys=>true);
+
+INSERT INTO trend_directory.table_trend_statistics (table_trend_id, min, max)
   SELECT id, NULL, NULL
   FROM trend_directory.table_trend;
 
@@ -28,7 +30,7 @@ BEGIN
       'JOIN pg_class c ON s.starelid = c.oid '
       'JOIN pg_namespace ns ON c.relnamespace = ns.oid '
       'JOIN trend_directory.partition p ON c.relname LIKE p.name || ''%%'' '
-      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id'
+      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id '
       'JOIN pg_attribute a ON a.attrelid = s.starelid and a.attnum = s.staattnum '
       'WHERE ns.nspname = ''trend_partition'' AND tsp.name = ''%s'' AND a.attname = ''%s'')'
     'SELECT FLOOR(MIN(VALUE)) FROM x',
@@ -126,4 +128,3 @@ CREATE TRIGGER create_statistics_on_new_table_trend
   AFTER INSERT ON trend_directory.table_trend
   FOR EACH ROW
   EXECUTE PROCEDURE trend_directory.create_statistics_for_table_trend();
-
