@@ -874,3 +874,45 @@ impl Change for AddTrendStore {
         Ok(format!("Added trend store {}", &self.trend_store))
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateStatistics {
+    pub trend_store_part_name: Option<String>,
+}
+
+impl fmt::Display for CreateStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.trend_store_part_name {
+            Some(tsp) => writeln!(f, "CreateStatitics({})", &tsp)?,
+            None => writeln!(f, "CreateAllStatitics()")?,
+        };
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Change for CreateStatistics {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        match &self.trend_store_part_name {
+            Some(tsp) => {
+                let query = concat!(
+                    "SELECT trend_directory.update_statistics(tt) ",
+                    "FROM trend_directory.table_trend tt ",
+                    "JOIN trend_directory.trend_store_part tsp ",
+                    "ON tt.trend_store_part_id = tsp.id ",
+                    "WHERE tsp.name = {}",
+                );
+                client.execute(query, &[&tsp]).await?;
+                Ok(format!("Created statistics for trend store part {}", &tsp))
+            }
+            None => {
+                let query = concat!(
+                    "SELECT trend_directory.update_statistics(tt) ",
+                    "FROM trend_directory.table_trend tt",
+                );
+                client.execute(query, &[]).await?;
+                Ok("Created statistics for all trend store parts".to_string())
+            }
+        }
+    }
+}

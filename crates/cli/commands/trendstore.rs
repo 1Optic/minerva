@@ -10,6 +10,7 @@ pub mod list;
 pub mod part;
 pub mod partition;
 pub mod renametrend;
+pub mod statistics;
 pub mod update;
 
 use crate::commands::common::{Cmd, CmdResult};
@@ -23,6 +24,7 @@ use list::TrendStoreList;
 use part::{TrendStorePartOpt, TrendStorePartOptCommands};
 use partition::{TrendStorePartition, TrendStorePartitionCommands};
 use renametrend::TrendStoreRenameTrend;
+use statistics::TrendStoreStatistics;
 use update::TrendStoreUpdate;
 
 #[derive(Debug, Parser, PartialEq)]
@@ -55,6 +57,8 @@ pub enum TrendStoreOptCommands {
     DeleteTimestamp(TrendStoreDeleteTimestamp),
     #[command(about = "dump the definition of a trend store")]
     Dump(TrendStoreDump),
+    #[command(about = "recalculate all trend statistics")]
+    Statistics(TrendStoreStatistics),
 }
 
 impl TrendStoreOpt {
@@ -82,6 +86,7 @@ impl TrendStoreOpt {
                 delete_timestamp.run().await
             }
             TrendStoreOptCommands::Dump(dump) => dump.run().await,
+            TrendStoreOptCommands::Statistics(stats) => stats.run().await,
         }
     }
 }

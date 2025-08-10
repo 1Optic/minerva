@@ -10,7 +10,8 @@ ALTER TABLE "trend_directory"."table_trend_statistics"
   FOREIGN KEY (table_trend_id)
   REFERENCES "trend_directory"."table_trend" (id) ON DELETE CASCADE;
 
-SELECT citus_add_local_table_to_metadata($$trend_directory.table_trend_statistics$$, cascade_via_foreign_keys=>true);
+
+--SELECT citus_add_local_table_to_metadata($$trend_directory.table_trend_statistics$$, cascade_via_foreign_keys=>true);
 
 INSERT INTO trend_directory.table_trend_statistics (table_trend_id, min, max)
   SELECT id, NULL, NULL
@@ -123,8 +124,3 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
-
-CREATE TRIGGER create_statistics_on_new_table_trend
-  AFTER INSERT ON trend_directory.table_trend
-  FOR EACH ROW
-  EXECUTE PROCEDURE trend_directory.create_statistics_for_table_trend();
