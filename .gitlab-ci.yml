@@ -27,13 +27,13 @@ lint:
     - RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 
 # Use cargo to test the project
-test-minerva-cli:cargo:
+unit-test:cargo:
   stage: test
   before_script:
     - rustup default nightly
   script:
     - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --package minerva-cli --verbose -- --format=json  -Z unstable-options | cargo2junit > results.xml
+    - cargo test --workspace --exclude integration-tests --verbose -- --format=json  -Z unstable-options | cargo2junit > results.xml
   artifacts:
     when: always
     reports:

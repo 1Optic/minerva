@@ -1,8 +1,10 @@
+pub mod attribute_storage;
 pub mod common;
 pub mod compact_attribute;
 pub mod create_kpi;
 pub mod create_trigger;
 pub mod default_alias;
+pub mod entity;
 pub mod entity_set;
 pub mod get_entity_types;
 pub mod initialize;

@@ -169,5 +169,19 @@ fn setup_tests(connector: Option<MinervaClusterConnector>) -> Vec<Trial> {
                 integration_tests::trigger_trigger::trigger_trigger_notifications,
             ),
         ),
+        Trial::test(
+            "load_attribute_data",
+            setup_test(
+                connector.clone(),
+                integration_tests::attribute_storage::load_attribute_data,
+            ),
+        ),
+        Trial::test(
+            "db_entity_mapping",
+            setup_test(
+                connector.clone(),
+                integration_tests::entity::db_entity_mapping,
+            ),
+        ),
     ]
 }
