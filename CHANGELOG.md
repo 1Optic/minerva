@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.33.0] - 2025-08-12
+
+### Added
+
+- DB: Support timestamptz in data_type_order function
+
+### Changed
+
+- Tests: Use custom test harness to reuse Minerva cluster for multiple integration tests
+- DB: Store trend statistics in separate table 'table_trend_statistics'
+
+### Fixed
+
+- Library: Fix data type mismatch detection when loading trend data using copy from
+
 ## [9.32.0] - 2025-07-22
 
 ### Added
@@ -472,4 +487,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.30.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.29.0...9.30.0
 [9.31.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.30.0...9.31.0
 [9.32.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.31.0...9.32.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.32.0...HEAD
+[9.33.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.32.0...9.33.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.0...HEAD
