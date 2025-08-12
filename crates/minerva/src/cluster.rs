@@ -7,8 +7,8 @@ use std::net::IpAddr;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 
-use bollard::image::BuildImageOptions;
-use bollard::Docker;
+use bollard::query_parameters::BuildImageOptions;
+use bollard::{body_stream, Docker};
 use log::{debug, error, info};
 
 use futures_util::StreamExt;
@@ -307,15 +307,19 @@ impl ImageProvider for BuildImageProvider {
         let docker = Docker::connect_with_socket_defaults().unwrap();
 
         let build_image_options = BuildImageOptions {
-            dockerfile: "docker-image/Dockerfile",
-            t: &t,
+            dockerfile: "docker-image/Dockerfile".to_string(),
+            t: Some(t),
             ..Default::default()
         };
 
         let contents: Vec<u8> = std::fs::read(&self.definition_file).unwrap();
 
+        let payload = Box::new(contents).leak();
+        let payload = payload.chunks(32);
+        let stream = futures_util::stream::iter(payload.map(bytes::Bytes::from));
+
         let mut image_build_stream =
-            docker.build_image(build_image_options, None, Some(contents.into()));
+            docker.build_image(build_image_options, None, Some(body_stream(stream)));
 
         while let Some(msg) = image_build_stream.next().await {
             match msg {
