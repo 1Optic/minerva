@@ -11,6 +11,7 @@ pub mod initialize;
 pub mod load_data;
 pub mod service;
 pub mod trend_materialization;
+pub mod trend_statistics;
 pub mod trend_storage;
 pub mod trend_value_information;
 pub mod trigger_trigger;

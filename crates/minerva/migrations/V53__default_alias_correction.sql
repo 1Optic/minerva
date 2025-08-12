@@ -1,3 +1,5 @@
+DROP FUNCTION directory.update_entity_type(text,text,text);
+
 CREATE OR REPLACE FUNCTION "directory"."update_entity_type"(entity_type_name text, primary_alias text, "description" text)
     RETURNS directory.entity_type
 AS $$
