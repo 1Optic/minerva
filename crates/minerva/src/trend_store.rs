@@ -593,12 +593,14 @@ impl StoreCopyFromError {
                         StoreCopyFromError::UniqueViolation(error_text)
                     } else if error_text.contains("incorrect binary data format")
                         || error_text.contains("unexpected EOF in COPY data")
-                        || error_text.contains("invalid scale in external \"numeric\" value")
                     {
                         StoreCopyFromError::DataMismatch(error_text)
                     } else {
                         StoreCopyFromError::Generic(error_text)
                     }
+                }
+                SqlState::INVALID_BINARY_REPRESENTATION => {
+                    StoreCopyFromError::DataMismatch(error_text)
                 }
                 _ => StoreCopyFromError::Generic(error_text),
             }
