@@ -6,13 +6,13 @@ use minerva::change::Change;
 
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 use minerva::trend_materialization::get_function_def;
 use minerva::trend_store::TrendStore;
 use serde_json::json;
 
 use crate::common::{
-    create_webservice_role, get_available_port, MinervaService, MinervaServiceConfig,
+    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
+    MinervaServiceConfig,
 };
 
 const TREND_STORE_DEFINITION: &str = r"
@@ -38,13 +38,14 @@ parts:
 pub async fn create_trigger(
     cluster: MinervaClusterConnector,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let webservice_role = "webservice";
     let test_database = cluster.create_db().await?;
 
     debug!("Created database '{}'", test_database.name);
 
     let trigger_template_id = {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
             .map_err(|e| format!("Could not read trend store definition: {e}"))?;
@@ -63,7 +64,7 @@ pub async fn create_trigger(
 
         client.execute("INSERT INTO trigger.template_parameter (template_id, name, is_variable, is_source_name) SELECT id, 'value', true, false from trigger.template WHERE name = 'first template';", &[]).await?;
 
-        create_webservice_role(&cluster).await?;
+        create_webservice_role(&cluster, webservice_role).await?;
 
         trigger_template_id
     };
@@ -76,7 +77,7 @@ pub async fn create_trigger(
         pg_port: cluster.coordinator_connector.port.to_string(),
         pg_sslmode: "disable".to_string(),
         pg_database: test_database.name.to_string(),
-        pg_user: "webservice".to_string(),
+        pg_user: webservice_role.to_string(),
         service_address: service_address.to_string(),
         service_port,
     };
@@ -124,35 +125,6 @@ pub async fn create_trigger(
             ]
         }
     });
-
-    {
-        let c = test_database.connect().await?;
-
-        let query = r#"
-WITH RECURSIVE cte AS (
-   SELECT oid, 0 AS steps, true AS inherit_option
-   FROM   pg_roles
-   WHERE  rolname = $1
-
-   UNION ALL
-   SELECT m.roleid, c.steps + 1, c.inherit_option AND m.inherit_option
-   FROM   cte c
-   JOIN   pg_auth_members m ON m.member = c.oid
-   )
-SELECT oid, oid::regrole::text AS rolename, steps, inherit_option
-FROM   cte;"#;
-
-        let username = "webservice";
-
-        let rows = c.query(query, &[&username]).await?;
-
-        for row in rows {
-            let rolename = row.get::<usize, &str>(1);
-            let inherit_option = row.get::<usize, bool>(3);
-
-            println!("role: {rolename}, inherit: {inherit_option}");
-        }
-    }
 
     let response = client.post(url.clone()).json(&request_data).send().await?;
 

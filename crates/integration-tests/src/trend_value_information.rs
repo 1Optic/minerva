@@ -5,7 +5,8 @@ use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 use minerva::change::Change;
 use minerva::change::InformationOption;
 use minerva::changes::trend_store::{AddTrendStore, TrendRemoveValueInformation};
-use minerva::schema::create_schema;
+
+use crate::common::create_schema_with_retry;
 
 const TREND_STORE_DEFINITION: &str = r###"
 title: Raw node data
@@ -42,7 +43,7 @@ pub async fn trend_value_information(
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
             .map_err(|e| format!("Could not read trend store definition: {e}"))?;

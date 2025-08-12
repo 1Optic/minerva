@@ -8,10 +8,10 @@ use assert_cmd::cargo::cargo_bin;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+use crate::common::create_schema_with_retry;
 use minerva::attribute_store::{AddAttributeStore, AttributeStore};
 use minerva::change::Change;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 
 const ATTRIBUTE_STORE_DEFINITION: &str = r"
 data_source: hub
@@ -52,7 +52,8 @@ pub async fn compact_attribute(
     info!("Created database '{}'", test_database.name);
 
     let mut client = test_database.connect().await?;
-    create_schema(&mut client).await?;
+
+    create_schema_with_retry(&mut client, 5).await?;
 
     let attribute_store: AttributeStore = serde_yaml::from_str(ATTRIBUTE_STORE_DEFINITION)
         .map_err(|e| format!("Could not read trend store definition: {e}"))?;

@@ -6,7 +6,8 @@ use serde_json::{json, Value};
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
+
+use crate::common::create_schema_with_retry;
 
 const TREND_STORE_DEFINITION: &str = r###"
 title: Raw node data
@@ -102,7 +103,7 @@ pub async fn trigger_trigger_notifications(
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         client
             .execute(

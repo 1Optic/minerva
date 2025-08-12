@@ -5,11 +5,11 @@ use log::debug;
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
 
 use crate::common::{
-    create_webservice_role, get_available_port, MinervaService, MinervaServiceConfig,
+    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
+    MinervaServiceConfig,
 };
 
 const TREND_STORE_DEFINITION: &str = r"
@@ -41,6 +41,7 @@ parts:
 pub async fn get_entity_types(
     cluster: MinervaClusterConnector,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let webservice_role = "webservice";
     let test_database = cluster.create_db().await?;
 
     debug!("Created database '{}'", test_database.name);
@@ -48,7 +49,7 @@ pub async fn get_entity_types(
     {
         let mut client = test_database.connect().await?;
 
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
             .map_err(|e| format!("Could not read trend store definition: {e}"))?;
@@ -57,7 +58,7 @@ pub async fn get_entity_types(
 
         add_trend_store.apply(&mut client).await?;
 
-        create_webservice_role(&cluster).await?;
+        create_webservice_role(&cluster, webservice_role).await?;
 
         let timestamp = chrono::DateTime::parse_from_rfc3339("2023-03-25T14:00:00+00:00").unwrap();
         create_partitions_for_timestamp(&mut client, timestamp.into()).await?;
@@ -72,7 +73,7 @@ pub async fn get_entity_types(
             pg_port: cluster.coordinator_connector.port.to_string(),
             pg_sslmode: "disable".to_string(),
             pg_database: test_database.name.to_string(),
-            pg_user: "webservice".to_string(),
+            pg_user: webservice_role.to_string(),
             service_address: service_address.to_string(),
             service_port,
         };

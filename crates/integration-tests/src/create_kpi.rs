@@ -6,10 +6,9 @@ use minerva::change::Change;
 
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 use minerva::trend_store::TrendStore;
 
-use crate::common::{create_webservice_role, get_available_port};
+use crate::common::{create_schema_with_retry, create_webservice_role, get_available_port};
 use crate::common::{MinervaService, MinervaServiceConfig};
 
 const TREND_STORE_DEFINITION_15M: &str = r"
@@ -57,13 +56,14 @@ pub async fn create_kpi(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use minerva::trend_materialization::get_function_def;
 
+    let webservice_role = "webservice";
     let test_database = cluster.create_db().await?;
 
     debug!("Created database '{}'", test_database.name);
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION_15M)
             .map_err(|e| format!("Could not read trend store definition: {e}"))?;
@@ -79,7 +79,7 @@ pub async fn create_kpi(
 
         add_trend_store.apply(&mut client).await?;
 
-        create_webservice_role(&cluster).await?;
+        create_webservice_role(&cluster, webservice_role).await?;
     }
 
     let service_address = Ipv4Addr::new(127, 0, 0, 1);
@@ -90,7 +90,7 @@ pub async fn create_kpi(
         pg_port: cluster.coordinator_connector.port.to_string(),
         pg_sslmode: "disable".to_string(),
         pg_database: test_database.name.to_string(),
-        pg_user: "webservice".to_string(),
+        pg_user: webservice_role.to_string(),
         service_address: service_address.to_string(),
         service_port,
     };

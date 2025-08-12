@@ -389,6 +389,16 @@ impl Connector {
 
         config
     }
+
+    pub async fn create_role(&self, query: &str) -> Result<(), Error> {
+        let retry_count = 3;
+        let config = self.connect_config("postgres");
+        let client = connect_to_db(&config, retry_count).await?;
+
+        client.execute(query, &[]).await?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -399,18 +409,10 @@ pub struct MinervaClusterConnector {
 
 impl MinervaClusterConnector {
     pub async fn create_role(&self, query: &str) -> Result<(), Error> {
-        let retry_count = 3;
-        let config = self.coordinator_connector.connect_config("postgres");
-        let client = connect_to_db(&config, retry_count).await?;
-
-        client.execute(query, &[]).await?;
+        self.coordinator_connector.create_role(query).await?;
 
         for worker_conn in &self.worker_connectors {
-            let worker_config = worker_conn.connect_config("postgres");
-
-            let worker_client = connect_to_db(&worker_config, retry_count).await?;
-
-            worker_client.execute(query, &[]).await?;
+            worker_conn.create_role(query).await?;
         }
 
         Ok(())

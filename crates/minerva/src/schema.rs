@@ -1,21 +1,42 @@
 use refinery::embed_migrations;
+use thiserror::Error;
 use tokio_postgres::Client;
 
 embed_migrations!("migrations");
 
 const SCHEMA_HISTORY_TABLE: &str = "schema_history";
 
-pub async fn create_schema(client: &mut Client) -> Result<(), String> {
+#[derive(Error, Debug)]
+pub enum SchemaCreationError {
+    #[error("{0}")]
+    Postgres(#[from] tokio_postgres::Error),
+    #[error("{0}")]
+    Refinery(#[from] refinery::Error),
+    #[error("Tuple concurrently updated")]
+    TupleConcurrentlyUpdated,
+}
+
+pub async fn create_schema(client: &mut Client) -> Result<(), SchemaCreationError> {
     client
         .execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[])
-        .await
-        .unwrap();
+        .await?;
 
     migrations::runner()
         .set_migration_table_name(SCHEMA_HISTORY_TABLE)
         .run_async(client)
         .await
-        .unwrap();
+        .map_err(|e| match e.kind() {
+            refinery::error::Kind::Connection(_conn_err_msg, conn_err) => {
+                if let Some(source) = conn_err.source() {
+                    if source.to_string().contains("tuple concurrently updated") {
+                        return SchemaCreationError::TupleConcurrentlyUpdated;
+                    }
+                }
+
+                SchemaCreationError::from(e)
+            }
+            _ => SchemaCreationError::from(e),
+        })?;
 
     Ok(())
 }

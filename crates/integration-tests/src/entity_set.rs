@@ -8,22 +8,23 @@ use tokio::time::Duration;
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 use minerva::trend_store::TrendStore;
 
 use crate::common::{
-    create_webservice_role, get_available_port, MinervaService, MinervaServiceConfig,
+    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
+    MinervaServiceConfig,
 };
 
 /// Test the listing and creation of new entity sets
 pub async fn get_and_create_entity_sets(
     cluster: MinervaClusterConnector,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let webservice_role = "webservice";
     let test_database = cluster.create_db().await?;
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         let trend_store: TrendStore = TrendStore {
             title: None,
@@ -49,7 +50,7 @@ pub async fn get_and_create_entity_sets(
             )
             .await?;
 
-        create_webservice_role(&cluster).await?;
+        create_webservice_role(&cluster, webservice_role).await?;
     }
 
     {
@@ -61,7 +62,7 @@ pub async fn get_and_create_entity_sets(
             pg_port: cluster.coordinator_connector.port.to_string(),
             pg_sslmode: "disable".to_string(),
             pg_database: test_database.name.to_string(),
-            pg_user: "webservice".to_string(),
+            pg_user: webservice_role.to_string(),
             service_address: service_address.to_string(),
             service_port,
         };

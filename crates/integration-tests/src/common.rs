@@ -7,19 +7,22 @@ use std::time::Duration;
 use assert_cmd::prelude::*;
 use minerva::error::{Error, RuntimeError};
 
-use log::{debug, error};
+use log::{debug, error, info};
+use postgres_protocol::escape::{escape_identifier, escape_literal};
 use rand::distr::{Alphanumeric, SampleString};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use testcontainers::core::{ContainerPort, ContainerRequest};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use tokio::io::AsyncBufReadExt;
+use tokio_postgres::Client;
 use toxiproxy_rust::proxy::ProxyPack;
 
 use minerva::cluster::{
     MinervaCluster, MinervaClusterConfig, MinervaClusterConnector, TestDatabase,
 };
-use minerva::schema::create_schema;
+use minerva::schema::{create_schema, SchemaCreationError};
 
 const TOXIPROXY_API_PORT: u16 = 8474;
 const DB_PROXIED_PORT: u16 = 5432;
@@ -456,7 +459,7 @@ impl TestStack {
             .await
             .map_err(|e| TestStackError::DatabaseCreate(e.to_string()))?;
 
-        create_schema(&mut client)
+        create_schema_with_retry(&mut client, 5)
             .await
             .map_err(|e| TestStackError::DatabaseCreate(e.to_string()))?;
 
@@ -475,7 +478,7 @@ impl TestStack {
             .await
             .map_err(|e| TestStackError::DatabaseCreate(e.to_string()))?;
 
-        create_schema(&mut client)
+        create_schema_with_retry(&mut client, 5)
             .await
             .map_err(|e| TestStackError::DatabaseCreate(e.to_string()))?;
 
@@ -553,30 +556,105 @@ impl TestStack {
 
 pub async fn create_webservice_role(
     minerva_cluster_connector: &MinervaClusterConnector,
+    name: &str,
 ) -> Result<(), Error> {
-    let create_role_sql = r#"
+    // For some reason, when a role is created on a Citus coordinator, this propagates to the
+    // worker nodes, but without the full inheritance of roles. That is why we explitly mention all
+    // required roles.
+    let create_role_sql = format!(
+        r#"
 DO
 $do$
 BEGIN
    IF EXISTS (
       SELECT FROM pg_catalog.pg_roles
-      WHERE rolname = 'webservice') THEN
+      WHERE rolname = {}) THEN
 
-      RAISE NOTICE 'Role "webservice" already exists. Skipping.';
+      RAISE NOTICE 'Role "{}" already exists. Skipping.';
    ELSE
       BEGIN   -- nested block
-        CREATE ROLE webservice WITH login IN ROLE minerva_admin;
+        CREATE ROLE {} WITH login IN ROLE minerva_admin, minerva_writer, minerva;
       EXCEPTION
          WHEN duplicate_object THEN
-            RAISE NOTICE 'Role "webservice" was just created by a concurrent transaction. Skipping.';
+            RAISE NOTICE 'Role "{}" was just created by a concurrent transaction. Skipping.';
       END;
    END IF;
 END
-$do$;"#;
+$do$;
+        "#,
+        escape_literal(name),
+        name,
+        escape_identifier(name),
+        name,
+    );
 
     minerva_cluster_connector
-        .create_role(create_role_sql)
+        .create_role(&create_role_sql)
         .await?;
+
+    Ok(())
+}
+
+pub async fn create_schema_with_retry(
+    client: &mut Client,
+    max_attempts: usize,
+) -> Result<(), SchemaCreationError> {
+    let mut attempt = 1;
+    let mut initialized: bool = false;
+
+    while !initialized && attempt <= max_attempts {
+        let result = create_schema(client).await;
+
+        match result {
+            Ok(_) => {
+                initialized = true;
+            }
+            Err(SchemaCreationError::TupleConcurrentlyUpdated) => {
+                // This can happen during test running when schema initialization is running
+                // parallel in multiple databases, just retry
+                info!("Schema creation failed due to concurrent tuple updating.");
+
+                let mut rng = rand::rng();
+
+                let millis = rng.random_range(0..1000);
+
+                tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+            }
+            Err(e) => return Err(e),
+        }
+
+        attempt += 1;
+    }
+
+    Ok(())
+}
+
+pub async fn show_roles(
+    client: tokio_postgres::Client,
+    role: &str,
+) -> Result<(), tokio_postgres::Error> {
+    let query = r#"
+WITH RECURSIVE cte AS (
+SELECT oid, 0 AS steps, true AS inherit_option
+FROM   pg_roles
+WHERE  rolname = $1
+
+UNION ALL
+SELECT m.roleid, c.steps + 1, c.inherit_option AND m.inherit_option
+FROM   cte c
+JOIN   pg_auth_members m ON m.member = c.oid
+)
+SELECT oid, oid::regrole::text AS rolename, steps, inherit_option
+FROM   cte;"#;
+
+    let rows = client.query(query, &[&role]).await?;
+
+    for row in rows {
+        let rolename = row.get::<usize, &str>(1);
+        let inherit_option = row.get::<usize, bool>(3);
+
+        println!("role: {rolename}, inherit: {inherit_option}");
+    }
 
     Ok(())
 }

@@ -12,8 +12,9 @@ use tokio::process::Command;
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::schema::create_schema;
 use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
+
+use crate::common::create_schema_with_retry;
 
 const TREND_STORE_DEFINITION: &str = r"title: Raw node data
 data_source: hub
@@ -108,7 +109,7 @@ pub async fn materialize_service(
     info!("Created database '{}'", test_database.name);
 
     let mut client = test_database.connect().await?;
-    create_schema(&mut client).await?;
+    create_schema_with_retry(&mut client, 5).await?;
 
     let trend_store: TrendStore = serde_yaml::from_str(TREND_STORE_DEFINITION)
         .map_err(|e| format!("Could not read trend store definition: {e}"))?;

@@ -12,11 +12,12 @@ use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
 use minerva::entity_type::{AddEntityType, EntityType};
 use minerva::meas_value::{DataType, MeasValue};
-use minerva::schema::create_schema;
 use minerva::trend_store::MeasurementStore;
 use minerva::trend_store::{
     create_partitions_for_timestamp, DataPackage, DataPackageWriteError, TrendStore,
 };
+
+use crate::common::create_schema_with_retry;
 
 const ENTITY_TYPE_DEFINITION: &str = r"
     name: Site
@@ -165,7 +166,8 @@ pub async fn default_alias_database(
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+
+        create_schema_with_retry(&mut client, 5).await?;
 
         let entity_type: EntityType = serde_yaml::from_str(ENTITY_TYPE_DEFINITION)
             .map_err(|e| format!("Could not read entity type definition: {e}"))?;
@@ -246,7 +248,7 @@ pub async fn default_alias_insert(
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         debug!("Schema created");
 
@@ -399,7 +401,7 @@ pub async fn default_alias_insert_delayed(
 
     {
         let mut client = test_database.connect().await?;
-        create_schema(&mut client).await?;
+        create_schema_with_retry(&mut client, 5).await?;
 
         debug!("Schema created");
 
