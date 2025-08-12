@@ -49,7 +49,7 @@ pub async fn get_and_create_entity_sets(
             )
             .await?;
 
-        create_webservice_role(&client).await?;
+        create_webservice_role(&cluster).await?;
     }
 
     {

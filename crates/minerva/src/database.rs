@@ -1,7 +1,7 @@
 use std::env;
 use std::time::Duration;
 
-use log::warn;
+use log::debug;
 use rustls::ClientConfig as RustlsClientConfig;
 
 use tokio_postgres::{config::SslMode, Config};
@@ -97,7 +97,8 @@ pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client
             }) {
                 Ok((client, connection)) => break (client, connection),
                 Err(e) => {
-                    warn!("Could not connect to database: {e:?}");
+                    debug!("Could not connect to database on attempt {attempt_num}: {e:?}");
+
                     if attempt_num > retry_count {
                         return Err(Error::Database(DatabaseError::from_msg(format!(
                             "Failed to connect after {retry_count} retries"
@@ -129,7 +130,8 @@ pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client
             }) {
                 Ok((client, connection)) => break (client, connection),
                 Err(e) => {
-                    warn!("Could not connect to database: {e:?}");
+                    debug!("Could not connect to database on attempt {attempt_num}: {e:?}");
+
                     if attempt_num > retry_count {
                         return Err(Error::Database(DatabaseError::from_msg(format!(
                             "Failed to connect after {retry_count} retries"

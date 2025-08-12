@@ -57,7 +57,7 @@ pub async fn get_entity_types(
 
         add_trend_store.apply(&mut client).await?;
 
-        create_webservice_role(&client).await?;
+        create_webservice_role(&cluster).await?;
 
         let timestamp = chrono::DateTime::parse_from_rfc3339("2023-03-25T14:00:00+00:00").unwrap();
         create_partitions_for_timestamp(&mut client, timestamp.into()).await?;

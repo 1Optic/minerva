@@ -101,11 +101,6 @@ pub async fn create_worker_node(
         internal_port: postgresql_port,
     };
 
-    let config = connector.connect_config("postgres");
-    let client = connect_to_db(&config, 3).await?;
-
-    create_minerva_roles(&client).await?;
-
     Ok(WorkerNode {
         container,
         connector,
@@ -211,29 +206,6 @@ impl From<TestDatabaseError> for Error {
     fn from(value: TestDatabaseError) -> Self {
         Error::Runtime(RuntimeError::from_msg(value.to_string()))
     }
-}
-
-async fn create_minerva_roles(client: &Client) -> Result<(), tokio_postgres::Error> {
-    client
-        .execute(
-            "CREATE ROLE minerva NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE",
-            &[],
-        )
-        .await?;
-    client
-        .execute(
-            "CREATE ROLE minerva_writer NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE",
-            &[],
-        )
-        .await?;
-    client
-        .execute(
-            "CREATE ROLE minerva_admin NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE",
-            &[],
-        )
-        .await?;
-
-    Ok(())
 }
 
 pub struct TestDatabase {
@@ -426,6 +398,24 @@ pub struct MinervaClusterConnector {
 }
 
 impl MinervaClusterConnector {
+    pub async fn create_role(&self, query: &str) -> Result<(), Error> {
+        let retry_count = 3;
+        let config = self.coordinator_connector.connect_config("postgres");
+        let client = connect_to_db(&config, retry_count).await?;
+
+        client.execute(query, &[]).await?;
+
+        for worker_conn in &self.worker_connectors {
+            let worker_config = worker_conn.connect_config("postgres");
+
+            let worker_client = connect_to_db(&worker_config, retry_count).await?;
+
+            worker_client.execute(query, &[]).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn create_db(&self) -> Result<TestDatabase, MinervaClusterError> {
         let database_name = generate_name(16);
 
@@ -640,12 +630,15 @@ impl MinervaCluster {
             worker_connectors: workers.iter().map(|w| w.connector.clone()).collect(),
         };
 
-        let config = cluster_connector
-            .coordinator_connector
-            .connect_config("postgres");
-        let client = connect_to_db(&config, 3).await?;
-
-        create_minerva_roles(&client).await?;
+        cluster_connector
+            .create_role("CREATE ROLE minerva NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE")
+            .await?;
+        cluster_connector
+            .create_role("CREATE ROLE minerva_writer NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE")
+            .await?;
+        cluster_connector
+            .create_role("CREATE ROLE minerva_admin NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE")
+            .await?;
 
         Ok(MinervaCluster {
             controller_container,

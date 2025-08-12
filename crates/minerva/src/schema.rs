@@ -6,6 +6,11 @@ embed_migrations!("migrations");
 const SCHEMA_HISTORY_TABLE: &str = "schema_history";
 
 pub async fn create_schema(client: &mut Client) -> Result<(), String> {
+    client
+        .execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[])
+        .await
+        .unwrap();
+
     migrations::runner()
         .set_migration_table_name(SCHEMA_HISTORY_TABLE)
         .run_async(client)

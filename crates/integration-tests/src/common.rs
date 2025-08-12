@@ -14,10 +14,11 @@ use testcontainers::core::{ContainerPort, ContainerRequest};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use tokio::io::AsyncBufReadExt;
-use tokio_postgres::GenericClient;
 use toxiproxy_rust::proxy::ProxyPack;
 
-use minerva::cluster::{MinervaCluster, MinervaClusterConfig, TestDatabase};
+use minerva::cluster::{
+    MinervaCluster, MinervaClusterConfig, MinervaClusterConnector, TestDatabase,
+};
 use minerva::schema::create_schema;
 
 const TOXIPROXY_API_PORT: u16 = 8474;
@@ -550,9 +551,9 @@ impl TestStack {
     }
 }
 
-pub async fn create_webservice_role<T: GenericClient + Send + Sync>(
-    client: &T,
-) -> Result<(), tokio_postgres::Error> {
+pub async fn create_webservice_role(
+    minerva_cluster_connector: &MinervaClusterConnector,
+) -> Result<(), Error> {
     let create_role_sql = r#"
 DO
 $do$
@@ -573,7 +574,9 @@ BEGIN
 END
 $do$;"#;
 
-    client.execute(create_role_sql, &[]).await?;
+    minerva_cluster_connector
+        .create_role(create_role_sql)
+        .await?;
 
     Ok(())
 }

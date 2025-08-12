@@ -79,7 +79,7 @@ pub async fn create_kpi(
 
         add_trend_store.apply(&mut client).await?;
 
-        create_webservice_role(&client).await?;
+        create_webservice_role(&cluster).await?;
     }
 
     let service_address = Ipv4Addr::new(127, 0, 0, 1);
