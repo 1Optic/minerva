@@ -10,9 +10,6 @@ ALTER TABLE "trend_directory"."table_trend_statistics"
   FOREIGN KEY (table_trend_id)
   REFERENCES "trend_directory"."table_trend" (id) ON DELETE CASCADE;
 
-
---SELECT citus_add_local_table_to_metadata($$trend_directory.table_trend_statistics$$, cascade_via_foreign_keys=>true);
-
 INSERT INTO trend_directory.table_trend_statistics (table_trend_id, min, max)
   SELECT id, NULL, NULL
   FROM trend_directory.table_trend;
@@ -30,10 +27,8 @@ BEGIN
       'FROM pg_statistic s '
       'JOIN pg_class c ON s.starelid = c.oid '
       'JOIN pg_namespace ns ON c.relnamespace = ns.oid '
-      'JOIN trend_directory.partition p ON c.relname LIKE p.name || ''%%'' '
-      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id '
       'JOIN pg_attribute a ON a.attrelid = s.starelid and a.attnum = s.staattnum '
-      'WHERE ns.nspname = ''trend_partition'' AND tsp.name = ''%s'' AND a.attname = ''%s'')'
+      'WHERE ns.nspname = ''partition'' AND c.relname LIKE ''%s%%'' AND a.attname = ''%s'')'
     'SELECT FLOOR(MIN(VALUE)) FROM x',
     $1, $2
   ) INTO result;
@@ -54,10 +49,8 @@ BEGIN
       'FROM pg_statistic s '
       'JOIN pg_class c ON s.starelid = c.oid '
       'JOIN pg_namespace ns ON c.relnamespace = ns.oid '
-      'JOIN trend_directory.partition p ON c.relname LIKE p.name || ''%%'' '
-      'JOIN trend_directory.trend_store_part tsp ON p.trend_store_part_id = tsp.id '
       'JOIN pg_attribute a ON a.attrelid = s.starelid and a.attnum = s.staattnum '
-      'WHERE ns.nspname = ''trend_partition'' AND tsp.name = ''%s'' AND a.attname = ''%s'')'
+      'WHERE ns.nspname = ''partition'' AND c.relname LIKE ''%s%%''  AND a.attname = ''%s'')'
    'SELECT CEIL(MAX(VALUE)) FROM x',
     $1, $2
   ) INTO result;
@@ -79,12 +72,12 @@ AS $function$
     IF $1.data_type <> 'boolean' THEN
       IF trend_directory.greatest_data_type($1.data_type, 'numeric') = 'numeric' THEN
         EXECUTE FORMAT(
-          'SELECT min(nullif(result, '''')) FROM run_command_on_shards('
+          'SELECT min(nullif(result, '''')::numeric) FROM run_command_on_shards('
           '''trend."%s"'', '
           '$cmd$ SELECT trend_directory.get_lowest_trend_value(''%s'', ''%s'') $cmd$)',
           tspname, tspname, $1.name) INTO min;
         EXECUTE FORMAT(
-          'SELECT max(nullif(result, '''')) FROM run_command_on_shards('
+          'SELECT max(nullif(result, '''')::numeric) FROM run_command_on_shards('
           '''trend."%s"'', '
           '$cmd$ SELECT trend_directory.get_highest_trend_value(''%s'', ''%s'') $cmd$)',
           tspname, tspname, $1.name) INTO max;
