@@ -1681,11 +1681,11 @@ pub fn load_trend_store_from_file(path: &PathBuf) -> Result<TrendStore, Error> {
 
         Ok(trend_store)
     } else {
-        return Err(ConfigurationError::from_msg(format!(
+        Err(ConfigurationError::from_msg(format!(
             "Unsupported trend store definition format '{}'",
             path.extension().unwrap().to_string_lossy()
         ))
-        .into());
+        .into())
     }
 }
 
@@ -1699,7 +1699,7 @@ pub async fn create_partitions<T: GenericClient>(
         None => humantime::parse_duration("3days").unwrap(),
     };
 
-    let query = concat!("SELECT id FROM trend_directory.trend_store");
+    let query = "SELECT id FROM trend_directory.trend_store";
 
     let result = client
         .query(query, &[])
@@ -1719,7 +1719,7 @@ pub async fn create_partitions_for_timestamp<T: GenericClient>(
     client: &mut T,
     timestamp: DateTime<Utc>,
 ) -> Result<(), Error> {
-    let query = concat!("SELECT id FROM trend_directory.trend_store");
+    let query = "SELECT id FROM trend_directory.trend_store";
 
     let result = client
         .query(query, &[])

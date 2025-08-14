@@ -174,9 +174,8 @@ impl EntitySet {
             let entitieslist = self.entities.join("', '");
 
             let query = format!(
-                concat!("SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])"),
-                self.id.to_string(),
-                entitieslist
+                "SELECT relation_directory.change_set_entities_guarded({}, ARRAY['{}'])",
+                self.id, entitieslist
             );
             println!("{query}");
             let row = conn.query_one(&query, &[]).await.map_err(|e| {

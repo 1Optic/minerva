@@ -10,7 +10,7 @@ use tokio_postgres::Transaction;
 
 use crate::attribute_store::{Attribute, AttributeStore};
 use crate::entity::{EntityMapping, EntityMappingError};
-use crate::meas_value::{parse_meas_value, DataType, MeasValue, INT2_NONE_VALUE, TEXT_NONE_VALUE};
+use crate::meas_value::{parse_meas_value, DataType, MeasValue};
 
 #[derive(Error, Debug)]
 pub enum AttributeStorageError {
@@ -76,44 +76,6 @@ fn to_sql_type(data_type: DataType) -> Type {
         DataType::Double => Type::FLOAT8,
         DataType::Timestamp => Type::TIMESTAMPTZ,
         _ => Type::TEXT,
-    }
-}
-
-#[derive(Debug, Clone)]
-struct NullValue {
-    data_type: DataType,
-}
-
-impl ToSql for NullValue {
-    fn to_sql(
-        &self,
-        ty: &Type,
-        out: &mut bytes::BytesMut,
-    ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>>
-    where
-        Self: Sized,
-    {
-        debug!("to_sql: {}", self.data_type);
-        match self.data_type {
-            DataType::Int2 => INT2_NONE_VALUE.to_sql(ty, out),
-            _ => TEXT_NONE_VALUE.to_sql(ty, out),
-        }
-    }
-
-    fn accepts(_ty: &Type) -> bool
-    where
-        Self: Sized,
-    {
-        true
-    }
-
-    fn to_sql_checked(
-        &self,
-        ty: &Type,
-        out: &mut BytesMut,
-    ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
-        debug!("to_sql_checked: {}", self.data_type);
-        TEXT_NONE_VALUE.to_sql_checked(ty, out)
     }
 }
 

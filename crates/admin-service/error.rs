@@ -1,4 +1,3 @@
-use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
@@ -26,9 +25,4 @@ pub struct CreationSuccess {
     pub code: i32,
     pub message: String,
     pub id: Option<i32>,
-}
-
-#[derive(Display, From, Debug)]
-pub struct BadRequest {
-    pub message: String,
 }

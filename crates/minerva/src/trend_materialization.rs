@@ -1667,7 +1667,7 @@ pub async fn get_view_def<T: GenericClient + Send + Sync>(
     client: &mut T,
     view: &str,
 ) -> Option<String> {
-    let query = format!(concat!("SELECT pg_get_viewdef('{}'::regclass::oid);"), view);
+    let query = format!("SELECT pg_get_viewdef('{}'::regclass::oid)", view);
 
     match client.query_one(query.as_str(), &[]).await {
         Ok(row) => row.get(0),
@@ -2117,8 +2117,7 @@ pub async fn remove_trend_materialization<T: GenericClient + Send + Sync>(
     client: &mut T,
     name: &str,
 ) -> Result<(), String> {
-    let query =
-        concat!("DELETE FROM trend_directory.materialization WHERE materialization::text = $1");
+    let query = "DELETE FROM trend_directory.materialization WHERE materialization::text = $1";
 
     let deleted = client.execute(query, &[&name]).await.unwrap();
 

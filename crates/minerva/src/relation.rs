@@ -55,11 +55,11 @@ pub fn load_relation_from_file(path: &PathBuf) -> Result<Relation, Error> {
 
         Ok(relation)
     } else {
-        return Err(ConfigurationError::from_msg(format!(
+        Err(ConfigurationError::from_msg(format!(
             "Unsupported relation definition format '{}'",
             path.extension().unwrap().to_string_lossy()
         ))
-        .into());
+        .into())
     }
 }
 

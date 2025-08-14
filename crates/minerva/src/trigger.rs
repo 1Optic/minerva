@@ -949,11 +949,11 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
 
         Ok(trigger.full_trigger())
     } else {
-        return Err(ConfigurationError::from_msg(format!(
+        Err(ConfigurationError::from_msg(format!(
             "Unsupported trigger definition format '{}'",
             path.extension().unwrap().to_string_lossy()
         ))
-        .into());
+        .into())
     }
 }
 

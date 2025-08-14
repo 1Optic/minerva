@@ -57,11 +57,11 @@ pub fn load_entity_type_from_file(path: &PathBuf) -> Result<EntityType, Error> {
 
         Ok(entity_type)
     } else {
-        return Err(ConfigurationError::from_msg(format!(
+        Err(ConfigurationError::from_msg(format!(
             "Unsupported entity type definition format '{}'",
             path.extension().unwrap().to_string_lossy()
         ))
-        .into());
+        .into())
     }
 }
 
