@@ -223,7 +223,8 @@ impl TrendViewMaterialization {
             || self.old_data_stability_delay != other.old_data_stability_delay
         {
             changes.push(Box::new(UpdateTrendViewMaterializationAttributes {
-                trend_view_materialization: other.clone(),
+                source_trend_view_materialization: self.clone(),
+                target_trend_view_materialization: other.clone(),
             }));
         }
 
@@ -390,10 +391,69 @@ async fn drop_fingerprint_function<T: GenericClient + Send + Sync>(
     }
 }
 
+struct ViewMaterializationAttributesDiffItem {
+    trend_view_materialization: TrendViewMaterialization,
+}
+
+impl From<&TrendViewMaterialization> for ViewMaterializationAttributesDiffItem {
+    fn from(value: &TrendViewMaterialization) -> Self {
+        ViewMaterializationAttributesDiffItem {
+            trend_view_materialization: value.clone(),
+        }
+    }
+}
+
+impl DiffItem for ViewMaterializationAttributesDiffItem {
+    fn textualize(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+
+        lines.push(format!(
+            "enabled: {}",
+            self.trend_view_materialization.enabled
+        ));
+
+        lines.push(format!(
+            "processing_delay: {}",
+            format_duration(self.trend_view_materialization.processing_delay)
+        ));
+
+        lines.push(format!(
+            "stability_delay: {}",
+            format_duration(self.trend_view_materialization.stability_delay)
+        ));
+
+        lines.push(format!(
+            "reprocessing_period: {}",
+            format_duration(self.trend_view_materialization.reprocessing_period)
+        ));
+
+        lines.push(format!(
+            "old_data_threshold: {}",
+            optional_to_string(
+                self.trend_view_materialization
+                    .old_data_threshold
+                    .map(format_duration)
+            )
+        ));
+
+        lines.push(format!(
+            "old_data_stability_delay: {}",
+            optional_to_string(
+                self.trend_view_materialization
+                    .old_data_stability_delay
+                    .map(format_duration)
+            )
+        ));
+
+        lines.join("\n")
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct UpdateTrendViewMaterializationAttributes {
-    pub trend_view_materialization: TrendViewMaterialization,
+    pub source_trend_view_materialization: TrendViewMaterialization,
+    pub target_trend_view_materialization: TrendViewMaterialization,
 }
 
 #[async_trait]
@@ -401,13 +461,26 @@ impl Change for UpdateTrendViewMaterializationAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        self.trend_view_materialization
+        self.target_trend_view_materialization
             .update_attributes(&mut tx)
             .await?;
 
         tx.commit().await?;
 
         Ok("Updated attributes of view materialization".into())
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(ViewDiff {
+            from_src: ViewMaterializationAttributesDiffItem::from(
+                &self.source_trend_view_materialization,
+            )
+            .textualize(),
+            to_src: ViewMaterializationAttributesDiffItem::from(
+                &self.target_trend_view_materialization,
+            )
+            .textualize(),
+        })]
     }
 }
 
@@ -416,15 +489,80 @@ impl fmt::Display for UpdateTrendViewMaterializationAttributes {
         write!(
             f,
             "UpdateTrendViewMaterializationAttributes({})",
-            &self.trend_view_materialization.target_trend_store_part,
+            &self
+                .target_trend_view_materialization
+                .target_trend_store_part,
         )
+    }
+}
+
+trait DiffItem {
+    fn textualize(&self) -> String;
+}
+
+struct FunctionMaterializationAttributesDiffItem {
+    trend_function_materialization: TrendFunctionMaterialization,
+}
+
+impl From<&TrendFunctionMaterialization> for FunctionMaterializationAttributesDiffItem {
+    fn from(value: &TrendFunctionMaterialization) -> Self {
+        FunctionMaterializationAttributesDiffItem {
+            trend_function_materialization: value.clone(),
+        }
+    }
+}
+
+impl DiffItem for FunctionMaterializationAttributesDiffItem {
+    fn textualize(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+
+        lines.push(format!(
+            "enabled: {}",
+            self.trend_function_materialization.enabled
+        ));
+
+        lines.push(format!(
+            "processing_delay: {}",
+            format_duration(self.trend_function_materialization.processing_delay)
+        ));
+
+        lines.push(format!(
+            "stability_delay: {}",
+            format_duration(self.trend_function_materialization.stability_delay)
+        ));
+
+        lines.push(format!(
+            "reprocessing_period: {}",
+            format_duration(self.trend_function_materialization.reprocessing_period)
+        ));
+
+        lines.push(format!(
+            "old_data_threshold: {}",
+            optional_to_string(
+                self.trend_function_materialization
+                    .old_data_threshold
+                    .map(format_duration)
+            )
+        ));
+
+        lines.push(format!(
+            "old_data_stability_delay: {}",
+            optional_to_string(
+                self.trend_function_materialization
+                    .old_data_stability_delay
+                    .map(format_duration)
+            )
+        ));
+
+        lines.join("\n")
     }
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct UpdateTrendFunctionMaterializationAttributes {
-    pub trend_function_materialization: TrendFunctionMaterialization,
+    pub source_trend_function_materialization: TrendFunctionMaterialization,
+    pub target_trend_function_materialization: TrendFunctionMaterialization,
 }
 
 #[async_trait]
@@ -432,13 +570,26 @@ impl Change for UpdateTrendFunctionMaterializationAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        self.trend_function_materialization
+        self.target_trend_function_materialization
             .update_attributes(&mut tx)
             .await?;
 
         tx.commit().await?;
 
         Ok("Updated attributes of function materialization".into())
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(ViewDiff {
+            from_src: FunctionMaterializationAttributesDiffItem::from(
+                &self.source_trend_function_materialization,
+            )
+            .textualize(),
+            to_src: FunctionMaterializationAttributesDiffItem::from(
+                &self.target_trend_function_materialization,
+            )
+            .textualize(),
+        })]
     }
 }
 
@@ -447,7 +598,9 @@ impl fmt::Display for UpdateTrendFunctionMaterializationAttributes {
         write!(
             f,
             "UpdateTrendFunctionMaterializationAttributes({})",
-            &self.trend_function_materialization.target_trend_store_part,
+            &self
+                .target_trend_function_materialization
+                .target_trend_store_part,
         )
     }
 }
@@ -648,6 +801,13 @@ pub struct TrendFunctionMaterialization {
     pub description: Option<Value>,
 }
 
+fn optional_to_string<T: Display>(interval: Option<T>) -> String {
+    match interval {
+        None => "None".to_string(),
+        Some(i) => i.to_string(),
+    }
+}
+
 impl TrendFunctionMaterialization {
     async fn define_materialization<T: GenericClient + Send + Sync>(
         &self,
@@ -806,7 +966,8 @@ impl TrendFunctionMaterialization {
             || self.old_data_stability_delay != other.old_data_stability_delay
         {
             changes.push(Box::new(UpdateTrendFunctionMaterializationAttributes {
-                trend_function_materialization: other.clone(),
+                source_trend_function_materialization: self.clone(),
+                target_trend_function_materialization: other.clone(),
             }));
         }
 
