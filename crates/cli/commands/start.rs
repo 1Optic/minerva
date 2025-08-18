@@ -149,17 +149,14 @@ impl Cmd for StartOpt {
 
         println!("Minerva cluster is running (press CTRL-C to stop)");
         println!(
-            "Connect to the cluster on port {}",
+            "Connect to the cluster on port {}\n",
             cluster.connector.coordinator_connector.port
         );
-        println!("");
         println!(
-            "  psql -h localhost -p {} -d {} -U postgres",
+            "  psql -h localhost -p {} -d {} -U postgres\n",
             cluster.connector.coordinator_connector.port, test_database.name
         );
-        println!("");
-        println!("or:");
-        println!("");
+        println!("or:\n");
         println!(
             "  PGHOST=localhost PGPORT={} PGDATABASE={} PGUSER=postgres PGSSLMODE=disable minerva",
             cluster.connector.coordinator_connector.port, test_database.name
