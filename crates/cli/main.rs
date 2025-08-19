@@ -10,6 +10,7 @@ pub mod interact;
 
 use crate::commands::aggregation::AggregationOpt;
 use crate::commands::attributestore::AttributeStoreOpt;
+use crate::commands::baselinedump::BaselineDumpOpt;
 use crate::commands::common::Cmd;
 use crate::commands::define::DefineOpt;
 use crate::commands::diff::DiffOpt;
@@ -71,6 +72,8 @@ enum Commands {
     VirtualEntity(VirtualEntityOpt),
     #[command(about = "Define Minerva instance")]
     Define(DefineOpt),
+    #[command(about = "Create a dump of the Minerva schema baseline")]
+    BaselineDump(BaselineDumpOpt),
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -121,6 +124,7 @@ async fn main() -> ExitCode {
         Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
         Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
         Some(Commands::Define(define)) => define.run().await,
+        Some(Commands::BaselineDump(baseline_dump)) => baseline_dump.run().await,
         None => return ExitCode::FAILURE,
     };
 

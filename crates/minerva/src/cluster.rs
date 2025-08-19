@@ -343,6 +343,8 @@ pub struct MinervaClusterConfig {
     pub config_file: PathBuf,
     pub worker_count: u8,
     pub prefix: String,
+    pub print_stdout: bool,
+    pub print_stderr: bool,
 }
 
 impl Default for MinervaClusterConfig {
@@ -352,6 +354,8 @@ impl Default for MinervaClusterConfig {
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
             worker_count: 3,
             prefix: generate_name(6),
+            print_stdout: true,
+            print_stderr: true,
         }
     }
 }
@@ -571,15 +575,19 @@ impl MinervaCluster {
             )
         })?;
 
-        print_stdout(
-            "Coordinator STDOUT: ".to_string(),
-            controller_container.stdout(true),
-        );
+        if config.print_stdout {
+            print_stdout(
+                "Coordinator STDOUT: ".to_string(),
+                controller_container.stdout(true),
+            );
+        }
 
-        print_stdout(
-            "Coordinator STDERR: ".to_string(),
-            controller_container.stderr(true),
-        );
+        if config.print_stderr {
+            print_stdout(
+                "Coordinator STDERR: ".to_string(),
+                controller_container.stderr(true),
+            );
+        }
 
         let controller_host = controller_container.get_host().await.map_err(|e| {
             crate::error::Error::Runtime(

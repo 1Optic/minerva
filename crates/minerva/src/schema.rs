@@ -1,3 +1,4 @@
+use log::info;
 use refinery::embed_migrations;
 use thiserror::Error;
 use tokio_postgres::Client;
@@ -88,10 +89,10 @@ pub async fn migrate(client: &mut Client) -> Result<(), String> {
     let migrations = report.applied_migrations();
 
     if migrations.is_empty() {
-        println!("Already up-to-date");
+        info!("Already up-to-date");
     } else {
         for m in migrations {
-            println!("Applied: {m}");
+            info!("Applied: {m}");
         }
     }
 
