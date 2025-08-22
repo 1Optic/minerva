@@ -651,15 +651,17 @@ impl InformationOption for TrendRemoveValueInformation {
         table
             .load_preset(UTF8_FULL_CONDENSED)
             .apply_modifier(UTF8_ROUND_CORNERS)
-            .set_header(vec!["trend", "from", "to", "max"]);
+            .set_header(vec!["trend", "max"]);
 
         for (index, trend_name) in self.trend_names.iter().enumerate() {
             let max = row.get::<usize, Option<Decimal>>(index);
 
-            table.add_row(vec![
-                Cell::new(trend_name.clone()),
-                Cell::new(format!("{max:?}")),
-            ]);
+            let value = match max {
+                Some(v) => format!("{v}"),
+                None => "-".to_string(),
+            };
+
+            table.add_row(vec![Cell::new(trend_name.clone()), Cell::new(value)]);
         }
 
         table.lines().collect()
