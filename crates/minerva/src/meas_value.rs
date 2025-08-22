@@ -90,10 +90,12 @@ impl fmt::Display for DataType {
 impl From<&str> for DataType {
     fn from(value: &str) -> DataType {
         match value {
+            "boolean" => DataType::Boolean,
             "smallint" => DataType::Int2,
             "integer" => DataType::Integer,
             "bigint" => DataType::Int8,
             "numeric" => DataType::Numeric,
+            "numeric[]" => DataType::NumericArray,
             "real" => DataType::Real,
             "double precision" => DataType::Double,
             "text" => DataType::Text,
