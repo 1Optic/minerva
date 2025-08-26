@@ -5,7 +5,9 @@ use crate::commands::common::{connect_db, Cmd, CmdResult};
 use materialize::materialize::{load_materialization_chunks, MaterializeConfig};
 
 #[derive(Debug, Parser, PartialEq)]
-pub struct TrendMaterializationChunkList {}
+pub struct TrendMaterializationChunkList {
+    max_chunks: Option<usize>,
+}
 
 #[async_trait]
 impl Cmd for TrendMaterializationChunkList {

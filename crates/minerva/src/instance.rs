@@ -60,6 +60,7 @@ pub struct DiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
+    pub instance_ignores: Vec<DeploymentIgnore>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -84,9 +85,36 @@ pub struct RetentionConfig {
     pub retention_period: Duration,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum TrendChange {
+    DataType,
+    ExtraData,
+    Remove,
+    Add,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DeploymentIgnoreTrend {
+    pub change: TrendChange,
+    pub trend_store_part: String,
+    pub trend_match_regex: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum DeploymentIgnore {
+    Trend(DeploymentIgnoreTrend),
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct DeploymentConfig {
+    pub ignore: Vec<DeploymentIgnore>,
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
+    pub deployment: DeploymentConfig,
     pub entity_aggregation_hints: Vec<EntityAggregationHint>,
     pub entity_types: Vec<String>,
     pub retention: Option<Vec<RetentionConfig>>,
@@ -114,8 +142,8 @@ pub enum InstanceConfigLoadError {
     NoSuchFile(String),
     #[error("Could not open file: {0}")]
     FileOpen(#[from] std::io::Error),
-    #[error("Could not deserialize config: {0}")]
-    Deserialize(String),
+    #[error("Could not deserialize config from file '{0}': {1}")]
+    Deserialize(String, String),
 }
 
 pub fn load_instance_config(
@@ -127,10 +155,14 @@ pub fn load_instance_config(
         return Ok(InstanceConfig::default());
     }
 
-    let config_file = std::fs::File::open(config_file_path)?;
+    let config_file = std::fs::File::open(config_file_path.clone())?;
     let reader = BufReader::new(config_file);
-    let image_config: InstanceConfig = serde_json::from_reader(reader)
-        .map_err(|e| InstanceConfigLoadError::Deserialize(format!("{e}")))?;
+    let image_config: InstanceConfig = serde_json::from_reader(reader).map_err(|e| {
+        InstanceConfigLoadError::Deserialize(
+            config_file_path.to_string_lossy().to_string(),
+            format!("{e}"),
+        )
+    })?;
 
     Ok(image_config)
 }
@@ -613,6 +645,7 @@ impl MinervaInstance {
                         ignore_trend_extra_data: options.ignore_trend_extra_data,
                         ignore_trend_data_type: options.ignore_trend_data_type,
                         ignore_deletions: options.ignore_deletions,
+                        instance_ignores: options.instance_ignores.clone(),
                     };
 
                     changes.append(&mut my_trend_store.diff(other_trend_store, diff_options));

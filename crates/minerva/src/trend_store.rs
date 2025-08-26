@@ -26,6 +26,7 @@ use crate::changes::trend_store::{
     ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
 };
 use crate::entity::EntityMapping;
+use crate::instance::DeploymentIgnore;
 use crate::meas_value::{
     DataType, MeasValue, INT8_NONE_VALUE, INTEGER_NONE_VALUE, NUMERIC_NONE_VALUE, TEXT_NONE_VALUE,
 };
@@ -293,6 +294,29 @@ pub struct TrendStorePartDiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
+    pub instance_ignores: Vec<DeploymentIgnore>,
+}
+
+impl TrendStorePartDiffOptions {
+    pub fn include_trend_data_type_change(&self, trend_name: &str) -> bool {
+        if self.ignore_trend_data_type {
+            return false;
+        }
+
+        for i in &self.instance_ignores {
+            match i {
+                DeploymentIgnore::Trend(trend_ignore) => {
+                    let pattern = regex::Regex::new(&trend_ignore.trend_match_regex).unwrap();
+
+                    if pattern.is_match(trend_name) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSql, PartialEq, Eq)]
@@ -1189,8 +1213,8 @@ impl TrendStorePart {
             {
                 Some(my_trend) => {
                     // The trend already exists, check for changes
-                    if !options.ignore_trend_data_type
-                        && my_trend.data_type != other_trend.data_type
+                    if my_trend.data_type != other_trend.data_type
+                        && options.include_trend_data_type_change(&my_trend.name)
                     {
                         alter_trend_data_types.push(ModifyTrendDataType {
                             trend_name: my_trend.name.clone(),
@@ -1280,6 +1304,7 @@ pub struct TrendStoreDiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
+    pub instance_ignores: Vec<DeploymentIgnore>,
 }
 
 impl TrendStoreDiffOptions {
@@ -1289,6 +1314,7 @@ impl TrendStoreDiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
+            instance_ignores: self.instance_ignores.clone(),
         }
     }
 }

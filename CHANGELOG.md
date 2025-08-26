@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.34.0] - 2025-08-26
+
+### Added
+
+- CLI: Added support for ignoring trend data type changes using instance config file.
+
 ## [9.33.1] - 2025-08-22
 
 ### Fixed
@@ -496,4 +502,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.32.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.31.0...9.32.0
 [9.33.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.32.0...9.33.0
 [9.33.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.0...9.33.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.1...HEAD
+[9.34.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.1...9.34.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...HEAD

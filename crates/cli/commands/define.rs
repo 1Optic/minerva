@@ -322,7 +322,7 @@ mod tests {
     use serde_json::json;
 
     use minerva::{
-        instance::{InstanceConfig, RetentionConfig},
+        instance::{DeploymentConfig, InstanceConfig, RetentionConfig},
         trend_store::{Trend, TrendStore, TrendStorePart},
     };
 
@@ -388,6 +388,7 @@ mod tests {
 
         let instance_config = InstanceConfig {
             docker_image: None,
+            deployment: DeploymentConfig::default(),
             entity_aggregation_hints: Vec::new(),
             entity_types: Vec::new(),
             old_data_stability_delay: Duration::from_secs(3600 * 3),

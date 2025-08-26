@@ -6,7 +6,7 @@ use clap::Parser;
 
 use erased_serde::Serializer;
 use minerva::error::{ConfigurationError, Error};
-use minerva::instance::{DiffOptions, MinervaInstance};
+use minerva::instance::{load_instance_config, DiffOptions, MinervaInstance};
 
 use super::common::{
     connect_to_db, get_db_config, show_db_config, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT,
@@ -49,6 +49,11 @@ impl Cmd for DiffOpt {
         let to_instance_descr: String;
 
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
+        let instance_config = load_instance_config(&minerva_instance_root).map_err(|e| {
+            minerva::error::ConfigurationError::from_msg(format!(
+                "Could not load instance config: {e}"
+            ))
+        })?;
 
         let other_instance = if let Some(with_dir) = &self.with_dir {
             to_instance_descr = format!("dir('{}')", with_dir.to_string_lossy());
@@ -69,6 +74,7 @@ impl Cmd for DiffOpt {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
+            instance_ignores: instance_config.deployment.ignore,
         };
 
         let changes = other_instance.diff(&instance_def, diff_options);

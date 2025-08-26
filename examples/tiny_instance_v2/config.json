@@ -1,4 +1,13 @@
 {
+    "deployment": {
+        "ignore": [
+            {
+                "change": "DataType",
+                "trend_store_part": "hub_node_main_15m",
+                "trend_match_regex": "inside_temp"
+            }
+        ]
+    },
     "entity_aggregation_hints": [],
     "entity_types": [],
     "old_data_threshold": "6h",

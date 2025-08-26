@@ -1,4 +1,7 @@
 {
+    "deployment": {
+        "ignore": []
+    },
     "entity_aggregation_hints": [],
     "entity_types": [],
     "old_data_threshold": "6h",

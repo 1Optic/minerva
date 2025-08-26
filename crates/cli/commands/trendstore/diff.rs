@@ -41,6 +41,7 @@ impl Cmd for TrendStoreDiff {
                     ignore_trend_extra_data: self.ignore_trend_extra_data,
                     ignore_trend_data_type: self.ignore_trend_data_type,
                     ignore_deletions: self.ignore_deletions,
+                    instance_ignores: Vec::new(),
                 };
 
                 let changes = trend_store_db.diff(&trend_store, diff_options);

@@ -11,6 +11,7 @@ use minerva::graph::dependee_graph;
 use minerva::graph::node_index_by_name;
 use minerva::graph::render_graph_with_changes;
 use minerva::graph::GraphNode;
+use minerva::instance::load_instance_config;
 use minerva::instance::DiffOptions;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::Dfs;
@@ -78,12 +79,18 @@ impl Cmd for UpdateOpt {
         //);
         //io::stdout().flush().unwrap();
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
+        let instance_config = load_instance_config(&minerva_instance_root).map_err(|e| {
+            minerva::error::ConfigurationError::from_msg(format!(
+                "Could not load instance config: {e}"
+            ))
+        })?;
         //println!("Ok");
 
         let diff_options = DiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
+            instance_ignores: instance_config.deployment.ignore,
         };
 
         let update_plan = plan_update(&instance_db, &instance_def, diff_options);
