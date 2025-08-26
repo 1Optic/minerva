@@ -1,0 +1,16 @@
+# Citus Docker image + Minerva CLI for Minerva instance testing
+#
+# Place a Minerva instance in directory '/minerva-instance' and it is loaded on container start.
+
+FROM harbor.hendrikx-itc.nl/1optic/rust-ci:1.89.2@sha256:c09afc23dc64d41ada7fe1a19738d3acc55b5e79aa8949be5b555657f3e3e518 AS build
+
+COPY . /src
+WORKDIR /src
+
+RUN cargo build --package minerva-cli --release --target=x86_64-unknown-linux-musl
+
+FROM docker.io/citusdata/citus:13.0.3-alpine
+
+COPY --from=build /src/target/x86_64-unknown-linux-musl/release/minerva /usr/bin/
+
+COPY ./container/load-instance.sh /docker-entrypoint-initdb.d/0-load-instance.sh
