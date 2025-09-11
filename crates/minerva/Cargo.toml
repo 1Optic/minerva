@@ -40,7 +40,7 @@ bollard-stubs = "=1.48.3-rc.28.0.4"
 erased-serde = "0.4.6"
 petgraph = "0.8.2"
 pg_query = "6.1.1"
-comfy-table = "7.2.0"
+comfy-table = "7.2.1"
 similar = "2.7.0"
 console = "0.16.1"
 
