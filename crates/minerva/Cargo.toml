@@ -12,7 +12,7 @@ tokio-postgres-rustls = "0.13"
 futures-util = "0.3"
 postgres-types = { version = "0.2.9", features = ["derive"] }
 postgres-protocol = "0.6.8"
-serde = { version = "1.0.220", features = ["derive"] }
+serde = { version = "1.0.221", features = ["derive"] }
 serde_yaml = "0.9.34"
 chrono = { version = "0.4", features = ["serde"] }
 humantime = "2.2.0"
