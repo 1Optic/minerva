@@ -51,7 +51,7 @@ thiserror = "2.0.16"
 deadpool-postgres = "0.14.1"
 tokio-stream = "0.1.17"
 futures = "0.3.31"
-erased-serde = "0.4.7"
+erased-serde = "0.4.8"
 petgraph = "0.8.2"
 dotenv = "0.15"
 
