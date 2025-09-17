@@ -9,12 +9,14 @@ use glob::glob;
 use log::error;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
 use crate::graph::GraphNode;
+use crate::meas_value::DataType;
 use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
 
 use super::attribute_materialization::{
@@ -111,6 +113,28 @@ pub struct DeploymentConfig {
     pub ignore: Vec<DeploymentIgnore>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct AddAttribute {
+    pub name: String,
+    pub data_type: DataType,
+    pub example: String,
+    #[serde(default)]
+    pub extra_data: Value,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct AddAttributes {
+    pub entity_type: String,
+    pub description: String,
+    pub attributes: Vec<AddAttribute>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct AttributeExtraction {
+    pub data_source: String,
+    pub add_attributes: Vec<AddAttributes>,
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
@@ -122,6 +146,7 @@ pub struct InstanceConfig {
     pub old_data_threshold: Duration,
     #[serde(with = "humantime_serde")]
     pub old_data_stability_delay: Duration,
+    pub attribute_extraction: AttributeExtraction,
 }
 
 impl InstanceConfig {

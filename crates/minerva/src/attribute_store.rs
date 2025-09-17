@@ -9,6 +9,7 @@ use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
 use postgres_protocol::escape::escape_identifier;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{Client, GenericClient};
 
@@ -22,13 +23,32 @@ use crate::meas_value::DataType;
 pub mod compact;
 pub mod materialize_curr_ptr;
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
-#[postgres(name = "attribute_descr")]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Attribute {
     pub name: PostgresName,
     pub data_type: DataType,
     #[serde(default = "default_empty_string")]
     pub description: String,
+    pub extra_data: Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSql)]
+#[postgres(name = "attribute_descr")]
+pub struct AttributeDescr {
+    pub name: PostgresName,
+    pub data_type: DataType,
+    #[serde(default = "default_empty_string")]
+    pub description: String,
+}
+
+impl From<&Attribute> for AttributeDescr {
+    fn from(value: &Attribute) -> Self {
+        AttributeDescr {
+            name: value.name.clone(),
+            data_type: value.data_type,
+            description: value.description.clone(),
+        }
+    }
 }
 
 impl fmt::Display for Attribute {
@@ -456,7 +476,12 @@ impl Change for AddAttributeStore {
             &[
                 &self.attribute_store.data_source,
                 &self.attribute_store.entity_type,
-                &self.attribute_store.attributes,
+                &self
+                    .attribute_store
+                    .attributes
+                    .iter()
+                    .map(AttributeDescr::from)
+                    .collect::<Vec<AttributeDescr>>(),
             ],
         )
         .await
@@ -541,7 +566,7 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
     conn: &T,
     attribute_store_id: i32,
 ) -> Vec<Attribute> {
-    let attribute_query = "SELECT name, data_type, description FROM attribute_directory.attribute WHERE attribute_store_id = $1";
+    let attribute_query = "SELECT name, data_type, description, extra_data FROM attribute_directory.attribute WHERE attribute_store_id = $1";
     let attribute_result = conn
         .query(attribute_query, &[&attribute_store_id])
         .await
@@ -553,11 +578,13 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
         let attribute_name: &str = attribute_row.get(0);
         let attribute_data_type: &str = attribute_row.get(1);
         let attribute_description: Option<String> = attribute_row.get(2);
+        let extra_data: Value = attribute_row.get(3);
 
         attributes.push(Attribute {
             name: String::from(attribute_name),
             data_type: DataType::from(attribute_data_type),
             description: attribute_description.unwrap_or_default(),
+            extra_data,
         });
     }
 
@@ -616,6 +643,7 @@ mod tests {
                 name: "equipment_type".to_string(),
                 data_type: DataType::Text,
                 description: "Type name from vendor".to_string(),
+                extra_data: Value::Null,
             }],
         };
 
@@ -643,6 +671,7 @@ mod tests {
                 name: "equipment_type".to_string(),
                 data_type: DataType::Text,
                 description: "Type name from vendor".to_string(),
+                extra_data: Value::Null,
             }],
         };
 

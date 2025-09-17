@@ -1,0 +1,41 @@
+{
+    "title": "Minerva trends input for trend store generation",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "data_source": {
+                "type": "string"
+            },
+            "granularity": {
+                "type": "string"
+            },
+            "entity_type": {
+                "type": "string"
+            },
+            "part": {
+                "type": "string"
+            },
+            "name": {
+                "type": "string"
+            },
+            "data_type": {
+                "type": "string"
+            },
+            "description": {
+                "type": "string"
+            },
+            "entity_aggregation": {
+                "type": "string"
+            },
+            "time_aggregation": {
+                "type": "string"
+            },
+            "extra_data": {
+                "type": "object"
+            }
+        },
+        "additionalProperties": false
+        "required": ["data_source", "entity_type", "granularity", "name", "data_type"]
+    }
+}

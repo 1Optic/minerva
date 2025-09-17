@@ -1,0 +1,170 @@
+{
+    "title": "Minerva Instance Config",
+    "description": "A specification of the format of Minerva instance configuration files",
+    "type": "object",
+    "properties": {
+        "docker_image": {
+            "type": "object",
+            "properties": {
+                "image_name": {
+                    "type": "string"
+                },
+                "image_tag": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "dockerfile": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false,
+            "required": ["image_name", "image_tag", "path", "dockerfile"]
+        },
+        "deployment": {
+            "type": "object",
+            "properties": {
+                "ignore": {
+                    "description": "Ignore certain changes when deploying instance changes",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "change": {
+                                "type": "string"
+                            },
+                            "trend_store_part": {
+                                "type": "string"
+                            },
+                            "trend_match_regex": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "trend_extraction": {
+            "description": "Defines how specification extraction scripts should map trends to Minerva instance objects",
+            "type": "object",
+            "properties": {
+                "data_source": {
+                    "type": "string"
+                },
+                "granularity": {
+                    "type": "string"
+                },
+                "trend_name_mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "match_regex": {
+                                "type": "string"
+                            },
+                            "target": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data_source"]
+        },
+        "attribute_extraction": {
+            "type": "object",
+            "properties": {
+                "data_source": {
+                    "type": "string"
+                },
+                "add_attributes": {
+                    "description": "Add attributes when generating attribute stores from specification extracted from external sources",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "attributes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "data_type": {
+                                            "type": "string"
+                                        },
+                                        "example": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": ["name", "data_type", "example"]
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": ["entity_type", "attributes"]
+                    }
+                }
+            },
+            "required": ["data_source"]
+        },
+        "old_data_threshold": {
+            "type": "string"
+        },
+        "old_data_stability_delay": {
+            "type": "string"
+        },
+        "retention": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "granularity": {
+                        "type": "string"
+                    },
+                    "retention_period": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": ["granularity", "retention_period"]
+            }
+        },
+        "entity_aggregation_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "relation": {
+                        "type": "string"
+                    },
+                    "materialization_type": {
+                        "enum": ["FUNCTION_MATERIALIZATION", "VIEW_MATERIALIZATION", "SUPPRESS"]
+                    },
+                    "prefix": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": ["relation", "materialization_type"]
+            }
+        },
+        "entity_types": {
+            "description": "Names of entity types known in advance and specifying the required casing",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    }
+}

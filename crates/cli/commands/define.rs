@@ -1,9 +1,13 @@
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
 use async_trait::async_trait;
 use clap::Parser;
 use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_store};
+use minerva::attribute_store::{Attribute, AttributeStore};
 use minerva::error::RuntimeError;
 use minerva::instance::{load_instance_config, load_trend_stores_from, InstanceConfig};
 use minerva::meas_value::DataType;
@@ -17,6 +21,8 @@ use super::common::{Cmd, CmdResult};
 pub struct DefineOpt {
     #[arg(help = "Root directory of Minerva instance to write to")]
     instance_root: PathBuf,
+    #[arg(help = "Directory with trend and attribute definitions")]
+    definitions_dir: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -78,11 +84,61 @@ impl From<&TrendDefinition> for Trend {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct AttributeDefinition {
+    data_source: String,
+    entity_type: String,
+    name: String,
+    data_type: DataType,
+    description: String,
+    extra_data: Value,
+}
+
+impl From<&AttributeDefinition> for Attribute {
+    fn from(value: &AttributeDefinition) -> Self {
+        Attribute {
+            name: value.name.clone(),
+            data_type: value.data_type,
+            description: value.description.clone(),
+            extra_data: value.extra_data.clone(),
+        }
+    }
+}
+
 #[async_trait]
 impl Cmd for DefineOpt {
     async fn run(&self) -> CmdResult {
+        let trend_definitions_file_path = self.definitions_dir.join("trends.json");
+        let trend_definitions_file = File::open(&trend_definitions_file_path).map_err(|e| {
+            RuntimeError::from_msg(format!(
+                "Could not open trend definitions file '{}': {e}",
+                trend_definitions_file_path.to_string_lossy()
+            ))
+        })?;
         let trend_definitions: Vec<TrendDefinition> =
-            serde_json::from_reader(std::io::stdin()).unwrap();
+            serde_json::from_reader(BufReader::new(trend_definitions_file)).map_err(|e| {
+                RuntimeError::from_msg(format!(
+                    "Could not load trend definitions file '{}': {e}",
+                    trend_definitions_file_path.to_string_lossy()
+                ))
+            })?;
+
+        let attribute_definitions_file_path = self.definitions_dir.join("attributes.json");
+        let attribute_definitions_file =
+            File::open(&attribute_definitions_file_path).map_err(|e| {
+                RuntimeError::from_msg(format!(
+                    "Could not open attribute definitions file '{}': {e}",
+                    trend_definitions_file_path.to_string_lossy()
+                ))
+            })?;
+
+        let mut attribute_definitions: Vec<AttributeDefinition> =
+            serde_json::from_reader(BufReader::new(attribute_definitions_file)).map_err(|e| {
+                RuntimeError::from_msg(format!(
+                    "Could not load attribute definitions file '{}': {e}",
+                    attribute_definitions_file_path.to_string_lossy()
+                ))
+            })?;
 
         let instance_config = load_instance_config(&self.instance_root).map_err(|e| {
             RuntimeError::from_msg(format!("Could not load instance configuration: {e}"))
@@ -95,15 +151,47 @@ impl Cmd for DefineOpt {
             &trend_definitions,
             &current_trend_stores,
             TrendStorePartParameters::default(),
-            instance_config,
+            &instance_config,
         );
 
         for trend_store in &trend_stores {
             save_trend_store(&self.instance_root, trend_store).unwrap();
         }
 
+        let attribute_stores =
+            define_attribute_stores(&mut attribute_definitions, &instance_config);
+
+        for attribute_store in &attribute_stores {
+            println!("Saving attribute store '{}'", attribute_store);
+            save_attribute_store(&self.instance_root, attribute_store).unwrap();
+        }
+
         Ok(())
     }
+}
+
+pub fn save_attribute_store(
+    instance_root: &Path,
+    attribute_store: &AttributeStore,
+) -> Result<(), String> {
+    let attribute_store_file_name = format!(
+        "{}_{}.yaml",
+        attribute_store.data_source, attribute_store.entity_type
+    );
+
+    let trend_store_file_path: PathBuf = PathBuf::from_iter([
+        instance_root,
+        &PathBuf::from("attribute"),
+        &PathBuf::from(attribute_store_file_name),
+    ]);
+
+    let file = File::create(trend_store_file_path).unwrap();
+
+    let writer = BufWriter::new(file);
+
+    serde_yaml::to_writer(writer, &attribute_store).unwrap();
+
+    Ok(())
 }
 
 struct TrendStorePartParameters {
@@ -222,7 +310,7 @@ fn define_trend_stores(
     trend_definitions: &[TrendDefinition],
     current_trend_stores: &[TrendStore],
     params: TrendStorePartParameters,
-    instance_config: InstanceConfig,
+    instance_config: &InstanceConfig,
 ) -> Vec<TrendStore> {
     let re = regex::Regex::new(r"[1-9]$").unwrap();
     let mut trend_store_parts: HashMap<String, TrendStorePartHolder> = HashMap::new();
@@ -315,6 +403,76 @@ fn define_trend_stores(
     trend_stores.into_values().collect()
 }
 
+fn define_attribute_stores(
+    attribute_definitions: &mut [AttributeDefinition],
+    instance_config: &InstanceConfig,
+) -> Vec<AttributeStore> {
+    attribute_definitions.sort_by(|a, b| {
+        (&a.data_source, &a.entity_type, &a.name).cmp(&(&b.data_source, &b.entity_type, &b.name))
+    });
+
+    let mut attribute_stores: HashMap<(&str, &str), AttributeStore> = HashMap::new();
+
+    for attribute_definition in attribute_definitions {
+        // First determine the entity type name by checking if a name is already defined
+        let entity_type_name = instance_config
+            .entity_types
+            .iter()
+            .find(|t| {
+                t.to_lowercase()
+                    .eq(&attribute_definition.entity_type.to_lowercase())
+            })
+            .unwrap_or(&attribute_definition.entity_type);
+
+        let attribute_store = attribute_stores
+            .entry((&attribute_definition.data_source, entity_type_name))
+            .or_insert_with(|| AttributeStore {
+                data_source: attribute_definition.data_source.clone(),
+                entity_type: entity_type_name.clone(),
+                attributes: Vec::new(),
+            });
+
+        if attribute_store
+            .attributes
+            .iter()
+            .any(|a| a.name.eq(&attribute_definition.name))
+        {
+        } else {
+            attribute_store
+                .attributes
+                .push(Attribute::from(&*attribute_definition));
+        }
+    }
+
+    for a in &instance_config.attribute_extraction.add_attributes {
+        let attribute_store_key = (
+            instance_config.attribute_extraction.data_source.as_str(),
+            a.entity_type.as_str(),
+        );
+
+        let attribute_store = attribute_stores
+            .entry(attribute_store_key)
+            .or_insert_with(|| AttributeStore {
+                data_source: instance_config.attribute_extraction.data_source.clone(),
+                entity_type: a.entity_type.clone(),
+                attributes: Vec::new(),
+            });
+
+        for add_attribute in &a.attributes {
+            attribute_store.attributes.push(Attribute {
+                name: add_attribute.name.clone(),
+                data_type: add_attribute.data_type,
+                description: "".to_string(),
+                extra_data: add_attribute.extra_data.clone(),
+            });
+        }
+
+        println!("Matched attribute store: '{}'", attribute_store);
+    }
+
+    attribute_stores.into_values().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -322,11 +480,13 @@ mod tests {
     use serde_json::json;
 
     use minerva::{
-        instance::{DeploymentConfig, InstanceConfig, RetentionConfig},
+        instance::{
+            AddAttribute, AddAttributes, DeploymentConfig, InstanceConfig, RetentionConfig,
+        },
         trend_store::{Trend, TrendStore, TrendStorePart},
     };
 
-    use crate::commands::define::TrendDefinition;
+    use crate::commands::define::{define_attribute_stores, AttributeDefinition, TrendDefinition};
 
     use super::{define_trend_stores, TrendStorePartParameters};
 
@@ -397,13 +557,21 @@ mod tests {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
             }]),
+            attribute_extraction: minerva::instance::AttributeExtraction {
+                data_source: "my-test".to_string(),
+                add_attributes: vec![AddAttributes {
+                    entity_type: "node".to_string(),
+                    description: "some extra attributes for testing".to_string(),
+                    attributes: vec![],
+                }],
+            },
         };
 
         let new_trend_stores = define_trend_stores(
             &trend_definitions,
             &current_trend_stores,
             params,
-            instance_config,
+            &instance_config,
         );
 
         assert_eq!(
@@ -432,5 +600,66 @@ mod tests {
         assert_eq!(second_trend_store_part.name, "my-test_node_traffic_15m");
         assert_eq!(second_trend_store_part.trends.len(), 1);
         assert_eq!(second_trend_store_part.trends.first().unwrap().name, "tx");
+    }
+
+    #[test]
+    fn test_define_attribute_stores() {
+        let mut attribute_definitions = vec![
+            AttributeDefinition {
+                data_source: "test_cm".to_string(),
+                entity_type: "node".to_string(),
+                name: "FrqB".to_string(),
+                data_type: minerva::meas_value::DataType::Text,
+                description: "Some frequency B".to_string(),
+                extra_data: json!("{}"),
+            },
+            AttributeDefinition {
+                data_source: "test_cm".to_string(),
+                entity_type: "node".to_string(),
+                name: "FrqA".to_string(),
+                data_type: minerva::meas_value::DataType::Text,
+                description: "Some frequency A".to_string(),
+                extra_data: json!("{}"),
+            },
+        ];
+
+        let instance_config = InstanceConfig {
+            docker_image: None,
+            deployment: DeploymentConfig::default(),
+            entity_aggregation_hints: Vec::new(),
+            entity_types: Vec::new(),
+            old_data_stability_delay: Duration::from_secs(3600 * 3),
+            old_data_threshold: Duration::from_secs(3600 * 6),
+            retention: Some(vec![RetentionConfig {
+                granularity: humantime::parse_duration("15m").unwrap(),
+                retention_period: humantime::parse_duration("14d").unwrap(),
+            }]),
+            attribute_extraction: minerva::instance::AttributeExtraction {
+                data_source: "test_cm".to_string(),
+                add_attributes: vec![AddAttributes {
+                    entity_type: "node".to_string(),
+                    description: "some extra attributes for testing".to_string(),
+                    attributes: vec![AddAttribute {
+                        name: "Pwr".to_string(),
+                        data_type: minerva::meas_value::DataType::Integer,
+                        example: "40".to_string(),
+                        extra_data: serde_json::Value::Null,
+                    }],
+                }],
+            },
+        };
+
+        let attribute_stores =
+            define_attribute_stores(&mut attribute_definitions, &instance_config);
+
+        assert_eq!(attribute_stores.len(), 1);
+
+        let attribute_store = &attribute_stores[0];
+
+        // We expect the 2 attributes from the definition and 1 from the extra added attributes
+        assert_eq!(attribute_store.attributes.len(), 3);
+
+        assert_eq!(attribute_store.attributes[0].name, "FrqA");
+        assert_eq!(attribute_store.attributes[1].name, "FrqB");
     }
 }

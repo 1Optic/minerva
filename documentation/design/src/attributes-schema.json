@@ -1,0 +1,29 @@
+{
+    "title": "Minerva attributes input for attribute store generation",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "data_source": {
+                "type": "string"
+            },
+            "entity_type": {
+                "type": "string"
+            },
+            "name": {
+                "type": "string"
+            },
+            "data_type": {
+                "type": "string"
+            },
+            "description": {
+                "type": "string"
+            },
+            "extra_data": {
+                "type": "object"
+            }
+        },
+        "additionalProperties": false,
+        "required": ["data_source", "entity_type", "name", "data_type"]
+    }
+}
