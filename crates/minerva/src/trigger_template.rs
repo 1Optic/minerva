@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
@@ -31,12 +31,15 @@ pub enum ParameterType {
     Default,
     Counter,
     ThresholdVariable,
+    LookbackVariable,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TemplateParameter {
     pub name: String,
     pub parameter_type: ParameterType,
+    pub has_lookback: bool,
+    pub lookback_parameter: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -131,12 +134,13 @@ impl TemplatedTrigger {
             return Err(TriggerTemplateError::ExtraneousParameter(parm.name));
         };
         let needed_thresholds = self.parameters.clone().into_iter().filter(|p| {
-            self.template
+            let ptype = self
+                .template
                 .clone()
                 .get_parameter(&p.name)
                 .unwrap()
-                .parameter_type
-                == ParameterType::ThresholdVariable
+                .parameter_type;
+            ptype == ParameterType::ThresholdVariable || ptype == ParameterType::LookbackVariable
         });
         if let Some(threshold) = needed_thresholds.clone().find(|p| {
             !self
@@ -175,6 +179,28 @@ impl TemplatedTrigger {
         }
     }
 
+    pub fn adapted_extended_parameter_name(
+        &self,
+        parameter: &ParameterValue,
+        extension: &str,
+    ) -> String {
+        match self
+            .template
+            .parameters
+            .clone()
+            .into_iter()
+            .find(|p| p.name == parameter.name)
+        {
+            Some(template_parameter) => match template_parameter.parameter_type {
+                ParameterType::Counter => {
+                    "\"".to_owned() + &parameter.value + "_" + extension + "\""
+                }
+                _ => parameter.value.clone() + "_" + extension,
+            },
+            None => parameter.value.clone() + "_" + extension,
+        }
+    }
+
     pub async fn create_trigger(
         &self,
         client: &mut Transaction<'_>,
@@ -202,6 +228,17 @@ impl TemplatedTrigger {
                     == ParameterType::Counter
             })
             .collect();
+        let lookback_counters: Vec<ParameterValue> = self
+            .parameters
+            .clone()
+            .into_iter()
+            .filter(|p| {
+                let tp = self.template.clone().get_parameter(&p.name).unwrap();
+                tp.parameter_type == ParameterType::Counter && tp.has_lookback
+            })
+            .collect();
+        let mut counter_source: HashMap<String, String> = HashMap::new();
+
         for counter in &counters {
             let granularity_str: String = format_duration(self.granularity).to_string();
 
@@ -241,11 +278,12 @@ impl TemplatedTrigger {
 
             let source: String = tsprows[0].get(0);
             if !sources.iter().any(|s| s == &source) {
-                sources.push(source);
+                sources.push(source.to_string());
+                counter_source.insert(counter.value.clone(), source);
             };
         }
 
-        let kpi_data = counters
+        let mut kpi_data: Vec<KPIDataColumn> = counters
             .clone()
             .into_iter()
             .map(|c| KPIDataColumn {
@@ -254,28 +292,156 @@ impl TemplatedTrigger {
             })
             .collect();
 
-        let mut kpi_function = concat!(
-            "BEGIN\n",
-            "  RETURN query EXECUTE $query$\n",
-            "    SELECT\n",
-            "      t1.entity_id,\n",
-            "      $1",
-        )
-        .to_string();
+        for counter in &lookback_counters {
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_count",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_avg",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_max",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_min",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_sum",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_stddev",
+                data_type: "numeric".to_string(),
+            });
+            kpi_data.push(KPIDataColumn {
+                name: counter.value.clone() + "_var",
+                data_type: "numeric".to_string(),
+            });
+        }
+
+        let mut kpi_function =
+            concat!("\nBEGIN\n", "  RETURN query EXECUTE $query$\n",).to_string();
+
+        let mut first = true;
+
+        for counter in &lookback_counters {
+            let lookback_param = self
+                .template
+                .clone()
+                .get_parameter(&counter.name)
+                .unwrap()
+                .lookback_parameter
+                .clone()
+                .unwrap_or("lookback".to_string());
+            let mut lookback = "1".to_string();
+            if let Some(lookback_param_name) = self
+                .parameters
+                .clone()
+                .into_iter()
+                .find(|p| p.name == lookback_param)
+            {
+                if let Some(lookback_param) = self
+                    .thresholds
+                    .clone()
+                    .into_iter()
+                    .find(|t| t.name == lookback_param_name.value)
+                {
+                    lookback = lookback_param.value.clone();
+                }
+            }
+
+            if first {
+                first = false;
+            } else {
+                kpi_function.push_str(",\n");
+            }
+            kpi_function.push_str(&format!(
+                "\
+    WITH \"{}_past_data\" AS (\n\
+      SELECT\n\
+        entity_id,\n\
+        count(*) AS {}_count,\n\
+        avg({}) AS {}_avg,\n\
+        max({}) AS {}_max,\n\
+        min({}) AS {}_min,\n\
+        sum({}) AS {}_sum,\n\
+        stddev_samp({}) AS {}_stddev,\n\
+        var_samp({}) AS {}_var\n\
+    FROM trend.\"{}\"\n\
+    WHERE timestamp < $1 AND timestamp >= $1 - '{}d'::interval\n\
+    GROUP BY entity_id\n\
+    )",
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter_source.get(&counter.value).unwrap(),
+                lookback
+            ));
+        }
+
+        kpi_function.push_str(concat!("    SELECT\n", "      t1.entity_id,\n", "      $1",));
         for counter in &counters {
             kpi_function.push_str(&format!(",\n      \"{}\"::numeric", counter.value));
         }
+        for counter in &lookback_counters {
+            kpi_function.push_str(&format!(
+                "\
+,\n      \"{}_past_data\".\"{}_count\"::numeric\
+,\n      \"{}_past_data\".\"{}_avg\"::numeric\
+,\n      \"{}_past_data\".\"{}_max\"::numeric\
+,\n      \"{}_past_data\".\"{}_min\"::numeric\
+,\n      \"{}_past_data\".\"{}_sum\"::numeric\
+,\n      \"{}_past_data\".\"{}_stddev\"::numeric\
+,\n      \"{}_past_data\".\"{}_var\"::numeric",
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+                counter.value,
+            ));
+        }
+
         let mut sourcecounter = 1;
         for source in &sources {
             if sourcecounter == 1 {
                 kpi_function.push_str(&format!("\n    FROM trend.\"{source}\" t1\n"));
             } else {
                 kpi_function.push_str(&format!(
-                    "    JOIN trend.{} t{} ON t{}.timestamp = t1.timestamp AND t{}.entity_id = t1.entity_id\n",
+                    "    JOIN trend.{} t{} ON t{}.timestamp = t1.timestamp AND t{}.entity_id = $1\n",
                     escape_identifier(source), sourcecounter, sourcecounter, sourcecounter
                 ));
             };
             sourcecounter += 1;
+        }
+        for counter in &lookback_counters {
+            kpi_function.push_str(&format!(
+                "    JOIN \"{}_past_data\" ON \"{}_past_data\".entity_id = t1.entity_id\n",
+                counter.value, counter.value
+            ));
         }
         sourcecounter = 1;
         for _ in &sources {
@@ -294,6 +460,39 @@ impl TemplatedTrigger {
                 &("{".to_owned() + &parameter.name + "}"),
                 &self.adapted_parameter_name(parameter),
             );
+            if self
+                .template
+                .parameters
+                .clone()
+                .into_iter()
+                .any(|p| p.name == parameter.name && p.has_lookback)
+            {
+                condition = condition
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_count}"),
+                        &self.adapted_extended_parameter_name(parameter, "count"),
+                    )
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_avg}"),
+                        &self.adapted_extended_parameter_name(parameter, "avg"),
+                    )
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_max}"),
+                        &self.adapted_extended_parameter_name(parameter, "max"),
+                    )
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_min}"),
+                        &self.adapted_extended_parameter_name(parameter, "min"),
+                    )
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_sum}"),
+                        &self.adapted_extended_parameter_name(parameter, "sum"),
+                    )
+                    .replace(
+                        &("{".to_owned() + &parameter.name + "_stddev}"),
+                        &self.adapted_extended_parameter_name(parameter, "stddev"),
+                    )
+            };
         }
 
         let mut data_code = format!(
@@ -407,7 +606,7 @@ pub async fn get_template_from_id(
     let bare_template = get_bare_template(conn, id).await?;
 
     let query = concat!(
-        "SELECT name, is_variable, is_source_name ",
+        "SELECT name, is_variable, is_source_name, has_lookback, lookback_parameter ",
         "FROM trigger.template_parameter WHERE template_id = $1",
     );
 
@@ -416,7 +615,8 @@ pub async fn get_template_from_id(
         .await
         .map_err(|e| TriggerTemplateError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
-    let parameters: Vec<TemplateParameter> = rows
+    let mut parameters: Vec<TemplateParameter> = rows
+        .clone()
         .into_iter()
         .map(|row| TemplateParameter {
             name: row.get(0),
@@ -427,8 +627,26 @@ pub async fn get_template_from_id(
             } else {
                 ParameterType::Default
             },
+            has_lookback: row.get(2) && row.get(3),
+            lookback_parameter: row.get(4),
         })
         .collect();
+
+    for row in &rows {
+        if row.get(2) && row.get(3) {
+            let new_parameter = TemplateParameter {
+                name: row.get(4),
+                parameter_type: ParameterType::LookbackVariable,
+                has_lookback: false,
+                lookback_parameter: None,
+            };
+            if !parameters.iter().any(|p| {
+                p.name == new_parameter.name && p.parameter_type == ParameterType::LookbackVariable
+            }) {
+                parameters.push(new_parameter);
+            }
+        }
+    }
 
     Ok(Template {
         id: bare_template.id,
