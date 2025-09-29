@@ -47,7 +47,7 @@ term-table = "1.4.0"
 comfy-table = "7.2.1"
 url = "2.5.7"
 testcontainers = { version = "0.25.0" }
-thiserror = "2.0.16"
+thiserror = "2.0.17"
 deadpool-postgres = "0.14.1"
 tokio-stream = "0.1.17"
 futures = "0.3.31"
