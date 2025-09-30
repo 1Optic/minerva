@@ -38,7 +38,7 @@ refinery = { version = "0.8.16", features = ["tokio-postgres"] }
 bollard = "0.19.1"
 bollard-stubs = "=1.48.3-rc.28.0.4"
 erased-serde = "0.4.8"
-petgraph = "0.8.2"
+petgraph = "0.8.3"
 pg_query = "6.1.1"
 comfy-table = "7.2.1"
 similar = "2.7.0"
