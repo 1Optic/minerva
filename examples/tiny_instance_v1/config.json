@@ -7,7 +7,7 @@
     "old_data_threshold": "6h",
     "old_data_stability_delay": "3h",
     "attribute_extraction": {
-        "data_source": "test",
+	    "data_source": "hub",
         "add_attributes": []
     }
 }
