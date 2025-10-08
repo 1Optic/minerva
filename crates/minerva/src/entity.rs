@@ -179,40 +179,47 @@ impl EntityMapping for DbEntityMapping {
     }
 
     async fn names_to_entities<T: GenericClient + Sync>(
-            &self,
-            client: &T,
-            entity_type: &EntityTypeName,
-            names: &[EntityName],
-        ) -> Result<Vec<Entity>, EntityMappingError> {
-            let mut entities: HashMap<String, Entity> = HashMap::new();
+        &self,
+        client: &T,
+        entity_type: &EntityTypeName,
+        names: &[EntityName],
+    ) -> Result<Vec<Entity>, EntityMappingError> {
+        let mut entities: HashMap<String, Entity> = HashMap::new();
 
-            let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
+        let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
                  data AS (SELECT entity.get_entity(et, l.name) AS entity FROM lookup_list l, directory.entity_type et WHERE et.name = $2)
                  SELECT (entity::entity.generic_entity).id::integer, (entity::entity.generic_entity).name, (entity::entity.generic_entity).alias FROM data".to_string();
 
-            let rows = client
-                .query(&query, &[&names, &entity_type])
-                .await
-                .map_err(EntityMappingError::DatabaseError)?;
+        let rows = client
+            .query(&query, &[&names, &entity_type])
+            .await
+            .map_err(EntityMappingError::DatabaseError)?;
 
-            for row in rows {
-                let id: i32 = row.get(0);
-                let name: String = row.get(1);
-                let primary_alias: Option<String> = row.get(2);
+        for row in rows {
+            let id: i32 = row.get(0);
+            let name: String = row.get(1);
+            let primary_alias: Option<String> = row.get(2);
 
-                entities.insert(name.clone(), Entity { id, name, alias: primary_alias });
-            }
-            names
-                .iter()
-                .map(|name| -> Result<Entity, EntityMappingError> {
-                    entities
-                        .get(name)
-                        .cloned()
-                        .ok_or(EntityMappingError::UnmappedEntityError)
-                })
-                .collect()
+            entities.insert(
+                name.clone(),
+                Entity {
+                    id,
+                    name,
+                    alias: primary_alias,
+                },
+            );
+        }
+        names
+            .iter()
+            .map(|name| -> Result<Entity, EntityMappingError> {
+                entities
+                    .get(name)
+                    .cloned()
+                    .ok_or(EntityMappingError::UnmappedEntityError)
+            })
+            .collect()
     }
-}   
+}
 
 pub struct CachingEntityMapping {
     id_cache: Cache<(EntityTypeName, EntityName), i32>,
@@ -382,73 +389,83 @@ impl EntityMapping for CachingEntityMapping {
     }
 
     async fn names_to_entities<T: GenericClient + Sync>(
-            &self,
-            client: &T,
-            entity_type: &EntityTypeName,
-            names: &[EntityName],
-        ) -> Result<Vec<Entity>, EntityMappingError> {
-            let mut entities: HashMap<String, Entity> = HashMap::new();
+        &self,
+        client: &T,
+        entity_type: &EntityTypeName,
+        names: &[EntityName],
+    ) -> Result<Vec<Entity>, EntityMappingError> {
+        let mut entities: HashMap<String, Entity> = HashMap::new();
 
-            let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
+        let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
                  data AS (SELECT entity.get_entity(et, l.name) AS entity FROM lookup_list l, directory.entity_type et WHERE et.name = $2)
                  SELECT (entity::entity.generic_entity).id, (entity::entity.generic_entity).name, (entity::entity.generic_entity).alias FROM data".to_string();
 
-            let mut names_list: Vec<&str> = Vec::new();
+        let mut names_list: Vec<&str> = Vec::new();
 
-            for name in names {
-                if let Some(entity) = self
-                    .id_cache
+        for name in names {
+            if let Some(entity) = self
+                .id_cache
+                .get(&(entity_type.to_string(), String::from(name)))
+            {
+                if let Some(alias) = self
+                    .alias_cache
                     .get(&(entity_type.to_string(), String::from(name)))
                 {
-                    if let Some(alias) = self
-                        .alias_cache
-                        .get(&(entity_type.to_string(), String::from(name)))
-                    {
-                        let entity = Entity { id: entity, name: name.clone(), alias: alias.clone() };
-                        entities.insert(name.clone(), entity);
-                        continue;
-                    } else {
-                        // If we have the ID but not the alias, we need to fetch the full entity from the database
-                        names_list.push(name.as_ref());
-                    }
+                    let entity = Entity {
+                        id: entity,
+                        name: name.clone(),
+                        alias: alias.clone(),
+                    };
+                    entities.insert(name.clone(), entity);
+                    continue;
                 } else {
+                    // If we have the ID but not the alias, we need to fetch the full entity from the database
                     names_list.push(name.as_ref());
                 }
+            } else {
+                names_list.push(name.as_ref());
             }
+        }
 
-            // Only lookup in the database if there is anything left to lookup
-            if !names_list.is_empty() {
-                let rows = client
-                    .query(&query, &[&names_list, &entity_type])
-                    .await
-                    .map_err(EntityMappingError::DatabaseError)?;
+        // Only lookup in the database if there is anything left to lookup
+        if !names_list.is_empty() {
+            let rows = client
+                .query(&query, &[&names_list, &entity_type])
+                .await
+                .map_err(EntityMappingError::DatabaseError)?;
 
-                for row in rows {
-                    let id: i32 = row.get(0);
-                    let name: String = row.get(1);
-                    let primary_alias: Option<String> = row.get(2);
+            for row in rows {
+                let id: i32 = row.get(0);
+                let name: String = row.get(1);
+                let primary_alias: Option<String> = row.get(2);
 
-                    let entity = Entity { id, name: name.clone(), alias: primary_alias.clone() };
+                let entity = Entity {
+                    id,
+                    name: name.clone(),
+                    alias: primary_alias.clone(),
+                };
 
-                    self.id_cache
-                        .insert((entity_type.to_string(), name.clone()), id);
+                self.id_cache
+                    .insert((entity_type.to_string(), name.clone()), id);
 
-                    self.alias_cache
-                        .insert((entity_type.to_string(), name.clone()), primary_alias.clone());
+                self.alias_cache.insert(
+                    (entity_type.to_string(), name.clone()),
+                    primary_alias.clone(),
+                );
 
-                    entities.insert(name.clone(), entity);
-                }
+                entities.insert(name.clone(), entity);
             }
+        }
 
-            names
-                .iter()
-                .map(|name| -> Result<Entity, EntityMappingError> {
-                    entities
-                        .get(name)
-                        .cloned()
-                        .ok_or(EntityMappingError::UnmappedEntityError)
-                })
-                .collect()
+        names
+            .iter()
+            .map(|name| -> Result<Entity, EntityMappingError> {
+                entities
+                    .get(name)
+                    .cloned()
+                    .ok_or(EntityMappingError::UnmappedEntityError)
+            })
+            .collect()
     }
 }
 
