@@ -10,6 +10,13 @@ use super::entity_type::EntityTypeName;
 
 type EntityName = String;
 
+#[derive(Clone, Debug)]
+pub struct Entity {
+    pub id: i32,
+    pub name: String,
+    pub alias: Option<String>,
+}
+
 #[derive(Error, Debug)]
 pub enum EntityMappingError {
     #[error("Database error: {0}")]
@@ -44,6 +51,13 @@ pub trait EntityMapping {
         entity_type: &EntityTypeName,
         names: &[EntityName],
     ) -> impl Future<Output = Result<Vec<Option<String>>, EntityMappingError>> + Send;
+
+    fn names_to_entities<T: GenericClient + Sync>(
+        &self,
+        client: &T,
+        entity_type: &EntityTypeName,
+        names: &[EntityName],
+    ) -> impl Future<Output = Result<Vec<Entity>, EntityMappingError>> + Send;
 }
 
 pub struct DbEntityMapping {}
@@ -163,11 +177,46 @@ impl EntityMapping for DbEntityMapping {
                 .collect(),
         }
     }
-}
+
+    async fn names_to_entities<T: GenericClient + Sync>(
+            &self,
+            client: &T,
+            entity_type: &EntityTypeName,
+            names: &[EntityName],
+        ) -> Result<Vec<Entity>, EntityMappingError> {
+            let mut entities: HashMap<String, Entity> = HashMap::new();
+
+            let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
+                 data AS (SELECT entity.get_entity(et, l.name) AS entity FROM lookup_list l, directory.entity_type et WHERE et.name = $2)
+                 SELECT (entity::entity.generic_entity).id::integer, (entity::entity.generic_entity).name, (entity::entity.generic_entity).alias FROM data".to_string();
+
+            let rows = client
+                .query(&query, &[&names, &entity_type])
+                .await
+                .map_err(EntityMappingError::DatabaseError)?;
+
+            for row in rows {
+                let id: i32 = row.get(0);
+                let name: String = row.get(1);
+                let primary_alias: Option<String> = row.get(2);
+
+                entities.insert(name.clone(), Entity { id, name, alias: primary_alias });
+            }
+            names
+                .iter()
+                .map(|name| -> Result<Entity, EntityMappingError> {
+                    entities
+                        .get(name)
+                        .cloned()
+                        .ok_or(EntityMappingError::UnmappedEntityError)
+                })
+                .collect()
+    }
+}   
 
 pub struct CachingEntityMapping {
     id_cache: Cache<(EntityTypeName, EntityName), i32>,
-    alias_cache: Cache<(EntityTypeName, EntityName), String>,
+    alias_cache: Cache<(EntityTypeName, EntityName), Option<String>>,
     primary_alias_cache: Cache<EntityTypeName, bool>,
 }
 
@@ -290,7 +339,7 @@ impl EntityMapping for CachingEntityMapping {
                 let mut names_list: Vec<&str> = Vec::new();
 
                 for name in names {
-                    if let Some(alias) = self
+                    if let Some(Some(alias)) = self
                         .alias_cache
                         .get(&(entity_type.to_string(), String::from(name)))
                     {
@@ -312,7 +361,7 @@ impl EntityMapping for CachingEntityMapping {
                         let alias: String = row.get(1);
 
                         self.alias_cache
-                            .insert((entity_type.to_string(), name.clone()), alias.clone());
+                            .insert((entity_type.to_string(), name.clone()), Some(alias.clone()));
 
                         aliases.insert(name, alias);
                     }
@@ -330,6 +379,76 @@ impl EntityMapping for CachingEntityMapping {
                 .map(|_| -> Result<Option<String>, EntityMappingError> { Ok(None) })
                 .collect(),
         }
+    }
+
+    async fn names_to_entities<T: GenericClient + Sync>(
+            &self,
+            client: &T,
+            entity_type: &EntityTypeName,
+            names: &[EntityName],
+        ) -> Result<Vec<Entity>, EntityMappingError> {
+            let mut entities: HashMap<String, Entity> = HashMap::new();
+
+            let query = "WITH lookup_list AS (SELECT unnest($1::text[]) AS name), \
+                 data AS (SELECT entity.get_entity(et, l.name) AS entity FROM lookup_list l, directory.entity_type et WHERE et.name = $2)
+                 SELECT (entity::entity.generic_entity).id, (entity::entity.generic_entity).name, (entity::entity.generic_entity).alias FROM data".to_string();
+
+            let mut names_list: Vec<&str> = Vec::new();
+
+            for name in names {
+                if let Some(entity) = self
+                    .id_cache
+                    .get(&(entity_type.to_string(), String::from(name)))
+                {
+                    if let Some(alias) = self
+                        .alias_cache
+                        .get(&(entity_type.to_string(), String::from(name)))
+                    {
+                        let entity = Entity { id: entity, name: name.clone(), alias: alias.clone() };
+                        entities.insert(name.clone(), entity);
+                        continue;
+                    } else {
+                        // If we have the ID but not the alias, we need to fetch the full entity from the database
+                        names_list.push(name.as_ref());
+                    }
+                } else {
+                    names_list.push(name.as_ref());
+                }
+            }
+
+            // Only lookup in the database if there is anything left to lookup
+            if !names_list.is_empty() {
+                let rows = client
+                    .query(&query, &[&names_list, &entity_type])
+                    .await
+                    .map_err(EntityMappingError::DatabaseError)?;
+
+                for row in rows {
+                    let id: i32 = row.get(0);
+                    let name: String = row.get(1);
+                    let primary_alias: Option<String> = row.get(2);
+
+                    let entity = Entity { id, name: name.clone(), alias: primary_alias.clone() };
+
+                    self.id_cache
+                        .insert((entity_type.to_string(), name.clone()), id);
+
+                    self.alias_cache
+                        .insert((entity_type.to_string(), name.clone()), primary_alias.clone());
+
+                    entities.insert(name.clone(), entity);
+                }
+            }
+
+            names
+                .iter()
+                .map(|name| -> Result<Entity, EntityMappingError> {
+                    entities
+                        .get(name)
+                        .cloned()
+                        .ok_or(EntityMappingError::UnmappedEntityError)
+                })
+                .collect()
     }
 }
 
