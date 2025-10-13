@@ -39,3 +39,25 @@ BEGIN
     RETURN result;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
+
+CREATE FUNCTION "entity"."get_existing_entities"(directory.entity_type, TEXT[])
+    RETURNS TABLE(id integer, "name" TEXT, alias TEXT)
+AS $$
+BEGIN
+    IF $1.primary_alias IS NULL THEN
+        RETURN QUERY EXECUTE FORMAT(
+            'WITH data AS (SELECT e.id, n.name::text, NULL AS alias
+            FROM UNNEST(%L::TEXT[]) n JOIN entity.%I e ON n.name = e.name
+            )
+            SELECT * FROM data',
+        $2, $1.name);
+    ELSE
+        RETURN QUERY EXECUTE FORMAT(
+            'WITH data AS (SELECT e.id, n.name::text, e.primary_alias AS alias
+            FROM UNNEST(%L::TEXT[]) n JOIN entity.%I e ON n.name = e.name
+            )
+            SELECT * FROM data',
+        $2, $1.name);
+    END IF;
+END;
+$$ LANGUAGE plpgsql STABLE;
