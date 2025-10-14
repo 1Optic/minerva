@@ -76,12 +76,6 @@ pub struct Kpi {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
-pub struct TrendInfo {
-    pub name: String,
-    pub data_type: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct KpiRawData {
     pub tsp_name: String,
     pub kpi_name: String,

@@ -74,7 +74,7 @@ impl Cmd for DiffOpt {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
-            instance_ignores: instance_config.deployment.ignore,
+            instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
         };
 
         let changes = other_instance.diff(&instance_def, diff_options);

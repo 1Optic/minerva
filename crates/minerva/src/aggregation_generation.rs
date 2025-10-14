@@ -50,7 +50,7 @@ pub fn generate_all_standard_aggregations(
                     &mut instance,
                     &config,
                     trend_store,
-                    &config.entity_aggregation_hints,
+                    config.entity_aggregation_hints.as_deref(),
                 )?;
             }
         }
@@ -63,7 +63,7 @@ fn generate_standard_aggregations(
     minerva_instance: &mut MinervaInstance,
     instance_config: &InstanceConfig,
     trend_store: TrendStore,
-    aggregation_hints: &[EntityAggregationHint],
+    aggregation_hints: Option<&[EntityAggregationHint]>,
 ) -> Result<(), AggregationGenerationError> {
     let entity_relations: Vec<(Relation, String)> = minerva_instance
         .relations
@@ -201,13 +201,28 @@ fn compile_time_aggregation(
 pub fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Result<(), String> {
     let trend_store_file_name = format!("{}.yaml", trend_store_name(trend_store)?);
 
-    let trend_store_file_path: PathBuf = PathBuf::from_iter([
-        instance_root,
-        &PathBuf::from("trend"),
-        &PathBuf::from(trend_store_file_name),
-    ]);
+    let trend_store_dir_path: PathBuf =
+        PathBuf::from_iter([instance_root, &PathBuf::from("trend")]);
 
-    let file = File::create(trend_store_file_path).unwrap();
+    // Check if the trend directory exists
+    if !trend_store_dir_path.is_dir() {
+        std::fs::create_dir(&trend_store_dir_path).map_err(|e| {
+            format!(
+                "Could not create trend store directory '{}': {e}",
+                &trend_store_dir_path.to_string_lossy()
+            )
+        })?;
+    }
+
+    let trend_store_file_path: PathBuf =
+        PathBuf::from_iter([&trend_store_dir_path, &PathBuf::from(trend_store_file_name)]);
+
+    let file = File::create(&trend_store_file_path).map_err(|e| {
+        format!(
+            "Could not create trend store file '{}': {e}",
+            &trend_store_file_path.to_string_lossy()
+        )
+    })?;
 
     let writer = BufWriter::new(file);
 
@@ -303,6 +318,7 @@ pub fn granularity_to_partition_size(granularity: Duration) -> Option<Duration> 
     let partition_size_mapping: &HashMap<Duration, Duration> =
         PARTITION_SIZE_MAPPING.get_or_init(|| {
             vec![
+                (Duration::from_secs(300), Duration::from_secs(86400)),
                 (Duration::from_secs(900), Duration::from_secs(86400)),
                 (Duration::from_secs(1800), Duration::from_secs(86400 * 2)),
                 (Duration::from_secs(3600), Duration::from_secs(86400 * 4)),
@@ -353,8 +369,8 @@ fn define_part_time_aggregation(
             target_granularity,
         ),
         description: None,
-        old_data_threshold: Some(config.old_data_threshold),
-        old_data_stability_delay: Some(config.old_data_stability_delay),
+        old_data_threshold: config.old_data_threshold,
+        old_data_stability_delay: config.old_data_stability_delay,
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
@@ -562,17 +578,21 @@ fn build_entity_aggregation(
     trend_store: &TrendStore,
     relation: &Relation,
     target_entity_type: &str,
-    aggregation_hints: &[EntityAggregationHint],
+    aggregation_hints: Option<&[EntityAggregationHint]>,
 ) -> Result<(), String> {
     let default_hint = EntityAggregationHint {
         relation: relation.name.clone(),
         materialization_type: AggregationType::FunctionMaterialization,
         prefix: None,
     };
-    let aggregation_hint = aggregation_hints
-        .iter()
-        .find(|hint| hint.relation == relation.name)
-        .unwrap_or(&default_hint);
+    let aggregation_hint = if let Some(hints) = aggregation_hints {
+        hints
+            .iter()
+            .find(|hint| hint.relation == relation.name)
+            .unwrap_or(&default_hint)
+    } else {
+        &default_hint
+    };
 
     let entity_aggregation = generate_entity_aggregation(
         trend_store,
@@ -934,8 +954,8 @@ fn define_function_part_entity_aggregation(
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
         description: None,
-        old_data_threshold: Some(config.old_data_threshold),
-        old_data_stability_delay: Some(config.old_data_stability_delay),
+        old_data_threshold: config.old_data_threshold,
+        old_data_stability_delay: config.old_data_stability_delay,
     }
 }
 
@@ -1139,6 +1159,7 @@ fn granularity_to_suffix(granularity: &Duration) -> Result<String, String> {
 
     let standard_aggregations = GRANULARITY_SUFFIX_MAPPING.get_or_init(|| {
         [
+            (Duration::from_secs(300), "5m".to_string()),
             (Duration::from_secs(900), "15m".to_string()),
             (Duration::from_secs(3600), "1h".to_string()),
             (humantime::parse_duration("1d").unwrap(), "1d".to_string()),

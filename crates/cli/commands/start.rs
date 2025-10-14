@@ -7,7 +7,6 @@ use log::info;
 
 use async_trait::async_trait;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 
 use tokio::signal;
 
@@ -32,13 +31,6 @@ pub struct StartOpt {
     instance_root: Option<PathBuf>,
     #[arg(long, help = "skip Minerva schema initialization", action)]
     no_schema_initialization: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ClusterConfig {
-    image_name: String,
-    image_tag: String,
-    path: String,
 }
 
 #[async_trait]

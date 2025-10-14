@@ -1,0 +1,274 @@
+[
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDl",
+    "data_type": "numeric",
+    "description": "Average delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.1"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.1.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.2.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.3.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.4.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.5.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.6.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayDist.7.QOS",
+    "data_type": "integer",
+    "description": "Distribution of delay DL air-interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.2"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.AirIfDelayUl",
+    "data_type": "numeric",
+    "description": "Average delay UL on over-the-air interface",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.3"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellDU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.RlcDelayUl",
+    "data_type": "numeric",
+    "description": "Average RLC packet delay in the UL",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.4"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "GNBCUUPFunction",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.PdcpReordDelayUl",
+    "data_type": "numeric",
+    "description": "Average PDCP re-ordering delay in the UL",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.5"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayDlNgranUeDist.5QI.1",
+    "data_type": "integer",
+    "description": "Distribution of DL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.6"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayDlNgranUeDist.5QI.2",
+    "data_type": "integer",
+    "description": "Distribution of DL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.6"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayDlNgranUeDist.5QI.3",
+    "data_type": "integer",
+    "description": "Distribution of DL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.6"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayUlNgranUeDist.5QI.1",
+    "data_type": "integer",
+    "description": "Distribution of UL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.7"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayUlNgranUeDist.5QI.2",
+    "data_type": "integer",
+    "description": "Distribution of UL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.7"
+      }
+    }
+  },
+  {
+    "data_source": "network-5g",
+    "entity_type": "NRCellCU",
+    "granularity": "5m",
+    "part": "default",
+    "name": "DRB.DelayUlNgranUeDist.5QI.3",
+    "data_type": "integer",
+    "description": "Distribution of UL delay between NG-RAN and UE",
+    "time_aggregation": "sum",
+    "entity_aggregation": "sum",
+    "extra_data": {
+      "3GPP": {
+        "section": "5.1.1.1.7"
+      }
+    }
+  }
+]

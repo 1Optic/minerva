@@ -3,7 +3,7 @@ authors = ["Alfred Blokland"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Minerva Design"
+title = "Minerva Documentation"
 
 [preprocessor]
 

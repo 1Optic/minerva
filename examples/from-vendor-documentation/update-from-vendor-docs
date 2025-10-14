@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+echo "Minerva instance root: '$SCRIPT_DIR'"
+echo ""
+
+# First reset by deleting previously generated items
+rm -r "${SCRIPT_DIR}/extracted-definitions"
+rm -r "${SCRIPT_DIR}/trend"
+rm -r "${SCRIPT_DIR}/attribute"
+
+mkdir -p "${SCRIPT_DIR}/extracted-definitions"
+
+"${SCRIPT_DIR}/extract-trends" -c "${SCRIPT_DIR}/config.json" "${SCRIPT_DIR}/vendor-docs/measurements.csv" "${SCRIPT_DIR}/extracted-definitions/trends.json"
+"${SCRIPT_DIR}/extract-attributes" -c "${SCRIPT_DIR}/config.json" "${SCRIPT_DIR}/vendor-docs/attributes.csv" "${SCRIPT_DIR}/extracted-definitions/attributes.json"
+
+ minerva define "${SCRIPT_DIR}" "${SCRIPT_DIR}/extracted-definitions"

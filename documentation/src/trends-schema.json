@@ -35,7 +35,7 @@
                 "type": "object"
             }
         },
-        "additionalProperties": false
-        "required": ["data_source", "entity_type", "granularity", "name", "data_type"]
+        "additionalProperties": false,
+        "required": ["data_source", "entity_type", "granularity", "part", "name", "data_type", "description", "time_aggregation", "entity_aggregation", "extra_data"]
     }
 }

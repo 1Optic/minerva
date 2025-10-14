@@ -39,11 +39,6 @@ pub struct EntitySetDataFull {
     pub modified: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
-pub struct Id {
-    pub id: i32,
-}
-
 impl EntitySetDataFull {
     fn entity_set(&self) -> EntitySet {
         EntitySet {

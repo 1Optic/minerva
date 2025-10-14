@@ -1,0 +1,9 @@
+data_source: network-5g
+entity_type: NRCellDU
+attributes:
+- name: Label
+  data_type: text
+  description: Element label
+  extra_data:
+    3GPP:
+      section: '-'

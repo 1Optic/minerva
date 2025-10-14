@@ -1,0 +1,11 @@
+{
+    "entity_types": [],
+    "old_data_threshold": "6 hours",
+    "old_data_stability_delay": "8 hours",
+    "trend_extraction": {
+        "data_source": "network-5g"
+    },
+    "attribute_extraction": {
+        "data_source": "network-5g"
+    }
+}

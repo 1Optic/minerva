@@ -128,7 +128,7 @@ impl Cmd for DefineOpt {
             File::open(&attribute_definitions_file_path).map_err(|e| {
                 RuntimeError::from_msg(format!(
                     "Could not open attribute definitions file '{}': {e}",
-                    trend_definitions_file_path.to_string_lossy()
+                    attribute_definitions_file_path.to_string_lossy()
                 ))
             })?;
 
@@ -155,6 +155,7 @@ impl Cmd for DefineOpt {
         );
 
         for trend_store in &trend_stores {
+            println!("Saving trend store '{}'", trend_store);
             save_trend_store(&self.instance_root, trend_store).unwrap();
         }
 
@@ -179,13 +180,25 @@ pub fn save_attribute_store(
         attribute_store.data_source, attribute_store.entity_type
     );
 
-    let trend_store_file_path: PathBuf = PathBuf::from_iter([
-        instance_root,
-        &PathBuf::from("attribute"),
+    let attribute_store_dir_path: PathBuf =
+        PathBuf::from_iter([instance_root, &PathBuf::from("attribute")]);
+
+    // Check if the attribute directory exists
+    if !attribute_store_dir_path.is_dir() {
+        std::fs::create_dir(&attribute_store_dir_path).map_err(|e| {
+            format!(
+                "Could not create attribute store directory '{}': {e}",
+                &attribute_store_dir_path.to_string_lossy()
+            )
+        })?;
+    }
+
+    let attribute_store_file_path: PathBuf = PathBuf::from_iter([
+        &attribute_store_dir_path,
         &PathBuf::from(attribute_store_file_name),
     ]);
 
-    let file = File::create(trend_store_file_path).unwrap();
+    let file = File::create(attribute_store_file_path).unwrap();
 
     let writer = BufWriter::new(file);
 
@@ -391,7 +404,7 @@ fn define_trend_stores(
                 .unwrap(),
                 retention_period: instance_config
                     .granularity_to_retention(part_holder.trend_store_key.granularity)
-                    .unwrap(),
+                    .unwrap_or(Duration::from_secs(86400 * 30)),
                 parts: Vec::new(),
             });
 
@@ -444,30 +457,33 @@ fn define_attribute_stores(
         }
     }
 
-    for a in &instance_config.attribute_extraction.add_attributes {
-        let attribute_store_key = (
-            instance_config.attribute_extraction.data_source.as_str(),
-            a.entity_type.as_str(),
-        );
+    if let Some(add_attributes) = &instance_config.attribute_extraction.add_attributes {
+        for a in add_attributes {
+            let attribute_store_key = (
+                instance_config.attribute_extraction.data_source.as_str(),
+                a.entity_type.as_str(),
+            );
 
-        let attribute_store = attribute_stores
-            .entry(attribute_store_key)
-            .or_insert_with(|| AttributeStore {
-                data_source: instance_config.attribute_extraction.data_source.clone(),
-                entity_type: a.entity_type.clone(),
-                attributes: Vec::new(),
-            });
+            let attribute_store =
+                attribute_stores
+                    .entry(attribute_store_key)
+                    .or_insert_with(|| AttributeStore {
+                        data_source: instance_config.attribute_extraction.data_source.clone(),
+                        entity_type: a.entity_type.clone(),
+                        attributes: Vec::new(),
+                    });
 
-        for add_attribute in &a.attributes {
-            attribute_store.attributes.push(Attribute {
-                name: add_attribute.name.clone(),
-                data_type: add_attribute.data_type,
-                description: "".to_string(),
-                extra_data: add_attribute.extra_data.clone(),
-            });
+            for add_attribute in &a.attributes {
+                attribute_store.attributes.push(Attribute {
+                    name: add_attribute.name.clone(),
+                    data_type: add_attribute.data_type,
+                    description: "".to_string(),
+                    extra_data: add_attribute.extra_data.clone(),
+                });
+            }
+
+            println!("Matched attribute store: '{}'", attribute_store);
         }
-
-        println!("Matched attribute store: '{}'", attribute_store);
     }
 
     attribute_stores.into_values().collect()
@@ -548,22 +564,22 @@ mod tests {
 
         let instance_config = InstanceConfig {
             docker_image: None,
-            deployment: DeploymentConfig::default(),
-            entity_aggregation_hints: Vec::new(),
+            deployment: Some(DeploymentConfig::default()),
+            entity_aggregation_hints: Some(Vec::new()),
             entity_types: Vec::new(),
-            old_data_stability_delay: Duration::from_secs(3600 * 3),
-            old_data_threshold: Duration::from_secs(3600 * 6),
+            old_data_stability_delay: Some(Duration::from_secs(3600 * 3)),
+            old_data_threshold: Some(Duration::from_secs(3600 * 6)),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
             }]),
             attribute_extraction: minerva::instance::AttributeExtraction {
                 data_source: "my-test".to_string(),
-                add_attributes: vec![AddAttributes {
+                add_attributes: Some(vec![AddAttributes {
                     entity_type: "node".to_string(),
                     description: "some extra attributes for testing".to_string(),
                     attributes: vec![],
-                }],
+                }]),
             },
         };
 
@@ -625,18 +641,18 @@ mod tests {
 
         let instance_config = InstanceConfig {
             docker_image: None,
-            deployment: DeploymentConfig::default(),
-            entity_aggregation_hints: Vec::new(),
+            deployment: Some(DeploymentConfig::default()),
+            entity_aggregation_hints: Some(Vec::new()),
             entity_types: Vec::new(),
-            old_data_stability_delay: Duration::from_secs(3600 * 3),
-            old_data_threshold: Duration::from_secs(3600 * 6),
+            old_data_stability_delay: Some(Duration::from_secs(3600 * 3)),
+            old_data_threshold: Some(Duration::from_secs(3600 * 6)),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
             }]),
             attribute_extraction: minerva::instance::AttributeExtraction {
                 data_source: "test_cm".to_string(),
-                add_attributes: vec![AddAttributes {
+                add_attributes: Some(vec![AddAttributes {
                     entity_type: "node".to_string(),
                     description: "some extra attributes for testing".to_string(),
                     attributes: vec![AddAttribute {
@@ -645,7 +661,7 @@ mod tests {
                         example: "40".to_string(),
                         extra_data: serde_json::Value::Null,
                     }],
-                }],
+                }]),
             },
         };
 

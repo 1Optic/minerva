@@ -132,21 +132,25 @@ pub struct AddAttributes {
 #[derive(Serialize, Deserialize, Default)]
 pub struct AttributeExtraction {
     pub data_source: String,
-    pub add_attributes: Vec<AddAttributes>,
+    pub add_attributes: Option<Vec<AddAttributes>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
-    pub deployment: DeploymentConfig,
-    pub entity_aggregation_hints: Vec<EntityAggregationHint>,
+    pub deployment: Option<DeploymentConfig>,
+    pub entity_aggregation_hints: Option<Vec<EntityAggregationHint>>,
     pub entity_types: Vec<String>,
     pub retention: Option<Vec<RetentionConfig>>,
-    #[serde(with = "humantime_serde")]
-    pub old_data_threshold: Duration,
-    #[serde(with = "humantime_serde")]
-    pub old_data_stability_delay: Duration,
+    #[serde(with = "humantime_serde::option", default = "default_duration_none")]
+    pub old_data_threshold: Option<Duration>,
+    #[serde(with = "humantime_serde::option")]
+    pub old_data_stability_delay: Option<Duration>,
     pub attribute_extraction: AttributeExtraction,
+}
+
+fn default_duration_none() -> Option<Duration> {
+    None
 }
 
 impl InstanceConfig {

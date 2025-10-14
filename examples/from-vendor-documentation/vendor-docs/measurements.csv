@@ -1,0 +1,18 @@
+Measurement,Unit,Data Type,Element Type,Description,3GPP Section
+DRB.AirIfDelayDl,millisecond,real,NRCellDU,Average delay DL air-interface,5.1.1.1.1
+DRB.AirIfDelayDist.1.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.2.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.3.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.4.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.5.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.6.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayDist.7.QOS,-,integer,NRCellDU,Distribution of delay DL air-interface,5.1.1.1.2
+DRB.AirIfDelayUl,millisecond,real,NRCellDU,Average delay UL on over-the-air interface,5.1.1.1.3
+DRB.RlcDelayUl,millisecond,real,NRCellDU,Average RLC packet delay in the UL,5.1.1.1.4
+DRB.PdcpReordDelayUl,millisecond,real,GNBCUUPFunction,Average PDCP re-ordering delay in the UL,5.1.1.1.5
+DRB.DelayDlNgranUeDist.5QI.1,-,integer,NRCellCU,Distribution of DL delay between NG-RAN and UE,5.1.1.1.6
+DRB.DelayDlNgranUeDist.5QI.2,-,integer,NRCellCU,Distribution of DL delay between NG-RAN and UE,5.1.1.1.6
+DRB.DelayDlNgranUeDist.5QI.3,-,integer,NRCellCU,Distribution of DL delay between NG-RAN and UE,5.1.1.1.6
+DRB.DelayUlNgranUeDist.5QI.1,-,integer,NRCellCU,Distribution of UL delay between NG-RAN and UE,5.1.1.1.7
+DRB.DelayUlNgranUeDist.5QI.2,-,integer,NRCellCU,Distribution of UL delay between NG-RAN and UE,5.1.1.1.7
+DRB.DelayUlNgranUeDist.5QI.3,-,integer,NRCellCU,Distribution of UL delay between NG-RAN and UE,5.1.1.1.7

@@ -1,0 +1,19 @@
+title: Raw data trend store generated from counter list
+data_source: network-5g
+entity_type: GNBCUUPFunction
+granularity: 5m
+partition_size: 1day
+retention_period: 30days
+parts:
+- name: network-5g_GNBCUUPFunction_default_5m
+  has_alias_column: false
+  trends:
+  - name: DRB.PdcpReordDelayUl
+    data_type: numeric
+    description: Average PDCP re-ordering delay in the UL
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.5
+  generated_trends: []

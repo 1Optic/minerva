@@ -1,0 +1,59 @@
+title: Raw data trend store generated from counter list
+data_source: network-5g
+entity_type: NRCellCU
+granularity: 5m
+partition_size: 1day
+retention_period: 30days
+parts:
+- name: network-5g_NRCellCU_default_5m
+  has_alias_column: false
+  trends:
+  - name: DRB.DelayDlNgranUeDist.5QI.1
+    data_type: integer
+    description: Distribution of DL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.6
+  - name: DRB.DelayDlNgranUeDist.5QI.2
+    data_type: integer
+    description: Distribution of DL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.6
+  - name: DRB.DelayDlNgranUeDist.5QI.3
+    data_type: integer
+    description: Distribution of DL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.6
+  - name: DRB.DelayUlNgranUeDist.5QI.1
+    data_type: integer
+    description: Distribution of UL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.7
+  - name: DRB.DelayUlNgranUeDist.5QI.2
+    data_type: integer
+    description: Distribution of UL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.7
+  - name: DRB.DelayUlNgranUeDist.5QI.3
+    data_type: integer
+    description: Distribution of UL delay between NG-RAN and UE
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.7
+  generated_trends: []

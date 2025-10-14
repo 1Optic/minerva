@@ -5,7 +5,6 @@ use log::info;
 
 use async_trait::async_trait;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 
 use testcontainers::core::ExecCommand;
 
@@ -17,13 +16,6 @@ use super::common::{Cmd, CmdResult};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BaselineDumpOpt {}
-
-#[derive(Serialize, Deserialize)]
-struct ClusterConfig {
-    image_name: String,
-    image_tag: String,
-    path: String,
-}
 
 #[async_trait]
 impl Cmd for BaselineDumpOpt {

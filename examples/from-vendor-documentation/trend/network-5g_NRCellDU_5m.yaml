@@ -1,0 +1,91 @@
+title: Raw data trend store generated from counter list
+data_source: network-5g
+entity_type: NRCellDU
+granularity: 5m
+partition_size: 1day
+retention_period: 30days
+parts:
+- name: network-5g_NRCellDU_default_5m
+  has_alias_column: false
+  trends:
+  - name: DRB.AirIfDelayDl
+    data_type: numeric
+    description: Average delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.1
+  - name: DRB.AirIfDelayDist.1.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.2.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.3.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.4.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.5.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.6.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayDist.7.QOS
+    data_type: integer
+    description: Distribution of delay DL air-interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.2
+  - name: DRB.AirIfDelayUl
+    data_type: numeric
+    description: Average delay UL on over-the-air interface
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.3
+  - name: DRB.RlcDelayUl
+    data_type: numeric
+    description: Average RLC packet delay in the UL
+    time_aggregation: sum
+    entity_aggregation: sum
+    extra_data:
+      3GPP:
+        section: 5.1.1.1.4
+  generated_trends: []

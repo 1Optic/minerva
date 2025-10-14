@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+import json
+import csv
+
+data_type_mapping = {
+    "integer": "integer",
+    "real": "numeric",
+}
+
+default_data_type = "text"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Extract attribute definitions from Vendor specification file"
+    )
+
+    parser.add_argument("-c", "--config", default="config.json", type=Path)
+    parser.add_argument("specifications_file", type=Path)
+    parser.add_argument("output_file", type=Path)
+
+    args = parser.parse_args()
+
+    with args.config.open() as config_file:
+        config = json.load(config_file)
+
+    data_source = config["attribute_extraction"]["data_source"]
+
+    attributes = []
+
+    with args.specifications_file.open() as attr_def_file:
+        csvreader = csv.reader(attr_def_file, delimiter=",")
+
+        # Skip the header
+        next(csvreader)
+
+        for row in csvreader:
+            name = row[0]
+            entity_type = row[3]
+            data_type = data_type_mapping.get(row[2], default_data_type)
+            description = row[4]
+            section = row[5]
+
+            attributes.append({
+                "data_source": data_source,
+                "entity_type": entity_type,
+                "name": name,
+                "data_type": data_type,
+                "description": description,
+                "extra_data": {
+                    "3GPP": {
+                        "section": section,
+                    },
+                },
+            })
+
+    with args.output_file.open("wt") as attributes_file:
+        json.dump(attributes, attributes_file, indent=2)
+
+
+if __name__ == "__main__":
+    main()
