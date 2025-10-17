@@ -20,7 +20,7 @@ clap_complete = "4.5.59"
 minerva = { version = "*", path = "../minerva" }
 tokio = { version = "1.47.1", features = ["full"] }
 tokio-postgres = { version = "0.7.14", features = ["with-chrono-0_4", "with-serde_json-1"] }
-rustls = { version = "0.23.32", features = ["ring"] }
+rustls = { version = "0.23.33", features = ["ring"] }
 rustls-native-certs = "0.8.2"
 tokio-postgres-rustls = "0.13"
 postgres-types = { version = "0.2.11", features = ["derive"] }
