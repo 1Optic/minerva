@@ -8,7 +8,7 @@ description = "Minerva integration tests"
 
 [dependencies]
 minerva = { version = "*", path = "../minerva" }
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.48.0", features = ["full"] }
 tokio-postgres = { version = "0.7.14", features = ["with-chrono-0_4", "with-serde_json-1"] }
 rustls = "0.23.34"
 rustls-native-certs = "0.8.2"
