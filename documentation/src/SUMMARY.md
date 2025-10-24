@@ -10,3 +10,4 @@
   - [Entity Sets](./design/entity_sets.md)
   - [Trends Schema](./design/trends-schema.md)
   - [Attributes Schema](./design/attributes-schema.md)
+  - [DDAs](./design/ddas.md)
