@@ -104,12 +104,12 @@ build-instance-tester-image:
 build-docs:
   stage: docs
   script:
-    - mdbook build documentation/design
+    - mdbook build documentation
     - rclone version
     - rclone
       --verbose
       --webdav-vendor other
-      sync documentation/design/book/ :webdav:/static-sites/minerva/design
+      sync documentation/book/ :webdav:/static-sites/minerva
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
