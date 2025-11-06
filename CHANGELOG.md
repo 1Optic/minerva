@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.35.0] - 2025-11-06
+
+### Added
+
+- CLI: Get attribute store from definition
+
+### Changed
+
+- Add PostGIS to instance tester container image
+
 ## [9.34.0] - 2025-08-26
 
 ### Added
@@ -17,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Library: Fixed loading of 'boolean' and 'numeric[]' trend data types 
+- Library: Fixed loading of 'boolean' and 'numeric[]' trend data types
 - CLI: Fixed trend value information table view for trend delete changes
 
 ## [9.33.0] - 2025-08-12
@@ -503,4 +513,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.33.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.32.0...9.33.0
 [9.33.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.0...9.33.1
 [9.34.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.1...9.34.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...HEAD
+[9.35.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...9.35.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...HEAD
