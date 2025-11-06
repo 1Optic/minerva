@@ -9,7 +9,6 @@ stages:
   - lint
   - test
   - build
-  - build-image
   - docs
 
 lint-openapi:
@@ -55,19 +54,20 @@ integration-test:cargo:
     reports:
       junit: results.xml
 
-publish-minerva-cli-deb:
-  stage: build
+build-minerva-cli-deb:
+  stage: test # Test musl build
   artifacts:
     paths:
       - "target/**/*.deb"
-  before_script:
-    - echo "$CACERT" > /ca.crt
   script:
     - cargo deb -p minerva-cli --target=x86_64-unknown-linux-musl
+
+publish-minerva-cli-deb:
+  stage: build
+  script:
     - |
       curl \
       --fail \
-      --cacert "/ca.crt" \
       -u "${REPO_USERNAME}:${REPO_PASSWORD}" \
       -H "Content-Type: multipart/form-data" \
       --data-binary "@./target/x86_64-unknown-linux-musl/debian/minerva-cli_${CI_COMMIT_TAG}-1_amd64.deb" \
@@ -76,7 +76,7 @@ publish-minerva-cli-deb:
     - if: $CI_COMMIT_TAG
 
 build-image:
-  stage: build-image
+  stage: build
   image: quay.io/buildah/stable@sha256:7d543392afeea6737dd2b86c5c09d6714b3df320c5fd86c3f7a3624afda63271
   before_script:
     - echo "$DOCKER_REGISTRY_PASSWORD" | buildah login -u "$DOCKER_REGISTRY_USER" --password-stdin $DOCKER_REGISTRY
@@ -89,7 +89,7 @@ build-image:
     - if: $CI_COMMIT_TAG
 
 build-instance-tester-image:
-  stage: build-image
+  stage: build
   image: quay.io/buildah/stable@sha256:7d543392afeea6737dd2b86c5c09d6714b3df320c5fd86c3f7a3624afda63271
   before_script:
     - echo "$DOCKER_REGISTRY_PASSWORD" | buildah login -u "$DOCKER_REGISTRY_USER" --password-stdin $DOCKER_REGISTRY
