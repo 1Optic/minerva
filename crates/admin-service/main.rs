@@ -47,8 +47,9 @@ use kpi::{delete_kpi, get_kpi, get_kpis, post_kpi, update_kpi, KpiImplementedDat
 
 mod trigger;
 use trigger::{
-    change_thresholds, create_trigger, get_template, get_templates, get_triggers,
-    ShortTemplateData, TemplateData, TemplatedTriggerDefinition, TriggerData,
+    change_thresholds, change_thresholds_by_id, create_trigger, delete_trigger_by_id, get_template,
+    get_templates, get_triggers, ShortTemplateData, TemplateData, TemplatedTriggerDefinition,
+    TriggerData,
 };
 
 mod entityset;
@@ -200,6 +201,8 @@ async fn main() -> Result<(), serviceerror::ServiceError> {
             .service(delete_kpi)
             .service(get_triggers)
             .service(change_thresholds)
+            .service(change_thresholds_by_id)
+            .service(delete_trigger_by_id)
             .service(get_templates)
             .service(get_template)
             .service(create_trigger)

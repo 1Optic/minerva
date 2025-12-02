@@ -2,7 +2,9 @@ use deadpool_postgres::Pool;
 use log::{debug, trace};
 use std::time::Duration;
 
-use actix_web::{get, post, put, web::Data, web::Path, HttpResponse, Responder};
+use actix_web::{
+    delete, get, post, put, web::Data, web::Path, HttpResponse, Responder, ResponseError,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -12,7 +14,7 @@ use minerva::change::Change;
 use minerva::error::DatabaseError;
 use minerva::trigger::{
     list_triggers, load_thresholds_with_client, load_trigger, set_enabled, set_thresholds,
-    AddTrigger, Threshold, TriggerError,
+    AddTrigger, DeleteTrigger, Threshold, TriggerError,
 };
 use minerva::trigger_template::{
     get_bare_template, get_template_from_id, list_templates, BareTemplate, ParameterValue,
@@ -223,17 +225,8 @@ pub(super) async fn get_triggers(pool: Data<Pool>) -> impl Responder {
 
 async fn change_thresholds_fn(
     pool: Data<Pool>,
-    post: String,
+    data: TriggerData,
 ) -> Result<HttpResponse, ExtendedServiceError> {
-    let data: TriggerData = serde_json::from_str(&post).map_err(|e| {
-        let mut messages = Map::new();
-        messages.insert("general".to_string(), e.to_string().into());
-        ExtendedServiceError {
-            kind: ServiceErrorKind::InternalError,
-            messages,
-        }
-    })?;
-
     let mut manager = pool.get().await.map_err(|e| {
         let mut messages = Map::new();
         messages.insert("general".to_string(), e.to_string().into());
@@ -364,14 +357,159 @@ async fn change_thresholds_fn(
 )]
 #[put("/triggers")]
 pub(super) async fn change_thresholds(pool: Data<Pool>, post: String) -> impl Responder {
-    let result = change_thresholds_fn(pool, post);
-    match result.await {
-        Ok(res) => res,
+    let data: TriggerData = match serde_json::from_str(&post) {
+        Ok(data) => data,
         Err(e) => {
             let mut messages = Map::new();
             messages.insert("general".to_string(), e.to_string().into());
-            HttpResponse::InternalServerError().json(messages)
+            return HttpResponse::BadRequest().json(messages);
         }
+    };
+
+    match change_thresholds_fn(pool, data).await {
+        Ok(res) => res,
+        Err(e) => e.error_response(),
+    }
+}
+
+async fn fetch_trigger_name_by_id(
+    pool: &Data<Pool>,
+    trigger_id: i32,
+) -> Result<String, ExtendedServiceError> {
+    let mut manager = pool.get().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), e.to_string().into());
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages,
+        }
+    })?;
+    let client: &mut tokio_postgres::Client = &mut manager;
+
+    let row = client
+        .query_opt(
+            "SELECT name FROM trigger.rule WHERE id = $1",
+            &[&trigger_id],
+        )
+        .await
+        .map_err(|e| {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            ExtendedServiceError {
+                kind: ServiceErrorKind::InternalError,
+                messages,
+            }
+        })?;
+
+    match row {
+        Some(row) => Ok(row.get(0)),
+        None => {
+            let mut messages = Map::new();
+            messages.insert(
+                "triggerId".to_string(),
+                format!("Trigger with id {trigger_id} not found").into(),
+            );
+            Err(ExtendedServiceError {
+                kind: ServiceErrorKind::NotFound,
+                messages,
+            })
+        }
+    }
+}
+
+#[utoipa::path(
+    put,
+    path="/triggers/{triggerId}",
+    params(
+        ("triggerId" = i32, Path, description = "Identifier of the trigger to update")
+    ),
+    responses(
+        (status = 200, description = "Updated trigger", body = Success),
+        (status = 400, description = "Input format incorrect", body = Error),
+        (status = 404, description = "Trigger not found", body = Error),
+        (status = 409, description = "Update failed", body = Error),
+        (status = 500, description = "General error", body = Error)
+    )
+)]
+#[put("/triggers/{trigger_id}")]
+pub(super) async fn change_thresholds_by_id(
+    pool: Data<Pool>,
+    trigger_id: Path<i32>,
+    post: String,
+) -> impl Responder {
+    let mut data: TriggerData = match serde_json::from_str(&post) {
+        Ok(data) => data,
+        Err(e) => {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            return HttpResponse::BadRequest().json(messages);
+        }
+    };
+
+    let trigger_name = match fetch_trigger_name_by_id(&pool, trigger_id.into_inner()).await {
+        Ok(name) => name,
+        Err(e) => return e.error_response(),
+    };
+
+    data.name = trigger_name;
+
+    match change_thresholds_fn(pool, data).await {
+        Ok(res) => res,
+        Err(e) => e.error_response(),
+    }
+}
+
+async fn delete_trigger_by_name(
+    pool: Data<Pool>,
+    trigger_name: String,
+) -> Result<HttpResponse, ExtendedServiceError> {
+    let mut manager = pool.get().await.map_err(|e| {
+        let mut messages = Map::new();
+        messages.insert("general".to_string(), e.to_string().into());
+        ExtendedServiceError {
+            kind: ServiceErrorKind::InternalError,
+            messages,
+        }
+    })?;
+    let client: &mut tokio_postgres::Client = &mut manager;
+
+    let delete_change = DeleteTrigger {
+        trigger_name: trigger_name.clone(),
+    };
+
+    let message = delete_change
+        .apply(client)
+        .await
+        .map_err(ExtendedServiceError::from)?;
+
+    Ok(HttpResponse::Ok().json(Success { code: 200, message }))
+}
+
+#[utoipa::path(
+    delete,
+    path="/triggers/{triggerId}",
+    params(
+        ("triggerId" = i32, Path, description = "Identifier of the trigger to delete")
+    ),
+    responses(
+        (status = 200, description = "Trigger deleted", body = Success),
+        (status = 404, description = "Trigger not found", body = Error),
+        (status = 500, description = "General error", body = Error)
+    )
+)]
+#[delete("/triggers/{trigger_id}")]
+pub(super) async fn delete_trigger_by_id(
+    pool: Data<Pool>,
+    trigger_id: Path<i32>,
+) -> impl Responder {
+    let trigger_name = match fetch_trigger_name_by_id(&pool, trigger_id.into_inner()).await {
+        Ok(name) => name,
+        Err(e) => return e.error_response(),
+    };
+
+    match delete_trigger_by_name(pool, trigger_name).await {
+        Ok(res) => res,
+        Err(e) => e.error_response(),
     }
 }
 

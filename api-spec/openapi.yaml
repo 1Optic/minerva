@@ -7,7 +7,10 @@ info:
     name: GNU Affero General Public License v3.0 or later
     url: https://www.gnu.org/licenses/agpl.txt
 servers:
+  #- url: http://localhost:8000
+  #  description: Local Minerva admin-service (e.g. `minerva start --with-definition ...`)
   - url: https://demo.1optic.io/gis-api/v1
+    description: Demo Minerva environment
 security: []
 paths:
   /trend-view-materializations:
@@ -852,10 +855,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Success'
+                $ref: '#/components/schemas/TriggerCreatedResponse'
               example:
-                code: 200
-                message: "Created trigger 'low_temperature'"
+                id: 123
         400:
           description: The input is incorrectly formatted
           content:
@@ -880,12 +882,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /triggers/{triggerId}:
     put:
-      summary: Change the thresholds for a trigger
+      summary: Change the thresholds or metadata for a trigger
       operationId: updateTrigger
+      parameters:
+        - name: triggerId
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
+        required: true
         content:
-          'application/json':
+          application/json:
             schema:
               $ref: '#/components/schemas/Trigger'
       responses:
@@ -915,6 +925,46 @@ paths:
                 $ref: '#/components/schemas/Error'
         409:
           description: Changing the trigger failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: Database unreachable or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete an existing trigger
+      operationId: deleteTrigger
+      parameters:
+        - name: triggerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Trigger successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        400:
+          description: The request is incorrectly formatted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: User is not allowed to perform this operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Trigger to be deleted does not exist
           content:
             application/json:
               schema:
@@ -1432,6 +1482,12 @@ components:
           format: int32
         message:
           type: string
+    TriggerCreatedResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier of the newly created trigger
     ExtendedError:
       type: array
       items:
