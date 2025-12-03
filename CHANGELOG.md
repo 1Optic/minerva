@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.36.0] - 2025-11-06
+
+### Added
+
+- API: Add trigger ID support
+- Trigger: Extend templates to be able to handle avg, min, max, sum... over a past time period
+
+### Fixed
+
+- DB: Fix migration filename
+
 ## [9.35.0] - 2025-11-06
 
 ### Added
@@ -514,4 +525,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.33.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.0...9.33.1
 [9.34.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.1...9.34.0
 [9.35.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...9.35.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...HEAD
+[9.36.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...9.36.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...HEAD
