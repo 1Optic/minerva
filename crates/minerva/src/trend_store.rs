@@ -455,7 +455,7 @@ impl<'a> SubPackageExtractor<'a> {
 
     fn extract_sub_package<'b>(
         &self,
-        entity_ids: &Vec<i32>,
+        entity_ids: &Vec<i64>,
         data_package: &'b [(String, DateTime<Utc>, Vec<String>)],
         aliases: &Vec<Option<String>>,
     ) -> Result<(Vec<ValueRow>, Vec<&'b DateTime<Utc>>), Error> {
@@ -500,7 +500,7 @@ impl RawMeasurementStore for TrendStore {
             .uses_alias_column(&self.entity_type, client)
             .await
             .map_err(|e| RawMeasurementStoreError::NamesToEntityIds(e.to_string()))?;
-        let entity_ids: Vec<i32> = entity_mapping
+        let entity_ids: Vec<i64> = entity_mapping
             .names_to_entity_ids(
                 client,
                 &self.entity_type,
@@ -814,7 +814,7 @@ pub trait DataPackage {
 }
 
 pub struct ValueRow {
-    pub entity_id: i32,
+    pub entity_id: i64,
     pub alias: Option<String>,
     pub timestamp: DateTime<chrono::Utc>,
     pub values: Vec<MeasValue>,
