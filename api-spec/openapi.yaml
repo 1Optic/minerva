@@ -10,7 +10,6 @@ servers:
   #- url: http://localhost:8000
   #  description: Local Minerva admin-service (e.g. `minerva start --with-definition ...`)
   - url: https://demo.1optic.io/gis-api/v1
-    description: Demo Minerva environment
 security: []
 paths:
   /trend-view-materializations:
@@ -1484,6 +1483,8 @@ components:
           type: string
     TriggerCreatedResponse:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer

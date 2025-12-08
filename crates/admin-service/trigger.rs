@@ -48,6 +48,11 @@ pub struct TemplateData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct TriggerCreatedResponse {
+    pub id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ShortTemplateData {
     pub id: i32,
     pub name: String,
@@ -408,6 +413,41 @@ async fn fetch_trigger_name_by_id(
             messages.insert(
                 "triggerId".to_string(),
                 format!("Trigger with id {trigger_id} not found").into(),
+            );
+            Err(ExtendedServiceError {
+                kind: ServiceErrorKind::NotFound,
+                messages,
+            })
+        }
+    }
+}
+
+async fn fetch_trigger_id_by_name(
+    client: &mut tokio_postgres::Client,
+    trigger_name: &str,
+) -> Result<i32, ExtendedServiceError> {
+    let row = client
+        .query_opt(
+            "SELECT id FROM trigger.rule WHERE name = $1",
+            &[&trigger_name],
+        )
+        .await
+        .map_err(|e| {
+            let mut messages = Map::new();
+            messages.insert("general".to_string(), e.to_string().into());
+            ExtendedServiceError {
+                kind: ServiceErrorKind::InternalError,
+                messages,
+            }
+        })?;
+
+    match row {
+        Some(row) => Ok(row.get(0)),
+        None => {
+            let mut messages = Map::new();
+            messages.insert(
+                "name".to_string(),
+                format!("Trigger with name {trigger_name} not found").into(),
             );
             Err(ExtendedServiceError {
                 kind: ServiceErrorKind::NotFound,
@@ -781,6 +821,8 @@ async fn create_trigger_fn(
 
     transaction.commit().await?;
 
+    let trigger_name = trigger.name.clone();
+
     let change = AddTrigger {
         trigger,
         verify: false,
@@ -790,9 +832,11 @@ async fn create_trigger_fn(
 
     debug!("Returned message {message}");
 
+    let trigger_id = fetch_trigger_id_by_name(client, &trigger_name).await?;
+
     trace!("Transaction committed");
 
-    Ok(HttpResponse::Ok().json(Success { code: 200, message }))
+    Ok(HttpResponse::Ok().json(TriggerCreatedResponse { id: trigger_id }))
 }
 
 // curl -H "Content-Type: application/json" -X POST -d '{"name": "high_downtime", "description": "downtime higher than maximum", "thresholds": [{"name": "max_downtime", "data_type": "numeric", "value": "50"}], "entity_type": "v-cell", "granularity": "15m", "weight": 100, "enabled": true, "template_instance": {"template_id": 1, "parameters": [{"parameter": "counter", "value": "L.Cell.Unavail.Dur.Sys"}, {"parameter": "comparison", "value": ">"}, {"parameter": "value", "value": "max_downtime"}]}}' localhost:8000/triggers
@@ -800,7 +844,7 @@ async fn create_trigger_fn(
     post,
     path="/triggers",
     responses(
-    (status = 200, description = "Creating trigger succeeded", body = Success),
+    (status = 200, description = "Creating trigger succeeded", body = TriggerCreatedResponse),
     (status = 400, description = "Request could not be parsed", body = Error),
     (status = 500, description = "Database unreachable", body = Error),
     )

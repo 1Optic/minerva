@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
+use console::Style;
 use log::{debug, error, trace};
 
 use postgres_types::ToSql;
@@ -10,13 +11,14 @@ use serde::{Deserialize, Serialize};
 
 use chrono::{DateTime, Timelike, Utc};
 use postgres_protocol::escape::{escape_identifier, escape_literal};
+use similar::{ChangeTag, TextDiff};
 use tokio_postgres::{Client, GenericClient, Row, Transaction};
 
 use async_trait::async_trait;
 
 use crate::interval::parse_interval;
 
-use super::change::{Change, ChangeResult};
+use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{ConfigurationError, DatabaseError, DatabaseErrorKind, Error, RuntimeError};
 use super::notification_store::notification_store_exists;
 
@@ -970,6 +972,70 @@ impl fmt::Display for UpdateTrigger {
     }
 }
 
+struct TriggerDiffInformation {
+    trigger: Trigger,
+}
+
+#[async_trait]
+impl InformationOption for TriggerDiffInformation {
+    fn name(&self) -> String {
+        "Show diff".to_string()
+    }
+
+    async fn retrieve(&self, client: &mut Client) -> Vec<String> {
+        match load_trigger(client, &self.trigger.name).await {
+            Ok(current) => match (render_trigger(&current), render_trigger(&self.trigger)) {
+                (Ok(from), Ok(to)) => colored_diff(&from, &to),
+                (Err(e), _) | (_, Err(e)) => {
+                    vec![format!("Could not render trigger diff: {e}")]
+                }
+            },
+            Err(TriggerError::NotFound(_)) => vec![format!(
+                "Trigger '{}' does not exist in the database",
+                &self.trigger.name
+            )],
+            Err(e) => vec![format!(
+                "Could not load current trigger '{}': {}",
+                &self.trigger.name,
+                e.to_database_error().msg
+            )],
+        }
+    }
+}
+
+impl fmt::Display for TriggerDiffInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name())
+    }
+}
+
+fn render_trigger(trigger: &Trigger) -> Result<String, Error> {
+    serde_yaml::to_string(trigger).map_err(|e| {
+        Error::Runtime(RuntimeError::from_msg(format!(
+            "Could not serialize trigger '{}': {e}",
+            &trigger.name
+        )))
+    })
+}
+
+fn colored_diff(from: &str, to: &str) -> Vec<String> {
+    let diff = TextDiff::from_lines(from, to);
+
+    diff.iter_all_changes()
+        .map(|c| {
+            let (sign, style) = match c.tag() {
+                ChangeTag::Delete => ("-", Style::new().red().bold()),
+                ChangeTag::Insert => ("+", Style::new().green().bold()),
+                ChangeTag::Equal => (" ", Style::new().dim()),
+            };
+
+            style
+                .apply_to(format!("{}{}", sign, c.to_string().trim_end()))
+                .to_string()
+        })
+        .collect()
+}
+
 #[async_trait]
 impl Change for UpdateTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
@@ -1031,6 +1097,12 @@ impl Change for UpdateTrigger {
         };
 
         Ok(message)
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(TriggerDiffInformation {
+            trigger: self.trigger.clone(),
+        })]
     }
 }
 

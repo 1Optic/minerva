@@ -130,13 +130,12 @@ pub async fn create_trigger(
 
     let response_data: serde_json::Value = response.json().await?;
 
-    assert_eq!(
-        response_data,
-        json!({
-            "code": 200,
-            "message": "Created trigger 'low_temperature'"
-        })
-    );
+    let trigger_id = response_data
+        .get("id")
+        .and_then(|v| v.as_i64())
+        .expect("expected response to contain trigger id");
+
+    assert!(trigger_id > 0);
 
     let response = client.get(url).send().await?;
     let response_data: serde_json::Value = response.json().await?;
