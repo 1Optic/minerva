@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.37.2] - 2025-12-17
+
+### Changed
+
+- Library: No longer populate all default alias values when enabling it for a trend store part
+
 ## [9.37.1] - 2025-12-17
 
 ### Fixed
@@ -544,4 +550,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.36.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...9.36.0
 [9.37.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...9.37.0
 [9.37.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...9.37.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...HEAD
+[9.37.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...9.37.2
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.2...HEAD

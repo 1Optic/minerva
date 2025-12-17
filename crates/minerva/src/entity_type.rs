@@ -37,14 +37,20 @@ impl EntityType {
                     primary_alias: other_primary_alias.to_string(),
                 })],
             },
-            Some(_) => match &other.primary_alias {
+            Some(my_primary_alias) => match &other.primary_alias {
                 None => vec![Box::new(RemovePrimaryAlias {
                     entity_type: self.name.clone(),
                 })],
-                Some(other_primary_alias) => vec![Box::new(ChangePrimaryAlias {
-                    entity_type: self.name.clone(),
-                    primary_alias: other_primary_alias.to_string(),
-                })],
+                Some(other_primary_alias) => {
+                    if other_primary_alias != my_primary_alias {
+                        vec![Box::new(ChangePrimaryAlias {
+                            entity_type: self.name.clone(),
+                            primary_alias: other_primary_alias.to_string(),
+                        })]
+                    } else {
+                        Vec::new()
+                    }
+                }
             },
         }
     }

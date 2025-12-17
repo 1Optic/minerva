@@ -235,12 +235,19 @@ async fn add_alias_column<T: GenericClient>(
     client: &mut T,
     trend_store_part_name: &str,
 ) -> Result<(), tokio_postgres::Error> {
-    let query = concat!(
-        "SELECT trend_directory.ensure_name_column(tsp) ",
-        "FROM trend_directory.trend_store_part tsp ",
-        "WHERE tsp.name = $1"
+    let update_query =
+        "UPDATE trend_directory.trend_store_part SET primary_alias = true WHERE name = $1";
+
+    client
+        .execute(update_query, &[&trend_store_part_name])
+        .await?;
+
+    let query = format!(
+        "ALTER TABLE trend.{} ADD COLUMN name text",
+        escape_identifier(trend_store_part_name)
     );
-    client.execute(query, &[&trend_store_part_name]).await?;
+
+    client.execute(&query, &[]).await?;
 
     Ok(())
 }
