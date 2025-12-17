@@ -85,6 +85,8 @@ impl Change for AddPrimaryAlias {
 
         transaction.execute(&query, &[]).await?;
 
+        transaction.commit().await?;
+
         Ok(format!(
             "Added primary alias to entity type '{}'",
             self.entity_type
@@ -124,6 +126,8 @@ impl Change for RemovePrimaryAlias {
         );
 
         transaction.execute(&query, &[]).await?;
+
+        transaction.commit().await?;
 
         Ok(format!(
             "Removed primary alias from entity type '{}'",
@@ -169,6 +173,8 @@ impl Change for ChangePrimaryAlias {
         );
 
         transaction.execute(&query, &[]).await?;
+
+        transaction.commit().await?;
 
         Ok(format!(
             "Changed primary alias of entity type '{}'",

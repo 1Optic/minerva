@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.37.1] - 2025-12-17
+
+### Fixed
+
+- CLI: Fixed updating of primary alias that was not properly commited
+
 ## [9.37.0] - 2025-12-17
 
 ### Added
@@ -537,4 +543,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.35.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...9.35.0
 [9.36.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...9.36.0
 [9.37.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...9.37.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...HEAD
+[9.37.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...9.37.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...HEAD
