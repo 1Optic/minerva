@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [9.37.0] - 2025-12-17
 
+### Added
+
+- CLI: Added updating of primary alias configuration of entity types
+
 ### Fixed
 
 - CLI: Fixed creation of specified entity types in initialize command
