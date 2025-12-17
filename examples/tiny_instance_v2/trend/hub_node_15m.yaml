@@ -5,6 +5,7 @@ partition_size: 1d
 retention_period: 6months
 parts:
   - name: hub_node_main_15m
+    has_alias_column: true
     trends:
       - name: outside_temp
         data_type: bigint

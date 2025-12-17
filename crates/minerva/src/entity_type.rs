@@ -27,6 +27,156 @@ impl fmt::Display for EntityType {
     }
 }
 
+impl EntityType {
+    pub fn diff(&self, other: &EntityType) -> Vec<Box<dyn Change + Send>> {
+        match &self.primary_alias {
+            None => match &other.primary_alias {
+                None => Vec::new(),
+                Some(other_primary_alias) => vec![Box::new(AddPrimaryAlias {
+                    entity_type: self.name.clone(),
+                    primary_alias: other_primary_alias.to_string(),
+                })],
+            },
+            Some(_) => match &other.primary_alias {
+                None => vec![Box::new(RemovePrimaryAlias {
+                    entity_type: self.name.clone(),
+                })],
+                Some(other_primary_alias) => vec![Box::new(ChangePrimaryAlias {
+                    entity_type: self.name.clone(),
+                    primary_alias: other_primary_alias.to_string(),
+                })],
+            },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddPrimaryAlias {
+    pub entity_type: String,
+    pub primary_alias: String,
+}
+
+impl fmt::Display for AddPrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "AddPrimaryAlias({}, {}):",
+            &self.entity_type, &self.primary_alias
+        )?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Change for AddPrimaryAlias {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let transaction = client.transaction().await?;
+
+        transaction
+            .execute(
+                "UPDATE directory.entity_type SET primary_alias = $1 WHERE name = $2",
+                &[&self.primary_alias, &self.entity_type],
+            )
+            .await?;
+
+        let query = format!("ALTER TABLE entity.\"{}\" ADD COLUMN primary_alias text GENERATED ALWAYS AS ({}) STORED", &self.entity_type, &self.primary_alias);
+
+        transaction.execute(&query, &[]).await?;
+
+        Ok(format!(
+            "Added primary alias to entity type '{}'",
+            self.entity_type
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovePrimaryAlias {
+    pub entity_type: String,
+}
+
+impl fmt::Display for RemovePrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "RemovePrimaryAlias({}):", &self.entity_type)?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Change for RemovePrimaryAlias {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let transaction = client.transaction().await?;
+
+        transaction
+            .execute(
+                "UPDATE directory.entity_type SET primary_alias = NULL WHERE name = $1",
+                &[&self.entity_type],
+            )
+            .await?;
+
+        let query = format!(
+            "ALTER TABLE entity.\"{}\" DROP COLUMN primary_alias",
+            &self.entity_type
+        );
+
+        transaction.execute(&query, &[]).await?;
+
+        Ok(format!(
+            "Removed primary alias from entity type '{}'",
+            self.entity_type
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ChangePrimaryAlias {
+    pub entity_type: String,
+    pub primary_alias: String,
+}
+
+impl fmt::Display for ChangePrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "ChangePrimaryAlias({}, {}):",
+            &self.entity_type, &self.primary_alias
+        )?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Change for ChangePrimaryAlias {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let transaction = client.transaction().await?;
+
+        transaction
+            .execute(
+                "UPDATE directory.entity_type SET primary_alias = $1 WHERE name = $2",
+                &[&self.primary_alias, &self.entity_type],
+            )
+            .await?;
+
+        let query = format!(
+            "ALTER TABLE entity.\"{}\" ALTER COLUMN primary_alias SET EXPRESSION AS ({})",
+            &self.entity_type, &self.primary_alias
+        );
+
+        transaction.execute(&query, &[]).await?;
+
+        Ok(format!(
+            "Changed primary alias of entity type '{}'",
+            self.entity_type
+        ))
+    }
+}
+
 pub fn load_entity_type_from_file(path: &PathBuf) -> Result<EntityType, Error> {
     let f = std::fs::File::open(path).map_err(|e| {
         ConfigurationError::from_msg(format!(

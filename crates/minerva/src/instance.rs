@@ -14,7 +14,7 @@ use std::time::Duration;
 use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
-use crate::entity_type::{load_entity_types, load_entity_types_from, EntityType};
+use crate::entity_type::{load_entity_types, load_entity_types_from, AddEntityType, EntityType};
 use crate::graph::GraphNode;
 use crate::meas_value::DataType;
 use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
@@ -661,6 +661,23 @@ impl MinervaInstance {
         options: DiffOptions,
     ) -> Vec<Box<dyn Change + Send + 'static>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        for other_entity_type in &other.entity_types {
+            match self
+                .entity_types
+                .iter()
+                .find(|my_entity_type| my_entity_type.name == other_entity_type.name)
+            {
+                Some(my_entity_type) => {
+                    changes.append(&mut my_entity_type.diff(other_entity_type));
+                }
+                None => {
+                    changes.push(Box::new(AddEntityType {
+                        entity_type: other_entity_type.clone(),
+                    }));
+                }
+            }
+        }
 
         // Check for changes in trend stores
         for other_trend_store in &other.trend_stores {
