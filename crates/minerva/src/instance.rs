@@ -296,6 +296,8 @@ impl MinervaInstance {
             .await;
         }
 
+        initialize_entity_types(client, &self.entity_types).await?;
+
         initialize_attribute_stores(client, &self.attribute_stores).await?;
 
         initialize_trend_stores(client, &self.trend_stores).await?;
@@ -852,6 +854,28 @@ fn load_attribute_stores_from(
             }
             Err(_) => None,
         })
+}
+
+async fn initialize_entity_types(
+    client: &mut Client,
+    entity_types: &Vec<EntityType>,
+) -> Result<(), Error> {
+    for entity_type in entity_types {
+        let change = AddEntityType {
+            entity_type: entity_type.clone(),
+        };
+
+        match change.apply(client).await {
+            Ok(message) => {
+                println!("{message}");
+            }
+            Err(e) => {
+                println!("{e}");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 async fn initialize_attribute_stores(

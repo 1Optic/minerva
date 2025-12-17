@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.37.0] - 2025-12-17
+
+### Fixed
+
+- CLI: Fixed creation of specified entity types in initialize command
+
 ## [9.36.0] - 2025-11-06
 
 ### Added
@@ -526,4 +532,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.34.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.33.1...9.34.0
 [9.35.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.34.0...9.35.0
 [9.36.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.35.0...9.36.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...HEAD
+[9.37.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...9.37.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...HEAD
