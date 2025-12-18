@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.37.3] - 2025-12-18
+
+### Fixed
+
+- CLI: Ignore trend store part deletions when --ignore-deletions is set
+
 ## [9.37.2] - 2025-12-17
 
 ### Changed
@@ -551,4 +557,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.37.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.36.0...9.37.0
 [9.37.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...9.37.1
 [9.37.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...9.37.2
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.2...HEAD
+[9.37.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.2...9.37.3
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.3...HEAD

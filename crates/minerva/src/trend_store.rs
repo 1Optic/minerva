@@ -1375,9 +1375,11 @@ impl TrendStore {
                     // Ok, the trend store part still exists
                 }
                 None => {
-                    changes.push(Box::new(RemoveTrendStorePart {
-                        name: my_part.name.clone(),
-                    }));
+                    if !options.ignore_deletions {
+                        changes.push(Box::new(RemoveTrendStorePart {
+                            name: my_part.name.clone(),
+                        }));
+                    }
                 }
             }
         }
