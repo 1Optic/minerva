@@ -37,6 +37,8 @@ pub struct UpdateOpt {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long)]
+    stage_deletions: bool,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
     plan_only: Option<String>,
 }
@@ -73,24 +75,19 @@ impl Cmd for UpdateOpt {
             },
         };
 
-        //print!(
-        //    "Reading Minerva instance from '{}'... ",
-        //    &minerva_instance_root.to_string_lossy()
-        //);
-        //io::stdout().flush().unwrap();
         let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
         let instance_config = load_instance_config(&minerva_instance_root).map_err(|e| {
             minerva::error::ConfigurationError::from_msg(format!(
                 "Could not load instance config: {e}"
             ))
         })?;
-        //println!("Ok");
 
         let diff_options = DiffOptions {
             ignore_trend_extra_data: self.ignore_trend_extra_data,
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
             instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
+            stage_deletions: self.stage_deletions,
         };
 
         let update_plan = plan_update(&instance_db, &instance_def, diff_options);

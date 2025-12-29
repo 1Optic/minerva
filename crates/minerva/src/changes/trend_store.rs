@@ -1,17 +1,18 @@
+use async_trait::async_trait;
 use chrono::Utc;
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
+use console::Style;
 use postgres_protocol::escape::escape_identifier;
+use rand::distr::{Alphanumeric, SampleString};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt::{self, Display};
-use tokio_postgres::{Client, GenericClient};
-
-use async_trait::async_trait;
-use console::Style;
 use similar::{ChangeTag, TextDiff};
+use std::fmt::{self, Display};
+use thiserror::Error;
+use tokio_postgres::{Client, GenericClient};
 
 use crate::change::{Change, ChangeResult, InformationOption, MinervaObjectRef};
 use crate::error::DatabaseError;
@@ -22,6 +23,221 @@ use crate::trend_store::create::{
 };
 use crate::trend_store::remove::remove_trend_store;
 use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart};
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct StageTrendsForDeletion {
+    pub trend_store_part: TrendStorePart,
+    pub trends: Vec<String>,
+}
+
+impl fmt::Display for StageTrendsForDeletion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "StageTrendsForDeletion({}, {}):",
+            &self.trend_store_part,
+            self.trends.len()
+        )?;
+
+        for t in &self.trends {
+            writeln!(f, " - {}", &t)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for StageTrendsForDeletion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StageTrendsForDeletion({}, {})",
+            &self.trend_store_part,
+            &self
+                .trends
+                .iter()
+                .map(|t| format!("'{}'", &t))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
+}
+
+struct TrendColumnRename {
+    pub trend_store_part_name: String,
+    pub trend_name: String,
+    pub staging_name: String,
+}
+
+impl TrendColumnRename {
+    pub async fn update<T: GenericClient>(
+        &self,
+        client: &mut T,
+    ) -> Result<(), tokio_postgres::Error> {
+        let alter_query = format!(
+            "ALTER TABLE trend.{} RENAME COLUMN {} TO {}",
+            escape_identifier(&self.trend_store_part_name),
+            escape_identifier(&self.trend_name),
+            escape_identifier(&self.staging_name)
+        );
+
+        client.execute(&alter_query, &[]).await?;
+
+        let alter_staging_table_query = format!(
+            "ALTER TABLE trend.{} RENAME COLUMN {} TO {}",
+            escape_identifier(&format!("{}_staging", self.trend_store_part_name)),
+            escape_identifier(&self.trend_name),
+            escape_identifier(&self.staging_name)
+        );
+
+        client.execute(&alter_staging_table_query, &[]).await?;
+
+        let update_query = concat!(
+            "UPDATE trend_directory.table_trend tt ",
+            "SET staged_for_deletion = now(), deletion_staging_column = $3 ",
+            "FROM trend_directory.trend_store_part tsp ",
+            "WHERE tsp.id = tt.trend_store_part_id AND tsp.name = $1 AND tt.name = $2"
+        );
+
+        client
+            .execute(
+                update_query,
+                &[
+                    &self.trend_store_part_name,
+                    &self.trend_name,
+                    &self.staging_name,
+                ],
+            )
+            .await?;
+
+        Ok(())
+    }
+}
+
+pub fn random_name(len: usize) -> String {
+    Alphanumeric.sample_string(&mut rand::rng(), len)
+}
+
+#[async_trait]
+impl Change for StageTrendsForDeletion {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        let renamings: Vec<TrendColumnRename> = self
+            .trends
+            .iter()
+            .map(|trend_name| TrendColumnRename {
+                trend_store_part_name: self.trend_store_part.name.clone(),
+                trend_name: trend_name.clone(),
+                staging_name: format!("_{}", random_name(32)),
+            })
+            .collect();
+
+        for trend_column_rename in &renamings {
+            trend_column_rename.update(&mut tx).await.map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error staging trend '{}' for removal in trend store part '{}': {}",
+                    &trend_column_rename.trend_name, &self.trend_store_part.name, e
+                ))
+            })?;
+        }
+
+        tx.commit().await?;
+
+        Ok(format!(
+            "Staged {} trends for deletion in trend store part '{}'",
+            &self.trends.len(),
+            &self.trend_store_part.name
+        ))
+    }
+
+    fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
+        vec![Box::new(TrendRemoveValueInformation {
+            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_names: self.trends.to_vec(),
+        })]
+    }
+}
+
+/////////////// RemoveTrends ////////////
+
+#[derive(Error, Debug)]
+enum TrendRemoveError {
+    #[error("{0}")]
+    Database(#[from] tokio_postgres::Error),
+    #[error("No such trend")]
+    NoSuchTrend,
+}
+
+struct TrendRemove {
+    pub trend_store_part_name: String,
+    pub trend_name: String,
+}
+
+impl TrendRemove {
+    pub async fn remove<T: GenericClient>(&self, client: &mut T) -> Result<(), TrendRemoveError> {
+        let deletion_staging_column_query = concat!(
+            "SELECT deletion_staging_column ",
+            "FROM trend_directory.table_trend tt ",
+            "JOIN trend_directory.trend_store_part tsp ON tsp.id = tt.trend_store_part_id ",
+            "WHERE tsp.name = $1 AND tt.name = $2"
+        );
+
+        let rows = client
+            .query(
+                deletion_staging_column_query,
+                &[&self.trend_store_part_name, &self.trend_name],
+            )
+            .await?;
+
+        if rows.is_empty() {
+            return Err(TrendRemoveError::NoSuchTrend);
+        }
+
+        let deleted_staging_column: Option<String> = rows.first().unwrap().get(0);
+
+        let column_name = deleted_staging_column.unwrap_or(self.trend_name.clone());
+
+        let drop_column_query = format!(
+            "ALTER TABLE trend.{} DROP COLUMN {}",
+            escape_identifier(&self.trend_store_part_name),
+            escape_identifier(&column_name),
+        );
+
+        client.execute(&drop_column_query, &[]).await?;
+
+        let drop_staging_table_column_query = format!(
+            "ALTER TABLE trend.{} DROP COLUMN {}",
+            escape_identifier(&format!("{}_staging", self.trend_store_part_name)),
+            escape_identifier(&column_name),
+        );
+
+        client
+            .execute(&drop_staging_table_column_query, &[])
+            .await?;
+
+        let update_query = concat!(
+            "UPDATE trend_directory.table_trend tt ",
+            "SET deleted = now(), deletion_staging_column = NULL ",
+            "FROM trend_directory.trend_store_part tsp ",
+            "WHERE tsp.id = tt.trend_store_part_id AND tsp.name = $1 AND tt.name = $2"
+        );
+
+        let affected_records = client
+            .execute(
+                update_query,
+                &[&self.trend_store_part_name, &self.trend_name],
+            )
+            .await?;
+
+        if affected_records == 0 {
+            return Err(TrendRemoveError::NoSuchTrend);
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -66,24 +282,20 @@ impl fmt::Debug for RemoveTrends {
 #[async_trait]
 impl Change for RemoveTrends {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
-        let tx = client.transaction().await?;
-
-        let query = concat!(
-            "SELECT trend_directory.remove_table_trend(table_trend) ",
-            "FROM trend_directory.table_trend ",
-            "JOIN trend_directory.trend_store_part ON trend_store_part.id = table_trend.trend_store_part_id ",
-            "WHERE trend_store_part.name = $1 AND table_trend.name = $2",
-        );
+        let mut tx = client.transaction().await?;
 
         for trend_name in &self.trends {
-            tx.query_one(query, &[&self.trend_store_part.name, &trend_name])
-                .await
-                .map_err(|e| {
-                    DatabaseError::from_msg(format!(
-                        "Error removing trend '{}' from trend store part: {}",
-                        &trend_name, e
-                    ))
-                })?;
+            let remove = TrendRemove {
+                trend_store_part_name: self.trend_store_part.name.clone(),
+                trend_name: trend_name.clone(),
+            };
+
+            remove.remove(&mut tx).await.map_err(|e| {
+                DatabaseError::from_msg(format!(
+                    "Error removing trend '{}' from trend store part: {}",
+                    &trend_name, e
+                ))
+            })?;
         }
 
         tx.commit().await?;

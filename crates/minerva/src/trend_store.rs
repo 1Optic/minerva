@@ -24,6 +24,7 @@ use async_trait::async_trait;
 use crate::changes::trend_store::{
     AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
     ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
+    StageTrendsForDeletion,
 };
 use crate::entity::EntityMapping;
 use crate::instance::DeploymentIgnore;
@@ -296,6 +297,7 @@ pub struct TrendStorePartDiffOptions {
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
     pub instance_ignores: Vec<DeploymentIgnore>,
+    pub stage_deletions: bool,
 }
 
 impl TrendStorePartDiffOptions {
@@ -1276,10 +1278,17 @@ impl TrendStorePart {
         }
 
         if !options.ignore_deletions && !removed_trends.is_empty() {
-            changes.push(Box::new(RemoveTrends {
-                trend_store_part: self.clone(),
-                trends: removed_trends,
-            }));
+            if options.stage_deletions {
+                changes.push(Box::new(StageTrendsForDeletion {
+                    trend_store_part: self.clone(),
+                    trends: removed_trends,
+                }));
+            } else {
+                changes.push(Box::new(RemoveTrends {
+                    trend_store_part: self.clone(),
+                    trends: removed_trends,
+                }));
+            }
         }
 
         if !alter_trend_data_types.is_empty() {
@@ -1306,6 +1315,7 @@ pub struct TrendStoreDiffOptions {
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
     pub instance_ignores: Vec<DeploymentIgnore>,
+    pub stage_deletions: bool,
 }
 
 impl TrendStoreDiffOptions {
@@ -1316,6 +1326,7 @@ impl TrendStoreDiffOptions {
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
             instance_ignores: self.instance_ignores.clone(),
+            stage_deletions: self.stage_deletions,
         }
     }
 }

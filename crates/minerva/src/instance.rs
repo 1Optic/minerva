@@ -64,6 +64,7 @@ pub struct DiffOptions {
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
     pub instance_ignores: Vec<DeploymentIgnore>,
+    pub stage_deletions: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -695,6 +696,7 @@ impl MinervaInstance {
                         ignore_trend_data_type: options.ignore_trend_data_type,
                         ignore_deletions: options.ignore_deletions,
                         instance_ignores: options.instance_ignores.clone(),
+                        stage_deletions: options.stage_deletions,
                     };
 
                     changes.append(&mut my_trend_store.diff(other_trend_store, diff_options));

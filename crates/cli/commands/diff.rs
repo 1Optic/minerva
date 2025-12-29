@@ -26,6 +26,8 @@ pub struct DiffOpt {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long)]
+    stage_deletions: bool,
     #[arg(long, help = "output diff in json format")]
     json: bool,
 }
@@ -75,6 +77,7 @@ impl Cmd for DiffOpt {
             ignore_trend_data_type: self.ignore_trend_data_type,
             ignore_deletions: self.ignore_deletions,
             instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
+            stage_deletions: self.stage_deletions,
         };
 
         let changes = other_instance.diff(&instance_def, diff_options);

@@ -21,6 +21,8 @@ pub struct TrendStoreUpdate {
     ignore_trend_data_type: bool,
     #[arg(long)]
     ignore_deletions: bool,
+    #[arg(long)]
+    stage_deletions: bool,
 }
 
 #[async_trait]
@@ -45,6 +47,7 @@ impl Cmd for TrendStoreUpdate {
                     ignore_trend_data_type: self.ignore_trend_data_type,
                     ignore_deletions: self.ignore_deletions,
                     instance_ignores: Vec::new(),
+                    stage_deletions: self.stage_deletions,
                 };
 
                 let changes = trend_store_db.diff(&trend_store, diff_options);
