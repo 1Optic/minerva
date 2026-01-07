@@ -17,9 +17,9 @@ type PostgresName = String;
 
 use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
+
 use crate::change::{Changed, MinervaObjectRef};
 use crate::entity::{default_entity_id_type, EntityIdType};
-
 use crate::meas_value::DataType;
 
 pub mod compact;
