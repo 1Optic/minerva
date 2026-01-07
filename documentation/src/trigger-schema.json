@@ -1,0 +1,119 @@
+{
+    "title": "Minerva Trigger Definition",
+    "description": "A specification of the format of Minerva trigger definition files",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "kpi_data": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "data_type": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": ["name", "data_type"]
+            }
+        },
+        "kpi_function": {
+            "type": "string"
+        },
+        "thresholds": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "data_type": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "condition": {
+            "type": "string"
+        },
+        "weight": {
+            "type": "string"
+        },
+        "data": {
+            "type": "string"
+        },
+        "tags": {
+        },
+        "fingerprint": {
+            "type": "string"
+        },
+        "notification_store": {
+            "type": "string"
+        },
+        "trend_store_links": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "part_name": {
+                        "type": "string"
+                    },
+                    "mapping_function": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "mapping_functions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                }
+            }
+        },
+        "granularity": {
+            "type": "string"
+        },
+        "description": {
+            "type": "string"
+        },
+        "dummy_notification": {
+            "type": "object",
+            "properties": {
+                "default_entity": {
+                    "type": "string"
+                },
+                "variants": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "weight": {
+                                "type": "number"
+                            },
+                            "data": {
+                                "type": "object"
+                            }
+                        },
+                        "required": ["name", "weight", "data"]
+                    }
+                }
+            },
+            "required": ["variants"]
+        }
+    },
+    "required": ["name", "kpi_data", "kpi_function", "thresholds", "condition", "weight", "data", "fingerprint", "notification_store", "trend_store_links", "granularity", "description"]
+}
