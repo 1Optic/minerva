@@ -18,6 +18,7 @@ type PostgresName = String;
 use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use crate::change::{Changed, MinervaObjectRef};
+use crate::entity::{default_entity_id_type, EntityIdType};
 use crate::meas_value::DataType;
 
 pub mod compact;
@@ -494,6 +495,8 @@ pub struct AttributeStore {
     pub data_source: String,
     pub entity_type: String,
     pub attributes: Vec<Attribute>,
+    #[serde(default = "default_entity_id_type")]
+    pub entity_id_type: EntityIdType,
 }
 
 impl AttributeStore {
@@ -695,12 +698,39 @@ pub async fn load_attribute_stores<T: GenericClient + Send + Sync>(
         let data_source: &str = row.get(1);
         let entity_type: &str = row.get(2);
 
+        let entity_id_type_query = concat!(
+            "SELECT format_type(atttypid, null) ",
+            "FROM pg_attribute ",
+            "JOIN pg_class ON pg_class.oid = pg_attribute.attrelid ",
+            "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace ",
+            "WHERE pg_class.relname = $1 ",
+            "AND pg_attribute.attname = 'entity_id' ",
+            "AND pg_namespace.nspname = 'attribute_base'",
+        );
+
+        let table_name = format!("{}_{}", data_source, entity_type);
+
+        let entity_id_type_result = conn
+            .query(entity_id_type_query, &[&table_name])
+            .await
+            .unwrap();
+        let entity_id_type_row = entity_id_type_result.first().unwrap();
+        let entity_id_type_str: &str = entity_id_type_row.get(0);
+        let entity_id_type = match entity_id_type_str {
+            "int4" => EntityIdType::I32,
+            "int8" => EntityIdType::I64,
+            "integer" => EntityIdType::I32,
+            "bigint" => EntityIdType::I64,
+            _ => panic!("Unknown entity_id type '{}'", entity_id_type_str),
+        };
+
         let attributes = load_attributes(conn, attribute_store_id).await;
 
         attribute_stores.push(AttributeStore {
             data_source: String::from(data_source),
             entity_type: String::from(entity_type),
             attributes,
+            entity_id_type,
         });
     }
 
@@ -725,12 +755,39 @@ pub async fn load_attribute_store<T: GenericClient + Send + Sync>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Could not load attribute stores: {e}")))?;
 
+    let entity_id_type_query = concat!(
+        "SELECT format_type(atttypid, null) ",
+        "FROM pg_attribute ",
+        "JOIN pg_class ON pg_class.oid = pg_attribute.attrelid ",
+        "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace ",
+        "WHERE pg_class.relname = $1 ",
+        "AND pg_attribute.attname = 'entity_id' ",
+        "AND pg_namespace.nspname = 'attribute_base'",
+    );
+
+    let table_name = format!("{}_{}", data_source, entity_type);
+
+    let entity_id_type_result = conn
+        .query(entity_id_type_query, &[&table_name])
+        .await
+        .unwrap();
+    let entity_id_type_row = entity_id_type_result.first().unwrap();
+    let entity_id_type_str: &str = entity_id_type_row.get(0);
+    let entity_id_type = match entity_id_type_str {
+        "int4" => EntityIdType::I32,
+        "int8" => EntityIdType::I64,
+        "integer" => EntityIdType::I32,
+        "bigint" => EntityIdType::I64,
+        _ => panic!("Unknown entity_id type '{}'", entity_id_type_str),
+    };
+
     let attributes = load_attributes(conn, result.get::<usize, i32>(0)).await;
 
     Ok(AttributeStore {
         data_source: String::from(data_source),
         entity_type: String::from(entity_type),
         attributes,
+        entity_id_type,
     })
 }
 
@@ -854,6 +911,7 @@ mod tests {
             data_source: "test".to_string(),
             entity_type: "node".to_string(),
             attributes: vec![],
+            entity_id_type: default_entity_id_type(),
         };
 
         let other_attribute_store = AttributeStore {
@@ -865,6 +923,7 @@ mod tests {
                 description: "Type name from vendor".to_string(),
                 extra_data: Value::Null,
             }],
+            entity_id_type: default_entity_id_type(),
         };
 
         let diff_options = AttributeStoreDiffOptions {
@@ -893,12 +952,14 @@ mod tests {
                 description: "Type name from vendor".to_string(),
                 extra_data: Value::Null,
             }],
+            entity_id_type: default_entity_id_type(),
         };
 
         let other_attribute_store = AttributeStore {
             data_source: "test".to_string(),
             entity_type: "node".to_string(),
             attributes: vec![],
+            entity_id_type: default_entity_id_type(),
         };
 
         let diff_options = AttributeStoreDiffOptions {

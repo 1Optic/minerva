@@ -26,7 +26,7 @@ use crate::changes::trend_store::{
     ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
     StageTrendsForDeletion,
 };
-use crate::entity::EntityMapping;
+use crate::entity::{default_entity_id_type, EntityIdType, EntityMapping};
 use crate::instance::DeploymentIgnore;
 use crate::meas_value::{
     DataType, MeasValue, INT8_NONE_VALUE, INTEGER_NONE_VALUE, NUMERIC_NONE_VALUE, TEXT_NONE_VALUE,
@@ -331,6 +331,8 @@ pub struct TrendStorePart {
     pub trends: Vec<Trend>,
     #[serde(default = "default_generated_trends")]
     pub generated_trends: Vec<GeneratedTrend>,
+    #[serde(default = "default_entity_id_type")]
+    pub entity_id_type: EntityIdType,
 }
 
 impl PartialOrd for TrendStorePart {
@@ -882,8 +884,17 @@ impl TrendStorePart {
 
         let mut matched_trends: Vec<&Trend> = Vec::new();
 
-        let mut value_types: Vec<Type> =
-            vec![Type::INT4, Type::TIMESTAMPTZ, Type::TIMESTAMPTZ, Type::INT8];
+        let entity_id_sql_type = match self.entity_id_type {
+            EntityIdType::I32 => Type::INT4,
+            EntityIdType::I64 => Type::INT8,
+        };
+
+        let mut value_types: Vec<Type> = vec![
+            entity_id_sql_type,
+            Type::TIMESTAMPTZ,
+            Type::TIMESTAMPTZ,
+            Type::INT8,
+        ];
 
         // Filter trends that match the trend store parts trends and add corresponding types
         for t in &self.trends {
@@ -924,12 +935,40 @@ impl TrendStorePart {
         let created_timestamp = Utc::now();
 
         for value_row in data_rows {
-            let mut values: Vec<&(dyn ToSql + Sync)> = vec![
-                &value_row.entity_id,
-                &value_row.timestamp,
-                &created_timestamp,
-                &job_id,
-            ];
+            let mut values: Vec<&(dyn ToSql + Sync)>;
+            let i32_entity_id: i32;
+
+            match self.entity_id_type {
+                EntityIdType::I32 => {
+                    let entity_id_result: Result<i32, _> = value_row.entity_id.try_into();
+
+                    match entity_id_result {
+                        Ok(v) => {
+                            i32_entity_id = v;
+                            values = vec![
+                                &i32_entity_id,
+                                &value_row.timestamp,
+                                &created_timestamp,
+                                &job_id,
+                            ];
+                        }
+                        Err(_) => {
+                            return Err(TrendStorePartStorageError::Database(format!(
+                                "Cannot store entity ID {} as integer",
+                                value_row.entity_id
+                            )));
+                        }
+                    }
+                }
+                EntityIdType::I64 => {
+                    values = vec![
+                        &value_row.entity_id,
+                        &value_row.timestamp,
+                        &created_timestamp,
+                        &job_id,
+                    ];
+                }
+            }
 
             if let Some(alias) = &value_row.alias {
                 values.push(alias)
@@ -1110,12 +1149,40 @@ impl TrendStorePart {
         let query = insert_query(self, &matched_trends);
 
         for value_row in data_package {
-            let mut values: Vec<&(dyn ToSql + Sync)> = vec![
-                &value_row.entity_id,
-                &value_row.timestamp,
-                &created_timestamp,
-                &job_id,
-            ];
+            let mut values: Vec<&(dyn ToSql + Sync)>;
+            let i32_entity_id: i32;
+
+            match self.entity_id_type {
+                EntityIdType::I32 => {
+                    let entity_id_result: Result<i32, _> = value_row.entity_id.try_into();
+
+                    match entity_id_result {
+                        Ok(v) => {
+                            i32_entity_id = v;
+                            values = vec![
+                                &i32_entity_id,
+                                &value_row.timestamp,
+                                &created_timestamp,
+                                &job_id,
+                            ];
+                        }
+                        Err(_) => {
+                            return Err(Error::Runtime(RuntimeError::from_msg(format!(
+                                "Cannot store entity ID {} as integer",
+                                value_row.entity_id
+                            ))));
+                        }
+                    }
+                }
+                EntityIdType::I64 => {
+                    values = vec![
+                        &value_row.entity_id,
+                        &value_row.timestamp,
+                        &created_timestamp,
+                        &job_id,
+                    ];
+                }
+            }
 
             if let Some(alias) = &value_row.alias {
                 values.push(alias)
@@ -1640,6 +1707,30 @@ pub async fn load_trend_store_part<T: GenericClient>(
 
     let trend_store_part_id: i32 = trend_store_part_row.get(0);
 
+    let has_alias_column: bool = trend_store_part_row.get(1);
+
+    let entity_id_type_query = concat!(
+        "SELECT format_type(atttypid, null) ",
+        "FROM pg_attribute ",
+        "JOIN pg_class ON pg_class.oid = pg_attribute.attrelid ",
+        "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace ",
+        "WHERE pg_class.relname = $1 ",
+        "AND pg_attribute.attname = 'entity_id' ",
+        "AND pg_namespace.nspname = 'trend'",
+    );
+
+    let entity_id_type_result = conn.query(entity_id_type_query, &[&name]).await.unwrap();
+
+    let entity_id_type_row = entity_id_type_result.first().unwrap();
+    let entity_id_type_str: &str = entity_id_type_row.get(0);
+    let entity_id_type = match entity_id_type_str {
+        "int4" => EntityIdType::I32,
+        "int8" => EntityIdType::I64,
+        "integer" => EntityIdType::I32,
+        "bigint" => EntityIdType::I64,
+        _ => panic!("Unknown entity_id type '{}'", entity_id_type_str),
+    };
+
     let trend_query = concat!(
         "SELECT name, data_type, description, entity_aggregation, time_aggregation, extra_data ",
         "FROM trend_directory.table_trend ",
@@ -1672,8 +1763,9 @@ pub async fn load_trend_store_part<T: GenericClient>(
         name: String::from(name),
         trends,
         generated_trends: Vec::new(),
-        has_alias_column: false,
-    })
+        has_alias_column,
+        entity_id_type,
+    }
 }
 
 async fn load_trend_store_parts<T: GenericClient>(
@@ -1694,6 +1786,30 @@ async fn load_trend_store_parts<T: GenericClient>(
         let trend_store_part_id: i32 = trend_store_part_row.get(0);
         let trend_store_part_name: &str = trend_store_part_row.get(1);
         let has_alias_column: bool = trend_store_part_row.get(2);
+
+        let entity_id_type_query = concat!(
+            "SELECT format_type(atttypid, null) ",
+            "FROM pg_attribute ",
+            "JOIN pg_class ON pg_class.oid = pg_attribute.attrelid ",
+            "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace ",
+            "WHERE pg_class.relname = $1 ",
+            "AND pg_attribute.attname = 'entity_id' ",
+            "AND pg_namespace.nspname = 'trend'",
+        );
+
+        let entity_id_type_result = conn
+            .query(entity_id_type_query, &[&trend_store_part_name])
+            .await
+            .unwrap();
+        let entity_id_type_row = entity_id_type_result.first().unwrap();
+        let entity_id_type_str: &str = entity_id_type_row.get(0);
+        let entity_id_type = match entity_id_type_str {
+            "int4" => EntityIdType::I32,
+            "int8" => EntityIdType::I64,
+            "integer" => EntityIdType::I32,
+            "bigint" => EntityIdType::I64,
+            _ => panic!("Unknown entity_id type '{}'", entity_id_type_str),
+        };
 
         let trend_query = concat!(
             "SELECT name, data_type, description, entity_aggregation, time_aggregation, extra_data ",
@@ -1731,6 +1847,7 @@ async fn load_trend_store_parts<T: GenericClient>(
             trends,
             generated_trends: Vec::new(),
             has_alias_column,
+            entity_id_type,
         });
     }
 
