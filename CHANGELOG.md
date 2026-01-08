@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.39.0] - 2026-01-08
+
+### Changed
+
+- CLI: Serialize diff JSON as array instead of multi-object stream
+
 ## [9.38.0] - 2026-01-08
 
 ### Added
@@ -565,4 +571,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.37.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...9.37.2
 [9.37.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.2...9.37.3
 [9.38.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.3...9.38.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.38.0...HEAD
+[9.39.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.38.0...9.39.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.39.0...HEAD

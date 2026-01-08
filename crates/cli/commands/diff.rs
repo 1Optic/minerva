@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 
-use erased_serde::Serializer;
+use erased_serde::{Serialize, Serializer};
 use minerva::error::{ConfigurationError, Error};
 use minerva::instance::{load_instance_config, DiffOptions, MinervaInstance};
 
@@ -89,12 +89,12 @@ impl Cmd for DiffOpt {
                 println!("Differences {from_instance_descr} -> {to_instance_descr}");
             }
 
-            for change in changes {
-                if self.json {
-                    let json = &mut serde_json::Serializer::new(std::io::stdout());
-                    let mut serializer = Box::new(<dyn Serializer>::erase(json));
-                    let _ = change.erased_serialize(&mut serializer);
-                } else {
+            if self.json {
+                let json = &mut serde_json::Serializer::new(std::io::stdout());
+                let mut serializer = Box::new(<dyn Serializer>::erase(json));
+                let _ = changes.erased_serialize(&mut serializer);
+            } else {
+                for change in changes {
                     println!("* {}", &change);
                 }
             }
