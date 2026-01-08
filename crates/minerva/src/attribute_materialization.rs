@@ -324,7 +324,7 @@ pub async fn load_attribute_materializations<T: GenericClient + Send + Sync>(
     Ok(attribute_materializations)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AddAttributeMaterialization {
     pub attribute_materialization: AttributeMaterialization,
 }
@@ -340,6 +340,7 @@ impl fmt::Display for AddAttributeMaterialization {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddAttributeMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;

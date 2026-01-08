@@ -96,6 +96,7 @@ impl fmt::Debug for AddAttributes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -172,6 +173,7 @@ impl fmt::Debug for RemoveAttributes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -314,6 +316,7 @@ impl fmt::Debug for ChangeAttribute {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for ChangeAttribute {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -457,6 +460,7 @@ impl fmt::Display for AddAttributeStore {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddAttributeStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;

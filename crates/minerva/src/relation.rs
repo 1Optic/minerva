@@ -76,6 +76,7 @@ impl fmt::Display for AddRelation {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddRelation {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -109,6 +110,7 @@ impl fmt::Display for UpdateRelation {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateRelation {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;

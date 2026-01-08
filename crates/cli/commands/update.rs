@@ -1,5 +1,6 @@
 use std::env;
 use std::io;
+use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -39,6 +40,8 @@ pub struct UpdateOpt {
     ignore_deletions: bool,
     #[arg(long)]
     stage_deletions: bool,
+    #[arg(long)]
+    from_diff: Option<PathBuf>,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
     plan_only: Option<String>,
 }
@@ -82,15 +85,32 @@ impl Cmd for UpdateOpt {
             ))
         })?;
 
-        let diff_options = DiffOptions {
-            ignore_trend_extra_data: self.ignore_trend_extra_data,
-            ignore_trend_data_type: self.ignore_trend_data_type,
-            ignore_deletions: self.ignore_deletions,
-            instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
-            stage_deletions: self.stage_deletions,
-        };
+        let update_plan = match &self.from_diff {
+            Some(diff_file_path) => {
+                let config_file = std::fs::File::open(diff_file_path.clone()).unwrap();
+                let reader = BufReader::new(config_file);
+                let changes: Vec<Box<dyn Change + Send>> = serde_json::from_reader(reader)
+                    .map_err(|e| {
+                        minerva::error::RuntimeError::from_msg(format!("Could not load diff: {e}"))
+                    })?;
 
-        let update_plan = plan_update(&instance_db, &instance_def, diff_options);
+                UpdatePlan {
+                    dependency_graph: Graph::new(),
+                    changes,
+                }
+            }
+            None => {
+                let diff_options = DiffOptions {
+                    ignore_trend_extra_data: self.ignore_trend_extra_data,
+                    ignore_trend_data_type: self.ignore_trend_data_type,
+                    ignore_deletions: self.ignore_deletions,
+                    instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
+                    stage_deletions: self.stage_deletions,
+                };
+
+                plan_update(&instance_db, &instance_def, diff_options)
+            }
+        };
 
         if let Some(plan_output_format) = &self.plan_only {
             if plan_output_format.eq("plain") {
@@ -103,7 +123,7 @@ impl Cmd for UpdateOpt {
 
             Ok(())
         } else {
-            update(&mut client, update_plan, !self.non_interactive).await
+            update(&mut client, update_plan.changes, !self.non_interactive).await
         }
     }
 }
@@ -187,12 +207,16 @@ fn plan_update(
     }
 }
 
-async fn update(client: &mut Client, plan: UpdatePlan, interactive: bool) -> CmdResult {
+async fn update(
+    client: &mut Client,
+    changes: Vec<Box<dyn Change + std::marker::Send>>,
+    interactive: bool,
+) -> CmdResult {
     println!("Applying changes:");
 
-    let num_changes = plan.changes.len();
+    let num_changes = changes.len();
 
-    for (index, change) in plan.changes.iter().enumerate() {
+    for (index, change) in changes.iter().enumerate() {
         println!("\n\n* [{}/{num_changes}] {change}", index + 1);
 
         if !interactive || interact(client, change.as_ref()).await? {

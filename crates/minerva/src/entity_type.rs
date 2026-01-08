@@ -76,6 +76,7 @@ impl fmt::Display for AddPrimaryAlias {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddPrimaryAlias {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client.transaction().await?;
@@ -115,6 +116,7 @@ impl fmt::Display for RemovePrimaryAlias {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemovePrimaryAlias {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client.transaction().await?;
@@ -162,6 +164,7 @@ impl fmt::Display for ChangePrimaryAlias {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for ChangePrimaryAlias {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client.transaction().await?;
@@ -240,6 +243,7 @@ impl fmt::Display for AddEntityType {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddEntityType {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;

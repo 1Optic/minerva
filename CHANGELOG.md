@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.38.0] - 2026-01-08
+
+### Added
+
+- CLI: Add option to load update changes from JSON diff file
+
 ## [9.37.3] - 2025-12-18
 
 ### Fixed
@@ -558,4 +564,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.37.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.0...9.37.1
 [9.37.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.1...9.37.2
 [9.37.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.2...9.37.3
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.3...HEAD
+[9.38.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.37.3...9.38.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.38.0...HEAD

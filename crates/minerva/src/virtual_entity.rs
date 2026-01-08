@@ -76,6 +76,7 @@ impl fmt::Display for AddVirtualEntity {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddVirtualEntity {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;

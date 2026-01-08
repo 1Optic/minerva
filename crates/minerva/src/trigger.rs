@@ -304,6 +304,7 @@ impl AddTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx1 = client.transaction().await?;
@@ -886,6 +887,7 @@ impl fmt::Display for DeleteTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for DeleteTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -971,6 +973,7 @@ impl fmt::Display for UpdateTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
@@ -1049,6 +1052,7 @@ impl fmt::Display for RenameTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RenameTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         if self.trigger.name.len() > MAX_TRIGGER_NAME_LENGTH {
@@ -1141,6 +1145,7 @@ impl fmt::Display for VerifyTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for VerifyTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
@@ -1166,6 +1171,7 @@ impl fmt::Display for EnableTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for EnableTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
@@ -1191,6 +1197,7 @@ impl fmt::Display for DisableTrigger {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for DisableTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
@@ -1387,6 +1394,7 @@ impl fmt::Display for CreateNotifications {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for CreateNotifications
 where
     DateTime<Utc>: ToSql,

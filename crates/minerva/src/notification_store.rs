@@ -42,6 +42,7 @@ impl fmt::Display for AddAttributes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -140,6 +141,7 @@ impl fmt::Display for AddNotificationStore {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddNotificationStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;

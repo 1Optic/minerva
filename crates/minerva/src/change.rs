@@ -41,6 +41,7 @@ impl Display for MinervaObjectRef {
 }
 
 #[async_trait]
+#[typetag::serde(tag = "type")]
 pub trait Change: fmt::Display + Send + Sync + erased_serde::Serialize {
     async fn apply(&self, client: &mut Client) -> ChangeResult;
 

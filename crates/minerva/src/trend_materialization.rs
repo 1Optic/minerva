@@ -457,6 +457,7 @@ pub struct UpdateTrendViewMaterializationAttributes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateTrendViewMaterializationAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -566,6 +567,7 @@ pub struct UpdateTrendFunctionMaterializationAttributes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateTrendFunctionMaterializationAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -614,6 +616,7 @@ pub struct UpdateView {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateView {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -687,6 +690,7 @@ pub struct UpdateFunction {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateFunction {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -1957,6 +1961,7 @@ impl fmt::Display for AddTrendMaterialization {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddTrendMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -2003,6 +2008,7 @@ impl fmt::Display for RemoveTrendMaterialization {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveTrendMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -2041,6 +2047,7 @@ impl fmt::Display for UpdateTrendMaterialization {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for UpdateTrendMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;

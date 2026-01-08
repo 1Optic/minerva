@@ -120,6 +120,7 @@ pub fn random_name(len: usize) -> String {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for StageTrendsForDeletion {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -280,6 +281,7 @@ impl fmt::Debug for RemoveTrends {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveTrends {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -360,6 +362,7 @@ impl fmt::Debug for AddTrends {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddTrends {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -465,6 +468,7 @@ async fn add_alias_column<T: GenericClient>(
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddAliasColumn {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -515,6 +519,7 @@ async fn remove_alias_column<T: GenericClient>(
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveAliasColumn {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -600,6 +605,7 @@ impl fmt::Debug for ModifyTrendDataTypes {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for ModifyTrendDataTypes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client
@@ -914,6 +920,7 @@ impl fmt::Display for ModifyTrendExtraData {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for ModifyTrendExtraData {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
@@ -992,6 +999,7 @@ async fn define_table_trends<T: GenericClient>(
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddTrendStorePart {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -1039,6 +1047,7 @@ pub struct RemoveTrendStorePart {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveTrendStorePart {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -1083,6 +1092,7 @@ impl fmt::Display for AddTrendStore {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for AddTrendStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -1116,6 +1126,7 @@ impl fmt::Display for RemoveTrendStore {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for RemoveTrendStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -1146,6 +1157,7 @@ impl fmt::Display for CreateStatistics {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for CreateStatistics {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         match &self.trend_store_part_name {

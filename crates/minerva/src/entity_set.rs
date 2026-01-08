@@ -273,6 +273,7 @@ impl fmt::Display for ChangeEntitySet {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for ChangeEntitySet {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
@@ -398,6 +399,7 @@ impl fmt::Display for CreateEntitySet {
 }
 
 #[async_trait]
+#[typetag::serde]
 impl Change for CreateEntitySet {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;

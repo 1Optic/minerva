@@ -2171,7 +2171,7 @@ dependencies = [
 
 [[package]]
 name = "integration-tests"
-version = "9.37.3"
+version = "9.38.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2212,6 +2212,15 @@ dependencies = [
  "tokio-postgres-rustls",
  "toxiproxy_rust",
  "url",
+]
+
+[[package]]
+name = "inventory"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc61209c082fbeb19919bee74b176221b27223e27b65d781eb91af24eb1fb46e"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -2476,7 +2485,7 @@ dependencies = [
 
 [[package]]
 name = "minerva"
-version = "9.37.3"
+version = "9.38.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2515,12 +2524,13 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
+ "typetag",
  "url",
 ]
 
 [[package]]
 name = "minerva-cli"
-version = "9.37.3"
+version = "9.38.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2567,7 +2577,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-event-service"
-version = "9.37.3"
+version = "9.38.0"
 dependencies = [
  "chrono",
  "deadpool-postgres",
@@ -2589,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-service"
-version = "9.37.3"
+version = "9.38.0"
 dependencies = [
  "actix-cors",
  "actix-web",
@@ -4688,6 +4698,30 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+
+[[package]]
+name = "typetag"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be2212c8a9b9bcfca32024de14998494cf9a5dfa59ea1b829de98bac374b86bf"
+dependencies = [
+ "erased-serde",
+ "inventory",
+ "once_cell",
+ "serde",
+ "typetag-impl",
+]
+
+[[package]]
+name = "typetag-impl"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27a7a9b72ba121f6f1f6c3632b85604cac41aedb5ddc70accbebb6cac83de846"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
 
 [[package]]
 name = "ulid"
