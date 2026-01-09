@@ -64,7 +64,7 @@ fn default_empty_string() -> String {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddAttributes {
-    pub attribute_store: AttributeStore,
+    pub attribute_store: AttributeStoreRef,
     pub attributes: Vec<Attribute>,
 }
 
@@ -133,7 +133,7 @@ impl Change for AddAttributes {
 
         Ok(format!(
             "Added attributes to attribute store '{}'",
-            &self.attribute_store
+            self.attribute_store,
         ))
     }
 }
@@ -141,7 +141,7 @@ impl Change for AddAttributes {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct RemoveAttributes {
-    pub attribute_store: AttributeStore,
+    pub attribute_store: AttributeStoreRef,
     pub attributes: Vec<String>,
 }
 
@@ -291,7 +291,7 @@ impl Display for AttributeRemoveValueInformation {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct ChangeAttribute {
-    pub attribute_store: AttributeStore,
+    pub attribute_store: AttributeStoreRef,
     pub attribute: Attribute,
 }
 
@@ -364,6 +364,31 @@ pub struct AttributeStoreDiffOptions {
     pub ignore_deletions: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct AttributeStoreRef {
+    pub data_source: String,
+    pub entity_type: String,
+}
+
+impl fmt::Display for AttributeStoreRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AttributeStore({}, {})",
+            &self.data_source, &self.entity_type
+        )
+    }
+}
+
+impl From<&AttributeStore> for AttributeStoreRef {
+    fn from(value: &AttributeStore) -> Self {
+        AttributeStoreRef {
+            data_source: value.data_source.clone(),
+            entity_type: value.entity_type.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AttributeStore {
     pub data_source: String,
@@ -391,7 +416,7 @@ impl AttributeStore {
                 Some(my_part) => {
                     if my_part.data_type != other_attribute.data_type {
                         changes.push(Box::new(ChangeAttribute {
-                            attribute_store: self.clone(),
+                            attribute_store: self.into(),
                             attribute: other_attribute.clone(),
                         }));
                     }
@@ -404,7 +429,7 @@ impl AttributeStore {
 
         if !new_attributes.is_empty() {
             changes.push(Box::new(AddAttributes {
-                attribute_store: self.clone(),
+                attribute_store: self.into(),
                 attributes: new_attributes,
             }));
         }
@@ -428,7 +453,7 @@ impl AttributeStore {
 
         if !options.ignore_deletions && !removed_attributes.is_empty() {
             changes.push(Box::new(RemoveAttributes {
-                attribute_store: self.clone(),
+                attribute_store: self.into(),
                 attributes: removed_attributes,
             }));
         }

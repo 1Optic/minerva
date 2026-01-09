@@ -1,6 +1,6 @@
 use tokio_postgres::GenericClient;
 
-use crate::trend_store::{format_duration, TrendStore};
+use crate::trend_store::{format_duration, TrendStoreRef};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RemoveTrendStoreError {
@@ -18,7 +18,7 @@ pub enum RemoveTrendStoreError {
 
 pub async fn remove_trend_store<T: GenericClient>(
     client: &mut T,
-    trend_store: &TrendStore,
+    trend_store: &TrendStoreRef,
 ) -> Result<(), RemoveTrendStoreError> {
     let get_data_source_id_query = "SELECT id FROM directory.data_source WHERE name = $1";
 

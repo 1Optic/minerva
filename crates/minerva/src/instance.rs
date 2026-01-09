@@ -498,10 +498,9 @@ impl MinervaInstance {
                     }
                 }
                 TrendMaterialization::Function(m) => {
-                    let materialization_node_idx = graph.add_node(
-                        GraphNode::TrendFunctionMaterialization(m.target_trend_store_part.clone()),
-                    );
-                    let table_name = format!("trend.{}", m.target_trend_store_part);
+                    let materialization_node_idx =
+                        graph.add_node(GraphNode::TrendFunctionMaterialization(m.name()));
+                    let table_name = format!("trend.{}", m.name());
                     let source_index = table_node_map.get(&table_name).unwrap();
                     graph.add_edge(*source_index, materialization_node_idx, "".to_string());
 
@@ -728,7 +727,7 @@ impl MinervaInstance {
                     }
 
                     changes.push(Box::new(RemoveTrendStore {
-                        trend_store: my_trend_store.clone(),
+                        trend_store: my_trend_store.into(),
                     }));
                 }
             }

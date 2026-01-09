@@ -1,7 +1,7 @@
 target_trend_store_part: hub_node_main_1d
 enabled: true
 processing_delay: 30m
-stability_delay: 5m
+stability_delay: 10m
 reprocessing_period: 3 days
 sources:
 - trend_store_part: hub_node_main_15m
@@ -24,7 +24,7 @@ function:
           entity_id,
           $2 AS timestamp,
           (count(*))::smallint AS samples,
-          SUM(t."outside_temp")::numeric AS "outside_temp",
+          MAX(t."outside_temp")::numeric AS "outside_temp",
           SUM(t."inside_temp")::numeric AS "inside_temp",
           SUM(t."power_kwh")::numeric AS "power_kwh",
           SUM(t."freq_power")::numeric AS "freq_power"

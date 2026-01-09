@@ -10,8 +10,9 @@ use utoipa::ToSchema;
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationFunction,
-    TrendMaterializationSource, TrendMaterializationTrendSource, TrendViewMaterialization,
+    TrendFunctionMaterialization, TrendMaterialization, TrendMaterializationAttributes,
+    TrendMaterializationFunction, TrendMaterializationSource, TrendMaterializationTrendSource,
+    TrendViewMaterialization,
 };
 use tokio_postgres::Transaction;
 
@@ -201,18 +202,22 @@ pub enum TrendMaterializationDef {
 impl TrendViewMaterializationData {
     fn as_minerva(&self) -> TrendMaterialization {
         let sources = as_minerva(&(self.sources));
-        TrendMaterialization::View(TrendViewMaterialization {
-            target_trend_store_part: self.target_trend_store_part.clone(),
+        let attributes = TrendMaterializationAttributes {
             enabled: self.enabled,
             processing_delay: self.processing_delay,
             stability_delay: self.stability_delay,
             reprocessing_period: self.reprocessing_period,
-            sources,
-            view: self.view.to_string(),
             description: Some(self.description.clone()),
-            fingerprint_function: self.fingerprint_function.to_string(),
             old_data_threshold: self.old_data_threshold,
             old_data_stability_delay: self.old_data_stability_delay,
+        };
+
+        TrendMaterialization::View(TrendViewMaterialization {
+            target_trend_store_part: self.target_trend_store_part.clone(),
+            attributes,
+            sources,
+            view: self.view.to_string(),
+            fingerprint_function: self.fingerprint_function.to_string(),
         })
     }
 
@@ -303,18 +308,23 @@ impl TrendViewMaterializationData {
 impl TrendFunctionMaterializationData {
     pub fn as_minerva(&self) -> TrendMaterialization {
         let sources = as_minerva(&(self.sources));
-        TrendMaterialization::Function(TrendFunctionMaterialization {
-            target_trend_store_part: self.target_trend_store_part.clone(),
+
+        let attributes = TrendMaterializationAttributes {
             enabled: self.enabled,
             processing_delay: self.processing_delay,
             stability_delay: self.stability_delay,
             reprocessing_period: self.reprocessing_period,
-            sources,
-            function: self.function.as_minerva(),
             description: Some(self.description.clone()),
-            fingerprint_function: self.fingerprint_function.to_string(),
             old_data_threshold: self.old_data_threshold,
             old_data_stability_delay: self.old_data_stability_delay,
+        };
+
+        TrendMaterialization::Function(TrendFunctionMaterialization {
+            target_trend_store_part: self.target_trend_store_part.clone(),
+            attributes,
+            sources,
+            function: self.function.as_minerva(),
+            fingerprint_function: self.fingerprint_function.to_string(),
         })
     }
 

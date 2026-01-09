@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use log::info;
+use postgres_types::WrongType;
 use rust_decimal::prelude::FromPrimitive;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{binary_copy::BinaryCopyInWriter, GenericClient};
@@ -111,14 +112,33 @@ impl DataPackage for RefinedDataPackage {
                 let db_error = e.as_db_error();
 
                 match db_error {
-                    Some(db_e) => DataPackageWriteError::Generic(format!("dbe: {db_e}")),
+                    Some(db_e) => {
+                        let message = db_e.message();
+
+                        if message.contains("cannot convert between the Rust type") {
+                            DataPackageWriteError::DatatypeMismatch(message.to_string())
+                        } else {
+                            DataPackageWriteError::Generic(format!("dbe: {db_e}"))
+                        }
+                    }
                     None => {
                         let text = e.to_string();
 
-                        if text.contains("cannot convert between the Rust type") {
-                            DataPackageWriteError::DatatypeMismatch(text)
-                        } else {
-                            DataPackageWriteError::Generic(text)
+                        match e.into_source() {
+                            Some(source) => {
+                                if source.is::<WrongType>() {
+                                    DataPackageWriteError::DatatypeMismatch(text)
+                                } else {
+                                    DataPackageWriteError::Generic(source.to_string())
+                                }
+                            }
+                            None => {
+                                if text.contains("cannot convert between the Rust type") {
+                                    DataPackageWriteError::DatatypeMismatch(text)
+                                } else {
+                                    DataPackageWriteError::Generic(text)
+                                }
+                            }
                         }
                     }
                 }

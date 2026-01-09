@@ -1,6 +1,6 @@
 target_trend_store_part: hub-kpi_node_main_15m
 enabled: true
-processing_delay: 30m
+processing_delay: 1h
 stability_delay: 5m
 reprocessing_period: 3 days
 sources:
@@ -10,7 +10,7 @@ view: |-
   SELECT
     timestamp,
     entity_id, 
-    power_kwh * 1000 as power_mwh
+    power_kwh * 1000 * 5 as power_mwh
   FROM trend."hub_node_main_15m"
 fingerprint_function: |
   SELECT modified.last, format('{"hub_node_main_15m": "%s"}', modified.last)::jsonb

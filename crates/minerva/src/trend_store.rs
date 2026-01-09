@@ -605,25 +605,37 @@ impl StoreCopyFromError {
             let error_text = value.to_string();
 
             match *sqlstate {
-                SqlState::PROTOCOL_VIOLATION => {
-                    if error_text.contains("insufficient data left in message") {
-                        StoreCopyFromError::DataMismatch(error_text)
-                    } else {
-                        StoreCopyFromError::Generic(error_text)
+                SqlState::PROTOCOL_VIOLATION => match value.as_db_error() {
+                    Some(db_error) => {
+                        let message = db_error.message();
+
+                        if message.contains("insufficient data left in message") {
+                            StoreCopyFromError::DataMismatch(message.to_string())
+                        } else {
+                            StoreCopyFromError::Generic(message.to_string())
+                        }
                     }
-                }
+                    None => StoreCopyFromError::Generic(error_text),
+                },
                 SqlState::INTERNAL_ERROR => {
-                    // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
-                    // The string representation of the error does contain the 'duplicate key' violation
-                    // indication.
-                    if error_text.contains("duplicate key value violates unique constraint") {
-                        StoreCopyFromError::UniqueViolation(error_text)
-                    } else if error_text.contains("incorrect binary data format")
-                        || error_text.contains("unexpected EOF in COPY data")
-                    {
-                        StoreCopyFromError::DataMismatch(error_text)
-                    } else {
-                        StoreCopyFromError::Generic(error_text)
+                    match value.as_db_error() {
+                        Some(db_error) => {
+                            let message = db_error.message();
+
+                            // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
+                            // The string representation of the error does contain the 'duplicate key' violation
+                            // indication.
+                            if message.contains("duplicate key value violates unique constraint") {
+                                StoreCopyFromError::UniqueViolation(message.to_string())
+                            } else if message.contains("incorrect binary dateDMYta format")
+                                || message.contains("unexpected EOF in COPY data")
+                            {
+                                StoreCopyFromError::DataMismatch(message.to_string())
+                            } else {
+                                StoreCopyFromError::Generic(message.to_string())
+                            }
+                        }
+                        None => StoreCopyFromError::Generic(error_text),
                     }
                 }
                 SqlState::INVALID_BINARY_REPRESENTATION => {
@@ -940,16 +952,24 @@ impl TrendStorePart {
             // For some reason, the error code returned by e.code() is XX000, or INTERNAL_ERROR.
             // The string representation of the error does contain the 'duplicate key' violation
             // indication.
-            if e.to_string()
-                .contains("duplicate key value violates unique constraint")
-            {
-                TrendStorePartStorageError::UniqueViolation(format!(
+            match e.as_db_error() {
+                None => TrendStorePartStorageError::Database(format!(
                     "Could not load data using COPY command: {e}"
-                ))
-            } else {
-                TrendStorePartStorageError::Database(format!(
-                    "Could not load data using COPY command: {e}"
-                ))
+                )),
+                Some(db_error) => {
+                    if db_error
+                        .message()
+                        .contains("duplicate key value violates unique constraint")
+                    {
+                        TrendStorePartStorageError::UniqueViolation(format!(
+                            "Could not load data using COPY command: {e}"
+                        ))
+                    } else {
+                        TrendStorePartStorageError::Database(format!(
+                            "Could not load data using COPY command: {e}"
+                        ))
+                    }
+                }
             }
         })?;
 
@@ -1245,7 +1265,7 @@ impl TrendStorePart {
 
         if !new_trends.is_empty() {
             changes.push(Box::new(AddTrends {
-                trend_store_part: self.clone(),
+                trend_store_part_name: self.name.clone(),
                 trends: new_trends,
             }));
         }
@@ -1267,7 +1287,7 @@ impl TrendStorePart {
 
         if !self.has_alias_column && other.has_alias_column {
             changes.push(Box::new(AddAliasColumn {
-                trend_store_part: self.clone(),
+                trend_store_part_name: self.name.clone(),
             }))
         }
 
@@ -1280,12 +1300,12 @@ impl TrendStorePart {
         if !options.ignore_deletions && !removed_trends.is_empty() {
             if options.stage_deletions {
                 changes.push(Box::new(StageTrendsForDeletion {
-                    trend_store_part: self.clone(),
+                    trend_store_part_name: self.name.clone(),
                     trends: removed_trends,
                 }));
             } else {
                 changes.push(Box::new(RemoveTrends {
-                    trend_store_part: self.clone(),
+                    trend_store_part_name: self.name.clone(),
                     trends: removed_trends,
                 }));
             }
@@ -1331,6 +1351,35 @@ impl TrendStoreDiffOptions {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct TrendStoreRef {
+    pub data_source: String,
+    pub entity_type: String,
+    pub granularity: Duration,
+}
+
+impl fmt::Display for TrendStoreRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TrendStore({}, {}, {})",
+            &self.data_source,
+            &self.entity_type,
+            &humantime::format_duration(self.granularity).to_string()
+        )
+    }
+}
+
+impl From<&TrendStore> for TrendStoreRef {
+    fn from(value: &TrendStore) -> Self {
+        TrendStoreRef {
+            data_source: value.data_source.clone(),
+            entity_type: value.entity_type.clone(),
+            granularity: value.granularity,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendStore {
     pub title: Option<String>,
@@ -1369,7 +1418,7 @@ impl TrendStore {
                 }
                 None => {
                     changes.push(Box::new(AddTrendStorePart {
-                        trend_store: self.clone(),
+                        trend_store: self.into(),
                         trend_store_part: other_part.clone(),
                     }));
                 }
@@ -1594,7 +1643,7 @@ async fn load_trend_store_parts<T: GenericClient>(
         let trend_query = concat!(
             "SELECT name, data_type, description, entity_aggregation, time_aggregation, extra_data ",
             "FROM trend_directory.table_trend ",
-            "WHERE trend_store_part_id = $1",
+            "WHERE trend_store_part_id = $1 AND deleted IS NULL",
         );
 
         let trend_result = conn

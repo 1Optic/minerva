@@ -13,8 +13,9 @@ use thiserror::Error;
 use crate::instance::EntityAggregationHint;
 use crate::meas_value::DataType;
 use crate::trend_materialization::{
-    TrendFunctionMaterialization, TrendMaterializationFunction, TrendMaterializationRelationSource,
-    TrendMaterializationSource, TrendMaterializationTrendSource,
+    TrendFunctionMaterialization, TrendMaterializationAttributes, TrendMaterializationFunction,
+    TrendMaterializationRelationSource, TrendMaterializationSource,
+    TrendMaterializationTrendSource,
 };
 use crate::trend_store::{Trend, TrendStore, TrendStorePart};
 use crate::{
@@ -350,12 +351,19 @@ fn define_part_time_aggregation(
     target_granularity: &Duration,
     name: String,
 ) -> Result<(TrendFunctionMaterialization, TrendStorePart), String> {
-    let materialization = TrendFunctionMaterialization {
-        target_trend_store_part: name.clone(),
+    let materialization_attributes = TrendMaterializationAttributes {
         enabled: true,
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
         reprocessing_period: Duration::from_secs(86400 * 7),
+        description: None,
+        old_data_threshold: config.old_data_threshold,
+        old_data_stability_delay: config.old_data_stability_delay,
+    };
+
+    let materialization = TrendFunctionMaterialization {
+        target_trend_store_part: name.clone(),
+        attributes: materialization_attributes,
         sources: vec![TrendMaterializationSource::Trend(
             TrendMaterializationTrendSource {
                 trend_store_part: source_part.name.clone(),
@@ -368,9 +376,6 @@ fn define_part_time_aggregation(
             source_granularity,
             target_granularity,
         ),
-        description: None,
-        old_data_threshold: config.old_data_threshold,
-        old_data_stability_delay: config.old_data_stability_delay,
     };
 
     let mut aggregate_trends: Vec<Trend> = source_part
@@ -867,7 +872,7 @@ fn write_function_entity_aggregations(
         let file_path: PathBuf = [
             minerva_instance.instance_root.clone().unwrap(),
             PathBuf::from("materialization"),
-            PathBuf::from(format!("{}.yaml", aggregation.target_trend_store_part)),
+            PathBuf::from(format!("{}.yaml", aggregation.name())),
         ]
         .iter()
         .collect();
@@ -936,12 +941,19 @@ fn define_function_part_entity_aggregation(
     relation: String,
     name: String,
 ) -> TrendFunctionMaterialization {
-    TrendFunctionMaterialization {
-        target_trend_store_part: name,
+    let materialization_attributes = TrendMaterializationAttributes {
         enabled: true,
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
         reprocessing_period: Duration::from_secs(86400 * 3),
+        description: None,
+        old_data_threshold: config.old_data_threshold,
+        old_data_stability_delay: config.old_data_stability_delay,
+    };
+
+    TrendFunctionMaterialization {
+        target_trend_store_part: name,
+        attributes: materialization_attributes,
         sources: vec![
             TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
                 trend_store_part: source_part.name.clone(),
@@ -953,9 +965,6 @@ fn define_function_part_entity_aggregation(
         ],
         function: entity_aggregation_function(source_part, relation),
         fingerprint_function: define_fingerprint_sql(source_part),
-        description: None,
-        old_data_threshold: config.old_data_threshold,
-        old_data_stability_delay: config.old_data_stability_delay,
     }
 }
 

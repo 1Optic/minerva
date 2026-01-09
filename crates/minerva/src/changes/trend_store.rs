@@ -22,12 +22,12 @@ use crate::trend_store::create::{
     create_trend_store, create_trend_store_part, remove_trend_store_part,
 };
 use crate::trend_store::remove::remove_trend_store;
-use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart};
+use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart, TrendStoreRef};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct StageTrendsForDeletion {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
     pub trends: Vec<String>,
 }
 
@@ -35,8 +35,8 @@ impl fmt::Display for StageTrendsForDeletion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "StageTrendsForDeletion({}, {}):",
-            &self.trend_store_part,
+            "StageTrendsForDeletion(TrendStorePart({}), {}):",
+            &self.trend_store_part_name,
             self.trends.len()
         )?;
 
@@ -52,8 +52,8 @@ impl fmt::Debug for StageTrendsForDeletion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "StageTrendsForDeletion({}, {})",
-            &self.trend_store_part,
+            "StageTrendsForDeletion(TrendStorePart({}), {})",
+            &self.trend_store_part_name,
             &self
                 .trends
                 .iter()
@@ -129,7 +129,7 @@ impl Change for StageTrendsForDeletion {
             .trends
             .iter()
             .map(|trend_name| TrendColumnRename {
-                trend_store_part_name: self.trend_store_part.name.clone(),
+                trend_store_part_name: self.trend_store_part_name.clone(),
                 trend_name: trend_name.clone(),
                 staging_name: format!("_{}", random_name(32)),
             })
@@ -139,7 +139,7 @@ impl Change for StageTrendsForDeletion {
             trend_column_rename.update(&mut tx).await.map_err(|e| {
                 DatabaseError::from_msg(format!(
                     "Error staging trend '{}' for removal in trend store part '{}': {}",
-                    &trend_column_rename.trend_name, &self.trend_store_part.name, e
+                    &trend_column_rename.trend_name, &self.trend_store_part_name, e
                 ))
             })?;
         }
@@ -149,13 +149,13 @@ impl Change for StageTrendsForDeletion {
         Ok(format!(
             "Staged {} trends for deletion in trend store part '{}'",
             &self.trends.len(),
-            &self.trend_store_part.name
+            &self.trend_store_part_name
         ))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
         vec![Box::new(TrendRemoveValueInformation {
-            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_store_part_name: self.trend_store_part_name.clone(),
             trend_names: self.trends.to_vec(),
         })]
     }
@@ -243,7 +243,7 @@ impl TrendRemove {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct RemoveTrends {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
     pub trends: Vec<String>,
 }
 
@@ -251,8 +251,8 @@ impl fmt::Display for RemoveTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "RemoveTrends({}, {}):",
-            &self.trend_store_part,
+            "RemoveTrends(TrendStorePart({}), {}):",
+            &self.trend_store_part_name,
             self.trends.len()
         )?;
 
@@ -268,8 +268,8 @@ impl fmt::Debug for RemoveTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "RemoveTrends({}, {})",
-            &self.trend_store_part,
+            "RemoveTrends(TrendStorePart({}), {})",
+            &self.trend_store_part_name,
             &self
                 .trends
                 .iter()
@@ -288,7 +288,7 @@ impl Change for RemoveTrends {
 
         for trend_name in &self.trends {
             let remove = TrendRemove {
-                trend_store_part_name: self.trend_store_part.name.clone(),
+                trend_store_part_name: self.trend_store_part_name.clone(),
                 trend_name: trend_name.clone(),
             };
 
@@ -305,13 +305,13 @@ impl Change for RemoveTrends {
         Ok(format!(
             "Removed {} trends from trend store part '{}'",
             &self.trends.len(),
-            &self.trend_store_part.name
+            &self.trend_store_part_name
         ))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
         vec![Box::new(TrendRemoveValueInformation {
-            trend_store_part_name: self.trend_store_part.name.clone(),
+            trend_store_part_name: self.trend_store_part_name.clone(),
             trend_names: self.trends.to_vec(),
         })]
     }
@@ -324,7 +324,7 @@ impl Change for RemoveTrends {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddTrends {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
     pub trends: Vec<Trend>,
 }
 
@@ -332,8 +332,8 @@ impl fmt::Display for AddTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "AddTrends({}, {}):",
-            &self.trend_store_part,
+            "AddTrends(TrendStorePart({}), {}):",
+            &self.trend_store_part_name,
             &self.trends.len()
         )?;
 
@@ -349,8 +349,8 @@ impl fmt::Debug for AddTrends {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AddTrends({}, {})",
-            &self.trend_store_part,
+            "AddTrends(TrendStorePart({}), {})",
+            &self.trend_store_part_name,
             &self
                 .trends
                 .iter()
@@ -367,7 +367,7 @@ impl Change for AddTrends {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        create_table_trends(&mut tx, &self.trend_store_part.name, &self.trends)
+        create_table_trends(&mut tx, &self.trend_store_part_name, &self.trends)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!("Error adding trends to trend store part: {e}"))
@@ -378,7 +378,7 @@ impl Change for AddTrends {
         Ok(format!(
             "Added {} trends to trend store part '{}'",
             &self.trends.len(),
-            &self.trend_store_part.name
+            &self.trend_store_part_name
         ))
     }
 }
@@ -429,18 +429,31 @@ async fn initialize_table_trends<T: GenericClient>(
 
     client.execute(&alter_table_query, &[]).await?;
 
+    let alter_staging_table_query = format!(
+        "ALTER TABLE {}.{} {}",
+        BASE_TABLE_SCHEMA,
+        escape_identifier(&format!("{}_staging", trend_store_part_name)),
+        column_specs
+    );
+
+    client.execute(&alter_staging_table_query, &[]).await?;
+
     Ok(())
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddAliasColumn {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
 }
 
 impl fmt::Display for AddAliasColumn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "AddAlias({}):", &self.trend_store_part)?;
+        writeln!(
+            f,
+            "AddAlias(TrendStorePart({})):",
+            &self.trend_store_part_name
+        )?;
 
         Ok(())
     }
@@ -473,7 +486,7 @@ impl Change for AddAliasColumn {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        add_alias_column(&mut tx, &self.trend_store_part.name)
+        add_alias_column(&mut tx, &self.trend_store_part_name)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
@@ -485,7 +498,7 @@ impl Change for AddAliasColumn {
 
         Ok(format!(
             "Added alias column to trend store part '{}'",
-            &self.trend_store_part.name
+            &self.trend_store_part_name
         ))
     }
 }
@@ -962,7 +975,7 @@ impl Change for ModifyTrendExtraData {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddTrendStorePart {
-    pub trend_store: TrendStore,
+    pub trend_store: TrendStoreRef,
     pub trend_store_part: TrendStorePart,
 }
 
@@ -1110,16 +1123,12 @@ impl Change for AddTrendStore {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct RemoveTrendStore {
-    pub trend_store: TrendStore,
+    pub trend_store: TrendStoreRef,
 }
 
 impl fmt::Display for RemoveTrendStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "RemoveTrendStore({})", &self.trend_store)?;
-
-        for part in &self.trend_store.parts {
-            writeln!(f, " - {}", &part.name)?;
-        }
+        write!(f, "RemoveTrendStore({})", self.trend_store)?;
 
         Ok(())
     }
@@ -1137,7 +1146,7 @@ impl Change for RemoveTrendStore {
 
         tx.commit().await?;
 
-        Ok(format!("Removed trend store {}", &self.trend_store))
+        Ok(format!("Removed trend store {}", self.trend_store))
     }
 }
 

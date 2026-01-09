@@ -1,7 +1,5 @@
 use std::env;
-use std::io;
 use std::io::BufReader;
-use std::io::Write;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -51,40 +49,6 @@ impl Cmd for UpdateOpt {
     async fn run(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        //print!("Reading Minerva instance from database... ");
-        io::stdout().flush().unwrap();
-        let instance_db = MinervaInstance::load_from_db(&mut client).await?;
-        //println!("Ok");
-
-        let minerva_instance_root = match &self.instance_root {
-            Some(root) => {
-                // Next to passing on the Minerva instance root directory, we need to set the
-                // environment variable for any child processes that might be started during
-                // initialization.
-                std::env::set_var(ENV_MINERVA_INSTANCE_ROOT, root);
-
-                root.clone()
-            }
-            None => match env::var(ENV_MINERVA_INSTANCE_ROOT) {
-                Ok(v) => PathBuf::from(v),
-                Err(e) => {
-                    return Err(Error::Configuration(ConfigurationError {
-                        msg: format!(
-                            "Environment variable '{}' could not be read: {}",
-                            &ENV_MINERVA_INSTANCE_ROOT, e
-                        ),
-                    }));
-                }
-            },
-        };
-
-        let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
-        let instance_config = load_instance_config(&minerva_instance_root).map_err(|e| {
-            minerva::error::ConfigurationError::from_msg(format!(
-                "Could not load instance config: {e}"
-            ))
-        })?;
-
         let update_plan = match &self.from_diff {
             Some(diff_file_path) => {
                 let config_file = std::fs::File::open(diff_file_path.clone()).unwrap();
@@ -100,6 +64,37 @@ impl Cmd for UpdateOpt {
                 }
             }
             None => {
+                let instance_db = MinervaInstance::load_from_db(&mut client).await?;
+
+                let minerva_instance_root = match &self.instance_root {
+                    Some(root) => {
+                        // Next to passing on the Minerva instance root directory, we need to set the
+                        // environment variable for any child processes that might be started during
+                        // initialization.
+                        std::env::set_var(ENV_MINERVA_INSTANCE_ROOT, root);
+
+                        root.clone()
+                    }
+                    None => match env::var(ENV_MINERVA_INSTANCE_ROOT) {
+                        Ok(v) => PathBuf::from(v),
+                        Err(e) => {
+                            return Err(Error::Configuration(ConfigurationError {
+                                msg: format!(
+                                    "Environment variable '{}' could not be read: {}",
+                                    &ENV_MINERVA_INSTANCE_ROOT, e
+                                ),
+                            }));
+                        }
+                    },
+                };
+
+                let instance_def = MinervaInstance::load_from(&minerva_instance_root)?;
+                let instance_config =
+                    load_instance_config(&minerva_instance_root).map_err(|e| {
+                        minerva::error::ConfigurationError::from_msg(format!(
+                            "Could not load instance config: {e}"
+                        ))
+                    })?;
                 let diff_options = DiffOptions {
                     ignore_trend_extra_data: self.ignore_trend_extra_data,
                     ignore_trend_data_type: self.ignore_trend_data_type,
