@@ -225,7 +225,7 @@ async fn main() {
     let config = get_config();
     let pool = connect_db().unwrap();
     let mut client = pool.get().await.unwrap();
-    let httpclient = Client::new();
+    let httpclient = reqwest::Client::new();
     let transaction = client.transaction().await.unwrap();
     let result = transaction
         .query_one(
