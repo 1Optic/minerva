@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{Error, RuntimeError};
@@ -28,9 +27,8 @@ pub struct TrendMaterializationUpdate {
     include_logic: bool,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationUpdate {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationUpdate {
+    async fn update(&self) -> CmdResult {
         let trend_materialization = trend_materialization_from_config(&self.definition)?;
 
         println!("Loaded definition, updating trend materialization");
@@ -81,5 +79,15 @@ impl Cmd for TrendMaterializationUpdate {
                 msg: format!("Error updating trend materialization: {e}"),
             })),
         }
+    }
+}
+
+impl Cmd for TrendMaterializationUpdate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
     }
 }

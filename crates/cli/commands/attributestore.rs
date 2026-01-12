@@ -39,16 +39,16 @@ pub enum AttributeStoreOptCommands {
 }
 
 impl AttributeStoreOpt {
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            AttributeStoreOptCommands::List(list) => list.run().await,
-            AttributeStoreOptCommands::Create(create) => create.run().await,
-            AttributeStoreOptCommands::Update(update) => update.run().await,
+            AttributeStoreOptCommands::List(list) => list.run(),
+            AttributeStoreOptCommands::Create(create) => create.run(),
+            AttributeStoreOptCommands::Update(update) => update.run(),
             AttributeStoreOptCommands::MaterializeCurrPtr(materialize_curr_ptr) => {
-                materialize_curr_ptr.run().await
+                materialize_curr_ptr.run()
             }
-            AttributeStoreOptCommands::Compact(compact) => compact.run().await,
-            AttributeStoreOptCommands::Materialize(materialize) => materialize.run().await,
+            AttributeStoreOptCommands::Compact(compact) => compact.run(),
+            AttributeStoreOptCommands::Materialize(materialize) => materialize.run(),
         }
     }
 }

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -24,10 +23,10 @@ pub enum AggregationOptCommands {
 }
 
 impl AggregationOpt {
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            AggregationOptCommands::Generate(generate) => generate.run().await,
-            AggregationOptCommands::CompileAll(compile_all) => compile_all.run().await,
+            AggregationOptCommands::Generate(generate) => generate.run(),
+            AggregationOptCommands::CompileAll(compile_all) => compile_all.run(),
         }
     }
 }
@@ -38,9 +37,8 @@ pub struct AggregationGenerate {
     instance_root: Option<PathBuf>,
 }
 
-#[async_trait]
 impl Cmd for AggregationGenerate {
-    async fn run(&self) -> CmdResult {
+    fn run(&self) -> CmdResult {
         let instance_root = match &self.instance_root {
             Some(path) => path.clone(),
             None => std::env::var(ENV_MINERVA_INSTANCE_ROOT)
@@ -60,9 +58,8 @@ impl Cmd for AggregationGenerate {
 #[derive(Debug, Parser, PartialEq)]
 pub struct AggregationCompileAll {}
 
-#[async_trait]
 impl Cmd for AggregationCompileAll {
-    async fn run(&self) -> CmdResult {
+    fn run(&self) -> CmdResult {
         Ok(())
     }
 }

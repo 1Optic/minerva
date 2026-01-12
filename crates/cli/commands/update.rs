@@ -2,7 +2,6 @@ use std::env;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -44,9 +43,8 @@ pub struct UpdateOpt {
     plan_only: Option<String>,
 }
 
-#[async_trait]
-impl Cmd for UpdateOpt {
-    async fn run(&self) -> CmdResult {
+impl UpdateOpt {
+    async fn update(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let update_plan = match &self.from_diff {
@@ -120,6 +118,16 @@ impl Cmd for UpdateOpt {
         } else {
             update(&mut client, update_plan.changes, !self.non_interactive).await
         }
+    }
+}
+
+impl Cmd for UpdateOpt {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
     }
 }
 

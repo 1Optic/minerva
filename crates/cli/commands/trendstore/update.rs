@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{Error, RuntimeError};
@@ -25,9 +24,8 @@ pub struct TrendStoreUpdate {
     stage_deletions: bool,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreUpdate {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreUpdate {
+    async fn update(&self) -> CmdResult {
         let trend_store = load_trend_store_from_file(&self.definition)?;
 
         let mut client = connect_db().await?;
@@ -83,5 +81,15 @@ impl Cmd for TrendStoreUpdate {
                 msg: format!("Error loading trend store: {e}"),
             })),
         }
+    }
+}
+
+impl Cmd for TrendStoreUpdate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
     }
 }

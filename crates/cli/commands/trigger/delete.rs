@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -12,9 +11,8 @@ pub struct TriggerDelete {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerDelete {
-    async fn run(&self) -> CmdResult {
+impl TriggerDelete {
+    async fn delete(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = DeleteTrigger {
@@ -26,5 +24,15 @@ impl Cmd for TriggerDelete {
         println!("Deleted trigger '{}'", &self.name);
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerDelete {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.delete())
     }
 }

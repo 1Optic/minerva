@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 
@@ -15,9 +14,8 @@ pub struct TriggerCreateNotifications {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerCreateNotifications {
-    async fn run(&self) -> CmdResult {
+impl TriggerCreateNotifications {
+    async fn create(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = CreateNotifications {
@@ -30,5 +28,15 @@ impl Cmd for TriggerCreateNotifications {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerCreateNotifications {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
     }
 }

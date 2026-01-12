@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::attribute_store::{load_attribute_store_from_file, AddAttributeStore, AttributeStore};
@@ -15,9 +14,8 @@ pub struct AttributeStoreCreate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreCreate {
-    async fn run(&self) -> CmdResult {
+impl AttributeStoreCreate {
+    async fn create(&self) -> CmdResult {
         let attribute_store: AttributeStore = load_attribute_store_from_file(&self.definition)?;
 
         println!("Loaded definition, creating attribute store");
@@ -38,5 +36,15 @@ impl Cmd for AttributeStoreCreate {
                 msg: format!("Error creating attribute store: {e}"),
             })),
         }
+    }
+}
+
+impl Cmd for AttributeStoreCreate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
     }
 }

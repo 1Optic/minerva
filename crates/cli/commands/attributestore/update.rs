@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::attribute_store::{
@@ -15,9 +14,8 @@ pub struct AttributeStoreUpdate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreUpdate {
-    async fn run(&self) -> CmdResult {
+impl AttributeStoreUpdate {
+    async fn update(&self) -> CmdResult {
         let attribute_store: AttributeStore = load_attribute_store_from_file(&self.definition)?;
 
         println!("Loaded definition, updating attribute store");
@@ -57,5 +55,15 @@ impl Cmd for AttributeStoreUpdate {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for AttributeStoreUpdate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
     }
 }

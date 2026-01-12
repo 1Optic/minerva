@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use comfy_table::Table;
@@ -11,9 +10,8 @@ use crate::commands::common::{connect_db, Cmd, CmdResult};
 #[derive(Debug, Parser, PartialEq)]
 pub struct TriggerList {}
 
-#[async_trait]
-impl Cmd for TriggerList {
-    async fn run(&self) -> CmdResult {
+impl TriggerList {
+    async fn list_triggers(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let triggers = list_triggers(&mut client)
@@ -43,5 +41,15 @@ impl Cmd for TriggerList {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerList {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.list_triggers())
     }
 }

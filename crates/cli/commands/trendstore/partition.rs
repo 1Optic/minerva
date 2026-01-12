@@ -3,7 +3,6 @@ use std::time::Duration;
 use chrono::DateTime;
 use chrono::FixedOffset;
 
-use async_trait::async_trait;
 use chrono::Utc;
 use clap::Parser;
 
@@ -33,33 +32,13 @@ pub enum TrendStorePartitionCommands {
 }
 
 #[derive(Debug, Parser, PartialEq)]
-pub struct TrendStorePartitionCreate {
-    #[arg(
-        help="period for which to create partitions",
-        long="ahead-interval",
-        value_parser=humantime::parse_duration
-    )]
-    ahead_interval: Option<Duration>,
-    #[arg(
-        help="timestamp for which to create partitions",
-        long="for-timestamp",
-        value_parser=DateTime::parse_from_rfc3339
-    )]
-    for_timestamp: Option<DateTime<FixedOffset>>,
-}
-
-#[derive(Debug, Parser, PartialEq)]
 pub struct TrendStorePartitionRemove {
     #[arg(help = "do not really remove the partitions", short, long)]
     pretend: bool,
 }
 
-#[derive(Debug, Parser, PartialEq)]
-pub struct ColumnarizePartitions {}
-
-#[async_trait]
-impl Cmd for TrendStorePartitionRemove {
-    async fn run(&self) -> CmdResult {
+impl TrendStorePartitionRemove {
+    async fn remove(&self) -> CmdResult {
         let client = connect_db().await?;
 
         let total_partition_count_query = "SELECT count(*) FROM trend_directory.partition";
@@ -113,18 +92,55 @@ impl Cmd for TrendStorePartitionRemove {
     }
 }
 
-#[async_trait]
-impl Cmd for ColumnarizePartitions {
-    async fn run(&self) -> CmdResult {
+impl Cmd for TrendStorePartitionRemove {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.remove())
+    }
+}
+
+#[derive(Debug, Parser, PartialEq)]
+pub struct ColumnarizePartitions {}
+
+impl ColumnarizePartitions {
+    async fn columnarize(&self) -> CmdResult {
         let mut client = connect_db().await?;
         columnarize_partitions(&mut client).await?;
         Ok(())
     }
 }
 
-#[async_trait]
-impl Cmd for TrendStorePartitionCreate {
-    async fn run(&self) -> CmdResult {
+impl Cmd for ColumnarizePartitions {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.columnarize())
+    }
+}
+
+#[derive(Debug, Parser, PartialEq)]
+pub struct TrendStorePartitionCreate {
+    #[arg(
+        help="period for which to create partitions",
+        long="ahead-interval",
+        value_parser=humantime::parse_duration
+    )]
+    ahead_interval: Option<Duration>,
+    #[arg(
+        help="timestamp for which to create partitions",
+        long="for-timestamp",
+        value_parser=DateTime::parse_from_rfc3339
+    )]
+    for_timestamp: Option<DateTime<FixedOffset>>,
+}
+
+impl TrendStorePartitionCreate {
+    async fn create(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         if let Some(for_timestamp) = self.for_timestamp {
@@ -135,5 +151,15 @@ impl Cmd for TrendStorePartitionCreate {
 
         println!("Created partitions");
         Ok(())
+    }
+}
+
+impl Cmd for TrendStorePartitionCreate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
     }
 }

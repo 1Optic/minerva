@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -20,9 +19,8 @@ pub struct TriggerUpdate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for TriggerUpdate {
-    async fn run(&self) -> CmdResult {
+impl TriggerUpdate {
+    async fn update(&self) -> CmdResult {
         let trigger = load_trigger_from_file(&self.definition)?;
 
         let mut client = connect_db().await?;
@@ -37,5 +35,15 @@ impl Cmd for TriggerUpdate {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerUpdate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
     }
 }

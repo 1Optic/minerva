@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -12,9 +11,8 @@ pub struct TriggerEnable {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerEnable {
-    async fn run(&self) -> CmdResult {
+impl TriggerEnable {
+    async fn enable(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = EnableTrigger {
@@ -26,5 +24,15 @@ impl Cmd for TriggerEnable {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerEnable {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.enable())
     }
 }

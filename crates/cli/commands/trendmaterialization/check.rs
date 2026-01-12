@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -7,9 +6,8 @@ use minerva::trend_materialization::{check_trend_materialization, load_materiali
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationCheck {}
 
-#[async_trait]
-impl Cmd for TrendMaterializationCheck {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationCheck {
+    async fn check(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let materializations = load_materializations(&mut client).await?;
@@ -30,5 +28,15 @@ impl Cmd for TrendMaterializationCheck {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationCheck {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.check())
     }
 }

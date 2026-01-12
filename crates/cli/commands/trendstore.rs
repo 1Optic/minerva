@@ -65,28 +65,26 @@ impl TrendStoreOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            TrendStoreOptCommands::List(list) => list.run().await,
-            TrendStoreOptCommands::Create(create) => create.run().await,
-            TrendStoreOptCommands::Diff(diff) => diff.run().await,
-            TrendStoreOptCommands::Update(update) => update.run().await,
-            TrendStoreOptCommands::Delete(delete) => delete.run().await,
+            TrendStoreOptCommands::List(list) => list.run(),
+            TrendStoreOptCommands::Create(create) => create.run(),
+            TrendStoreOptCommands::Diff(diff) => diff.run(),
+            TrendStoreOptCommands::Update(update) => update.run(),
+            TrendStoreOptCommands::Delete(delete) => delete.run(),
             TrendStoreOptCommands::Partition(partition) => match &partition.command {
-                TrendStorePartitionCommands::Create(create) => create.run().await,
-                TrendStorePartitionCommands::Remove(remove) => remove.run().await,
-                TrendStorePartitionCommands::Columnar(columnarize) => columnarize.run().await,
+                TrendStorePartitionCommands::Create(create) => create.run(),
+                TrendStorePartitionCommands::Remove(remove) => remove.run(),
+                TrendStorePartitionCommands::Columnar(columnarize) => columnarize.run(),
             },
-            TrendStoreOptCommands::Check(check) => check.run().await,
+            TrendStoreOptCommands::Check(check) => check.run(),
             TrendStoreOptCommands::Part(part) => match &part.command {
-                TrendStorePartOptCommands::Analyze(analyze) => analyze.run().await,
+                TrendStorePartOptCommands::Analyze(analyze) => analyze.run(),
             },
-            TrendStoreOptCommands::RenameTrend(rename_trend) => rename_trend.run().await,
-            TrendStoreOptCommands::DeleteTimestamp(delete_timestamp) => {
-                delete_timestamp.run().await
-            }
-            TrendStoreOptCommands::Dump(dump) => dump.run().await,
-            TrendStoreOptCommands::Statistics(stats) => stats.run().await,
+            TrendStoreOptCommands::RenameTrend(rename_trend) => rename_trend.run(),
+            TrendStoreOptCommands::DeleteTimestamp(delete_timestamp) => delete_timestamp.run(),
+            TrendStoreOptCommands::Dump(dump) => dump.run(),
+            TrendStoreOptCommands::Statistics(stats) => stats.run(),
         }
     }
 }

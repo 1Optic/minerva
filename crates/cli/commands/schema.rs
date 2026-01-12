@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 
 use minerva::schema::{get_current_version, get_pending_migrations, migrate};
@@ -11,9 +10,8 @@ pub struct SchemaMigrate {
     show_pending: bool,
 }
 
-#[async_trait]
-impl Cmd for SchemaMigrate {
-    async fn run(&self) -> CmdResult {
+impl SchemaMigrate {
+    async fn migrate(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         if self.show_pending {
@@ -32,12 +30,21 @@ impl Cmd for SchemaMigrate {
     }
 }
 
+impl Cmd for SchemaMigrate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.migrate())
+    }
+}
+
 #[derive(Debug, Parser, PartialEq)]
 pub struct SchemaCurrentVersion {}
 
-#[async_trait]
-impl Cmd for SchemaCurrentVersion {
-    async fn run(&self) -> CmdResult {
+impl SchemaCurrentVersion {
+    async fn show_current_version(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let version = get_current_version(&mut client).await?;
@@ -47,6 +54,16 @@ impl Cmd for SchemaCurrentVersion {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for SchemaCurrentVersion {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.show_current_version())
     }
 }
 
@@ -68,10 +85,10 @@ impl SchemaOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            SchemaOptCommands::Migrate(migrate) => migrate.run().await,
-            SchemaOptCommands::CurrentVersion(current_version) => current_version.run().await,
+            SchemaOptCommands::Migrate(migrate) => migrate.run(),
+            SchemaOptCommands::CurrentVersion(current_version) => current_version.run(),
         }
     }
 }

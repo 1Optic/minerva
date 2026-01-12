@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 use log::info;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use tokio::signal;
@@ -33,11 +32,8 @@ pub struct StartOpt {
     no_schema_initialization: bool,
 }
 
-#[async_trait]
-impl Cmd for StartOpt {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
-
+impl StartOpt {
+    async fn start(&self) -> CmdResult {
         let minerva_instance_root_option: Option<PathBuf> = match &self.instance_root {
             Some(root) => Some(root.clone()),
             None => match env::var(ENV_MINERVA_INSTANCE_ROOT) {
@@ -159,6 +155,18 @@ impl Cmd for StartOpt {
         })?;
 
         Ok(())
+    }
+}
+
+impl Cmd for StartOpt {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.start())
     }
 }
 

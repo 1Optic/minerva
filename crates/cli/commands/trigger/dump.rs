@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::trigger::{dump_trigger, load_trigger, TriggerError};
@@ -11,9 +10,8 @@ pub struct TriggerDump {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerDump {
-    async fn run(&self) -> CmdResult {
+impl TriggerDump {
+    async fn dump(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let trigger = load_trigger(&mut client, &self.name)
@@ -25,5 +23,15 @@ impl Cmd for TriggerDump {
         println!("{trigger_definition}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerDump {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.dump())
     }
 }

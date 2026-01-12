@@ -4,7 +4,6 @@ use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
-use async_trait::async_trait;
 use clap::Parser;
 use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_store};
 use minerva::attribute_store::{Attribute, AttributeStore};
@@ -105,9 +104,8 @@ impl From<&AttributeDefinition> for Attribute {
     }
 }
 
-#[async_trait]
 impl Cmd for DefineOpt {
-    async fn run(&self) -> CmdResult {
+    fn run(&self) -> CmdResult {
         let trend_definitions_file_path = self.definitions_dir.join("trends.json");
         let trend_definitions_file = File::open(&trend_definitions_file_path).map_err(|e| {
             RuntimeError::from_msg(format!(

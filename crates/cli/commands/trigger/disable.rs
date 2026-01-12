@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -12,9 +11,8 @@ pub struct TriggerDisable {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerDisable {
-    async fn run(&self) -> CmdResult {
+impl TriggerDisable {
+    async fn disable(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = DisableTrigger {
@@ -26,5 +24,15 @@ impl Cmd for TriggerDisable {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerDisable {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.disable())
     }
 }

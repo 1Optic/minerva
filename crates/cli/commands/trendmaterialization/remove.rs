@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -12,9 +11,8 @@ pub struct TrendMaterializationRemove {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationRemove {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationRemove {
+    async fn remove(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = RemoveTrendMaterialization {
@@ -26,5 +24,15 @@ impl Cmd for TrendMaterializationRemove {
         println!("Removed trend materialization '{}'", &self.name);
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationRemove {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.remove())
     }
 }

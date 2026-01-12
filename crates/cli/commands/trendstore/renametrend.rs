@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{Error, RuntimeError};
@@ -15,9 +14,8 @@ pub struct TrendStoreRenameTrend {
     to: String,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreRenameTrend {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreRenameTrend {
+    async fn rename_trend(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let transaction = client.transaction().await?;
@@ -58,5 +56,15 @@ impl Cmd for TrendStoreRenameTrend {
         );
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreRenameTrend {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.rename_trend())
     }
 }

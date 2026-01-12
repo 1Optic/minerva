@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 
-use async_trait::async_trait;
 use clap::Parser;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
@@ -45,11 +44,8 @@ pub struct TrendMaterializationService {
     oldest_first: bool,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationService {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
-
+impl TrendMaterializationService {
+    async fn start(&self) -> CmdResult {
         let materialize_config = MaterializeConfig {
             oldest_first: self.oldest_first,
             max_materializations: self.max_materializations,
@@ -107,5 +103,17 @@ impl Cmd for TrendMaterializationService {
         executor.execute(queue_receiver).await;
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationService {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.start())
     }
 }

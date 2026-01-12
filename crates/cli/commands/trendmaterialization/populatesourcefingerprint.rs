@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{Error, RuntimeError};
@@ -12,9 +11,8 @@ pub struct TrendMaterializationPopulateSourceFingerprint {
     materialization: String,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationPopulateSourceFingerprint {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationPopulateSourceFingerprint {
+    async fn populate(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         populate_source_fingerprint(&mut client, &self.materialization)
@@ -34,5 +32,15 @@ impl Cmd for TrendMaterializationPopulateSourceFingerprint {
         );
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationPopulateSourceFingerprint {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.populate())
     }
 }

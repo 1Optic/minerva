@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use tokio_postgres::Client;
 
@@ -17,10 +16,8 @@ pub struct AttributeStoreMaterialize {
     name: Option<String>,
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreMaterialize {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
+impl AttributeStoreMaterialize {
+    async fn materialize(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         client
@@ -77,6 +74,18 @@ impl Cmd for AttributeStoreMaterialize {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for AttributeStoreMaterialize {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.materialize())
     }
 }
 

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -6,9 +5,8 @@ use crate::commands::common::{connect_db, Cmd, CmdResult};
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationList {}
 
-#[async_trait]
-impl Cmd for TrendMaterializationList {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationList {
+    async fn list_materializations(&self) -> CmdResult {
         let client = connect_db().await?;
 
         let rows = client
@@ -33,5 +31,15 @@ impl Cmd for TrendMaterializationList {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationList {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.list_materializations())
     }
 }

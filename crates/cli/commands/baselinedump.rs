@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use log::info;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use testcontainers::core::ExecCommand;
@@ -17,11 +16,8 @@ use super::common::{Cmd, CmdResult};
 #[derive(Debug, Parser, PartialEq)]
 pub struct BaselineDumpOpt {}
 
-#[async_trait]
-impl Cmd for BaselineDumpOpt {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
-
+impl BaselineDumpOpt {
+    async fn dump(&self) -> CmdResult {
         info!("Starting containers");
         let config_file = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/postgresql.conf"));
 
@@ -110,5 +106,17 @@ impl Cmd for BaselineDumpOpt {
         println!("{}", String::from_utf8(stdoutbytes).unwrap());
 
         Ok(())
+    }
+}
+
+impl Cmd for BaselineDumpOpt {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.dump())
     }
 }

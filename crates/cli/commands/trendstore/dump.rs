@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::trend_store::load_trend_store;
@@ -20,9 +19,8 @@ pub struct TrendStoreDump {
     granularity: Duration,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreDump {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreDump {
+    async fn dump(&self) -> CmdResult {
         let client = connect_db().await?;
 
         let trend_store = load_trend_store(
@@ -38,5 +36,15 @@ impl Cmd for TrendStoreDump {
         println!("{}", trend_store_definition);
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreDump {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.dump())
     }
 }

@@ -62,22 +62,22 @@ impl TriggerOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            TriggerOptCommands::List(list) => list.run().await,
-            TriggerOptCommands::Create(create) => create.run().await,
-            TriggerOptCommands::Delete(delete) => delete.run().await,
-            TriggerOptCommands::Enable(enable) => enable.run().await,
-            TriggerOptCommands::Disable(disable) => disable.run().await,
-            TriggerOptCommands::Update(update) => update.run().await,
-            TriggerOptCommands::Rename(rename) => rename.run().await,
-            TriggerOptCommands::Dump(dump) => dump.run().await,
-            TriggerOptCommands::Verify(verify) => verify.run().await,
+            TriggerOptCommands::List(list) => list.run(),
+            TriggerOptCommands::Create(create) => create.run(),
+            TriggerOptCommands::Delete(delete) => delete.run(),
+            TriggerOptCommands::Enable(enable) => enable.run(),
+            TriggerOptCommands::Disable(disable) => disable.run(),
+            TriggerOptCommands::Update(update) => update.run(),
+            TriggerOptCommands::Rename(rename) => rename.run(),
+            TriggerOptCommands::Dump(dump) => dump.run(),
+            TriggerOptCommands::Verify(verify) => verify.run(),
             TriggerOptCommands::PreviewNotifications(preview_notifications) => {
-                preview_notifications.run().await
+                preview_notifications.run()
             }
             TriggerOptCommands::CreateNotifications(create_notifications) => {
-                create_notifications.run().await
+                create_notifications.run()
             }
         }
     }

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use tokio_postgres::{Client, Row};
 
@@ -23,9 +22,8 @@ pub async fn list_attribute_stores(conn: &mut Client) -> Result<Vec<(i32, String
     Ok(attribute_stores)
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreList {
-    async fn run(&self) -> CmdResult {
+impl AttributeStoreList {
+    async fn list(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let trend_stores = list_attribute_stores(&mut client).await.unwrap();
@@ -42,5 +40,15 @@ impl Cmd for AttributeStoreList {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for AttributeStoreList {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.list())
     }
 }

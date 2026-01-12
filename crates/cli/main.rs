@@ -80,8 +80,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
-#[tokio::main]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("Failed to install rustls crypto provider");
@@ -106,25 +105,23 @@ async fn main() -> ExitCode {
     }
 
     let result = match cli.command {
-        Some(Commands::Schema(schema)) => schema.run().await,
-        Some(Commands::Dump(dump)) => dump.run().await,
-        Some(Commands::Diff(diff)) => diff.run().await,
-        Some(Commands::Graph(graph)) => graph.run().await,
-        Some(Commands::Update(update)) => update.run().await,
-        Some(Commands::Initialize(initialize)) => initialize.run().await,
-        Some(Commands::TrendStore(trend_store)) => trend_store.run().await,
-        Some(Commands::Trigger(trigger)) => trigger.run().await,
-        Some(Commands::AttributeStore(attribute_store)) => attribute_store.run().await,
-        Some(Commands::TrendMaterialization(trend_materialization)) => {
-            trend_materialization.run().await
-        }
-        Some(Commands::LoadData(load_data)) => load_data.run().await,
-        Some(Commands::Relation(relation)) => relation.run().await,
-        Some(Commands::Start(start)) => start.run().await,
-        Some(Commands::Aggregation(aggregation)) => aggregation.run().await,
-        Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run().await,
-        Some(Commands::Define(define)) => define.run().await,
-        Some(Commands::BaselineDump(baseline_dump)) => baseline_dump.run().await,
+        Some(Commands::Schema(schema)) => schema.run(),
+        Some(Commands::Dump(dump)) => dump.run(),
+        Some(Commands::Diff(diff)) => diff.run(),
+        Some(Commands::Graph(graph)) => graph.run(),
+        Some(Commands::Update(update)) => update.run(),
+        Some(Commands::Initialize(initialize)) => initialize.run(),
+        Some(Commands::TrendStore(trend_store)) => trend_store.run(),
+        Some(Commands::Trigger(trigger)) => trigger.run(),
+        Some(Commands::AttributeStore(attribute_store)) => attribute_store.run(),
+        Some(Commands::TrendMaterialization(trend_materialization)) => trend_materialization.run(),
+        Some(Commands::LoadData(load_data)) => load_data.run(),
+        Some(Commands::Relation(relation)) => relation.run(),
+        Some(Commands::Start(start)) => start.run(),
+        Some(Commands::Aggregation(aggregation)) => aggregation.run(),
+        Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run(),
+        Some(Commands::Define(define)) => define.run(),
+        Some(Commands::BaselineDump(baseline_dump)) => baseline_dump.run(),
         None => return ExitCode::FAILURE,
     };
 

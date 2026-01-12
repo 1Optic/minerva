@@ -1,7 +1,6 @@
 use std::env;
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use erased_serde::{Serialize, Serializer};
@@ -32,9 +31,8 @@ pub struct DiffOpt {
     json: bool,
 }
 
-#[async_trait]
-impl Cmd for DiffOpt {
-    async fn run(&self) -> CmdResult {
+impl DiffOpt {
+    async fn diff(&self) -> CmdResult {
         let minerva_instance_root = match env::var(ENV_MINERVA_INSTANCE_ROOT) {
             Ok(v) => PathBuf::from(v),
             Err(e) => {
@@ -105,5 +103,15 @@ impl Cmd for DiffOpt {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for DiffOpt {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.diff())
     }
 }

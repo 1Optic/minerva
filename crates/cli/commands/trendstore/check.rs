@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{Cmd, CmdResult};
@@ -13,9 +12,8 @@ pub struct TrendStoreCheck {
     definition: PathBuf,
 }
 
-#[async_trait]
 impl Cmd for TrendStoreCheck {
-    async fn run(&self) -> CmdResult {
+    fn run(&self) -> CmdResult {
         let trend_store = load_trend_store_from_file(&self.definition)?;
 
         for trend_store_part in &trend_store.parts {

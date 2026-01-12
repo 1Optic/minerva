@@ -1,7 +1,5 @@
 use std::env;
 
-use async_trait::async_trait;
-
 use rustls::ClientConfig as RustlsClientConfig;
 use tokio;
 use tokio_postgres::{config::SslMode, Config};
@@ -16,9 +14,8 @@ pub static ENV_MINERVA_INSTANCE_ROOT: &str = "MINERVA_INSTANCE_ROOT";
 static ENV_DB_CONN: &str = "MINERVA_DB_CONN";
 
 /// Defines the interface for CLI commands
-#[async_trait]
 pub trait Cmd {
-    async fn run(&self) -> CmdResult;
+    fn run(&self) -> CmdResult;
 }
 
 #[must_use]

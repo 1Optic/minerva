@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::{DateTime, Local};
 use clap::Parser;
 
@@ -17,9 +16,8 @@ pub struct TriggerPreviewNotifications {
     timestamp: DateTime<Local>,
 }
 
-#[async_trait]
-impl Cmd for TriggerPreviewNotifications {
-    async fn run(&self) -> CmdResult {
+impl TriggerPreviewNotifications {
+    async fn preview_notifications(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let triggers = get_notifications(&mut client, &self.name, self.timestamp)
@@ -42,5 +40,15 @@ impl Cmd for TriggerPreviewNotifications {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerPreviewNotifications {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.preview_notifications())
     }
 }

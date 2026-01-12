@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use clap::Subcommand;
@@ -19,9 +18,8 @@ pub struct TrendStorePartAnalyze {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TrendStorePartAnalyze {
-    async fn run(&self) -> CmdResult {
+impl TrendStorePartAnalyze {
+    async fn analyze(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let result = analyze_trend_store_part(&mut client, &self.name).await?;
@@ -55,6 +53,16 @@ impl Cmd for TrendStorePartAnalyze {
         println!("{}", table.render());
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStorePartAnalyze {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.analyze())
     }
 }
 

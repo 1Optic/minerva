@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -21,11 +20,8 @@ pub struct LoadDataOpt {
     file: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for LoadDataOpt {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
-
+impl LoadDataOpt {
+    async fn load_data(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let parser_config: ParserConfig = match &self.parser_config {
@@ -77,5 +73,17 @@ impl Cmd for LoadDataOpt {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for LoadDataOpt {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.load_data())
     }
 }

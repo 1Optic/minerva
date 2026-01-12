@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use minerva::attribute_store::materialize_curr_ptr::{
     materialize_curr_ptr, materialize_curr_ptr_by_name,
@@ -16,9 +15,8 @@ pub struct AttributeStoreMaterializeCurrPtr {
     all_modified: bool,
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreMaterializeCurrPtr {
-    async fn run(&self) -> CmdResult {
+impl AttributeStoreMaterializeCurrPtr {
+    async fn materialize(&self) -> CmdResult {
         let client = connect_db().await?;
 
         if let Some(id) = self.id {
@@ -60,5 +58,15 @@ impl Cmd for AttributeStoreMaterializeCurrPtr {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for AttributeStoreMaterializeCurrPtr {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.materialize())
     }
 }

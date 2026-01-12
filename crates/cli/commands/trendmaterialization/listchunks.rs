@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -9,11 +8,8 @@ pub struct TrendMaterializationChunkList {
     max_chunks: Option<usize>,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationChunkList {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
-
+impl TrendMaterializationChunkList {
+    async fn list_chunks(&self) -> CmdResult {
         let client = connect_db().await?;
 
         let materialize_config = MaterializeConfig {
@@ -38,5 +34,17 @@ impl Cmd for TrendMaterializationChunkList {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationChunkList {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.list_chunks())
     }
 }

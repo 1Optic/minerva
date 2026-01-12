@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
@@ -22,9 +21,8 @@ pub struct GraphOpt {
     dependees: Option<String>,
 }
 
-#[async_trait]
-impl Cmd for GraphOpt {
-    async fn run(&self) -> CmdResult {
+impl GraphOpt {
+    async fn render_graph(&self) -> CmdResult {
         let instance = match &self.from_dir {
             Some(with_dir) => MinervaInstance::load_from(with_dir)?,
             None => {
@@ -57,5 +55,15 @@ impl Cmd for GraphOpt {
         println!("{}", dot);
 
         Ok(())
+    }
+}
+
+impl Cmd for GraphOpt {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.render_graph())
     }
 }

@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::database::{create_database, ClusterConfig};
@@ -27,9 +26,8 @@ pub struct InitializeOpt {
     instance_root: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for InitializeOpt {
-    async fn run(&self) -> CmdResult {
+impl InitializeOpt {
+    async fn initialize(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         if let Some(database_name) = &self.database_name {
@@ -121,5 +119,15 @@ impl Cmd for InitializeOpt {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for InitializeOpt {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.initialize())
     }
 }

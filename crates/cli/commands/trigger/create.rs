@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -22,10 +21,8 @@ pub struct TriggerCreate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for TriggerCreate {
-    async fn run(&self) -> CmdResult {
-        env_logger::init();
+impl TriggerCreate {
+    async fn create(&self) -> CmdResult {
         let trigger = load_trigger_from_file(&self.definition)?;
 
         println!("Loaded definition, creating trigger");
@@ -42,5 +39,17 @@ impl Cmd for TriggerCreate {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerCreate {
+    fn run(&self) -> CmdResult {
+        env_logger::init();
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
     }
 }

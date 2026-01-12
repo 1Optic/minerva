@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use chrono::FixedOffset;
 
-use async_trait::async_trait;
 use clap::Parser;
 use postgres_protocol::escape::escape_identifier;
 
@@ -21,9 +20,8 @@ pub struct TrendStoreDeleteTimestamp {
     timestamp: DateTime<FixedOffset>,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreDeleteTimestamp {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreDeleteTimestamp {
+    async fn delete_timestamp(&self) -> CmdResult {
         let client = connect_db().await?;
 
         for row in client.query("SELECT name FROM trend_directory.trend_store_part tsp JOIN trend_directory.trend_store ts ON ts.id = tsp.trend_store_id WHERE ts.granularity = $1::text::interval", &[&self.granularity]).await? {
@@ -35,5 +33,15 @@ impl Cmd for TrendStoreDeleteTimestamp {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreDeleteTimestamp {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.delete_timestamp())
     }
 }

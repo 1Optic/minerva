@@ -58,30 +58,28 @@ impl TrendMaterializationOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
             Some(TrendMaterializationOptCommand::Create(trend_materialization_create)) => {
-                trend_materialization_create.run().await
+                trend_materialization_create.run()
             }
             Some(TrendMaterializationOptCommand::Update(trend_materialization_update)) => {
-                trend_materialization_update.run().await
+                trend_materialization_update.run()
             }
             Some(TrendMaterializationOptCommand::Remove(trend_materialization_remove)) => {
-                trend_materialization_remove.run().await
+                trend_materialization_remove.run()
             }
             Some(TrendMaterializationOptCommand::PopulateSourceFingerprint(
                 populate_source_fingerprint,
-            )) => populate_source_fingerprint.run().await,
+            )) => populate_source_fingerprint.run(),
             Some(TrendMaterializationOptCommand::ResetSourceFingerprint(
                 reset_source_fingerprint,
-            )) => reset_source_fingerprint.run().await,
-            Some(TrendMaterializationOptCommand::Dump(dump)) => dump.run().await,
-            Some(TrendMaterializationOptCommand::List(list)) => list.run().await,
-            Some(TrendMaterializationOptCommand::ListChunks(list_chunks)) => {
-                list_chunks.run().await
-            }
-            Some(TrendMaterializationOptCommand::Service(service)) => service.run().await,
-            Some(TrendMaterializationOptCommand::Check(check)) => check.run().await,
+            )) => reset_source_fingerprint.run(),
+            Some(TrendMaterializationOptCommand::Dump(dump)) => dump.run(),
+            Some(TrendMaterializationOptCommand::List(list)) => list.run(),
+            Some(TrendMaterializationOptCommand::ListChunks(list_chunks)) => list_chunks.run(),
+            Some(TrendMaterializationOptCommand::Service(service)) => service.run(),
+            Some(TrendMaterializationOptCommand::Check(check)) => check.run(),
             None => Ok(()),
         }
     }

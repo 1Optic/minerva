@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use minerva::attribute_store::materialize_curr_ptr::materialize_curr_ptr;
 use tokio_postgres::Client;
@@ -25,9 +24,8 @@ pub struct AttributeStoreCompact {
     statement_timeout: Option<String>,
 }
 
-#[async_trait]
-impl Cmd for AttributeStoreCompact {
-    async fn run(&self) -> CmdResult {
+impl AttributeStoreCompact {
+    async fn compact(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         client
@@ -83,6 +81,16 @@ impl Cmd for AttributeStoreCompact {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for AttributeStoreCompact {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.compact())
     }
 }
 

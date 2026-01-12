@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 use minerva::{change::Change, changes::trend_store::CreateStatistics};
 
@@ -13,9 +12,8 @@ pub struct TrendStoreStatistics {
     trend_store_part: Option<String>,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreStatistics {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreStatistics {
+    async fn create_statistics(&self) -> CmdResult {
         let mut client = connect_db().await?;
         let cmd = CreateStatistics {
             trend_store_part_name: self.trend_store_part.clone(),
@@ -23,5 +21,15 @@ impl Cmd for TrendStoreStatistics {
         cmd.apply(&mut client).await?;
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreStatistics {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create_statistics())
     }
 }

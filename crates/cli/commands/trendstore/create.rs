@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
@@ -15,9 +14,8 @@ pub struct TrendStoreCreate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreCreate {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreCreate {
+    async fn create(&self) -> CmdResult {
         let trend_store = load_trend_store_from_file(&self.definition)?;
 
         println!("Loaded definition, creating trend store");
@@ -31,5 +29,15 @@ impl Cmd for TrendStoreCreate {
         println!("Created trend store");
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreCreate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
     }
 }

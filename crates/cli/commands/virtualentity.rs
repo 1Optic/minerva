@@ -1,6 +1,5 @@
 use std::io::Write;
 
-use async_trait::async_trait;
 use postgres_protocol::escape::escape_identifier;
 use tokio_postgres::GenericClient;
 
@@ -25,9 +24,9 @@ impl VirtualEntityOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            VirtualEntityOptCommands::Materialize(materialize) => materialize.run().await,
+            VirtualEntityOptCommands::Materialize(materialize) => materialize.run(),
         }
     }
 }
@@ -210,9 +209,8 @@ where
     materialize_select_virtual_entities(client, entity_type_names.as_slice()).await
 }
 
-#[async_trait]
-impl Cmd for VirtualEntityMaterialize {
-    async fn run(&self) -> CmdResult {
+impl VirtualEntityMaterialize {
+    async fn materialize(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         if self.name.is_empty() {
@@ -226,5 +224,15 @@ impl Cmd for VirtualEntityMaterialize {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for VirtualEntityMaterialize {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.materialize())
     }
 }

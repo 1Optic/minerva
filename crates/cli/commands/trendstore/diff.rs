@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::error::{Error, RuntimeError};
@@ -22,9 +21,8 @@ pub struct TrendStoreDiff {
     stage_deletions: bool,
 }
 
-#[async_trait]
-impl Cmd for TrendStoreDiff {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreDiff {
+    async fn diff(&self) -> CmdResult {
         let trend_store = load_trend_store_from_file(&self.definition)?;
 
         let client = connect_db().await?;
@@ -65,5 +63,15 @@ impl Cmd for TrendStoreDiff {
                 msg: format!("Error loading trend store: {e}"),
             })),
         }
+    }
+}
+
+impl Cmd for TrendStoreDiff {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.diff())
     }
 }

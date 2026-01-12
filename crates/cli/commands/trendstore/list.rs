@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use comfy_table;
@@ -10,9 +9,8 @@ use crate::commands::common::{connect_db, Cmd, CmdResult};
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStoreList {}
 
-#[async_trait]
-impl Cmd for TrendStoreList {
-    async fn run(&self) -> CmdResult {
+impl TrendStoreList {
+    async fn list(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let trend_stores = list_trend_stores(&mut client).await.unwrap();
@@ -34,5 +32,15 @@ impl Cmd for TrendStoreList {
         println!("{table}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendStoreList {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.list())
     }
 }

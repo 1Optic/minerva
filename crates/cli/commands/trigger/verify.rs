@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -12,9 +11,8 @@ pub struct TriggerVerify {
     name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerVerify {
-    async fn run(&self) -> CmdResult {
+impl TriggerVerify {
+    async fn verify(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let change = VerifyTrigger {
@@ -26,5 +24,15 @@ impl Cmd for TriggerVerify {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerVerify {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.verify())
     }
 }

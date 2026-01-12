@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use tokio_postgres::Client;
 
 use minerva::change::Change;
@@ -18,9 +17,8 @@ pub struct RelationCreate {
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for RelationCreate {
-    async fn run(&self) -> CmdResult {
+impl RelationCreate {
+    async fn create(&self) -> CmdResult {
         let relation = load_relation_from_file(&self.definition)?;
 
         println!("Loaded definition, creating trigger");
@@ -37,15 +35,24 @@ impl Cmd for RelationCreate {
     }
 }
 
+impl Cmd for RelationCreate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.create())
+    }
+}
+
 #[derive(Debug, Parser, PartialEq)]
 pub struct RelationUpdate {
     #[arg(help = "relation definition file")]
     definition: PathBuf,
 }
 
-#[async_trait]
-impl Cmd for RelationUpdate {
-    async fn run(&self) -> CmdResult {
+impl RelationUpdate {
+    async fn update(&self) -> CmdResult {
         let relation = load_relation_from_file(&self.definition)?;
 
         println!("Loaded definition, updating relation");
@@ -62,24 +69,24 @@ impl Cmd for RelationUpdate {
     }
 }
 
+impl Cmd for RelationUpdate {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.update())
+    }
+}
+
 #[derive(Debug, Parser, PartialEq)]
 pub struct RelationMaterialize {
     #[arg(help = "relation name")]
     name: Option<String>,
 }
 
-async fn get_relation_names(client: &Client) -> Vec<String> {
-    let rows = client
-        .query("SELECT name FROM relation_directory.type", &[])
-        .await
-        .unwrap();
-
-    rows.iter().map(|row| row.get(0)).collect()
-}
-
-#[async_trait]
-impl Cmd for RelationMaterialize {
-    async fn run(&self) -> CmdResult {
+impl RelationMaterialize {
+    async fn materialize(&self) -> CmdResult {
         let mut error_count = 0;
 
         let mut client = connect_db().await?;
@@ -137,6 +144,25 @@ impl Cmd for RelationMaterialize {
     }
 }
 
+async fn get_relation_names(client: &Client) -> Vec<String> {
+    let rows = client
+        .query("SELECT name FROM relation_directory.type", &[])
+        .await
+        .unwrap();
+
+    rows.iter().map(|row| row.get(0)).collect()
+}
+
+impl Cmd for RelationMaterialize {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.materialize())
+    }
+}
+
 #[derive(Debug, Parser, PartialEq)]
 pub struct RelationOpt {
     #[command(subcommand)]
@@ -157,11 +183,11 @@ impl RelationOpt {
     /// # Errors
     ///
     /// Will return `Err` if a subcommand returns an error.
-    pub async fn run(&self) -> CmdResult {
+    pub fn run(&self) -> CmdResult {
         match &self.command {
-            RelationOptCommands::Create(create) => create.run().await,
-            RelationOptCommands::Update(update) => update.run().await,
-            RelationOptCommands::Materialize(materialize) => materialize.run().await,
+            RelationOptCommands::Create(create) => create.run(),
+            RelationOptCommands::Update(update) => update.run(),
+            RelationOptCommands::Materialize(materialize) => materialize.run(),
         }
     }
 }

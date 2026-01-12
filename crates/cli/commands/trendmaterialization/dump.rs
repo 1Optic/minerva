@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::trend_materialization::load_materializations;
@@ -11,9 +10,8 @@ pub struct TrendMaterializationDump {
     materialization: String,
 }
 
-#[async_trait]
-impl Cmd for TrendMaterializationDump {
-    async fn run(&self) -> CmdResult {
+impl TrendMaterializationDump {
+    async fn dump(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
         let materializations = load_materializations(&mut client).await?;
@@ -28,5 +26,15 @@ impl Cmd for TrendMaterializationDump {
         }
 
         Ok(())
+    }
+}
+
+impl Cmd for TrendMaterializationDump {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.dump())
     }
 }

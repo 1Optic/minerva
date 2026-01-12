@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use clap::Parser;
 
 use minerva::change::Change;
@@ -23,9 +22,8 @@ pub struct TriggerRename {
     old_name: String,
 }
 
-#[async_trait]
-impl Cmd for TriggerRename {
-    async fn run(&self) -> CmdResult {
+impl TriggerRename {
+    async fn rename(&self) -> CmdResult {
         let trigger = load_trigger_from_file(&self.definition)?;
 
         if trigger.name == self.old_name {
@@ -48,5 +46,15 @@ impl Cmd for TriggerRename {
         println!("{message}");
 
         Ok(())
+    }
+}
+
+impl Cmd for TriggerRename {
+    fn run(&self) -> CmdResult {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(self.rename())
     }
 }
