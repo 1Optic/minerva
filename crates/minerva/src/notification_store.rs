@@ -26,12 +26,12 @@ fn default_empty_string() -> String {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct AddAttributes {
+pub struct AddNotificationStoreAttributes {
     pub notification_store: NotificationStore,
     pub attributes: Vec<Attribute>,
 }
 
-impl fmt::Display for AddAttributes {
+impl fmt::Display for AddNotificationStoreAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -43,7 +43,7 @@ impl fmt::Display for AddAttributes {
 
 #[async_trait]
 #[typetag::serde]
-impl Change for AddAttributes {
+impl Change for AddNotificationStoreAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
 
@@ -112,7 +112,7 @@ impl NotificationStore {
         }
 
         if !new_attributes.is_empty() {
-            changes.push(Box::new(AddAttributes {
+            changes.push(Box::new(AddNotificationStoreAttributes {
                 notification_store: self.clone(),
                 attributes: new_attributes,
             }));

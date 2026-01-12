@@ -63,12 +63,12 @@ fn default_empty_string() -> String {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct AddAttributes {
+pub struct AddAttributeStoreAttributes {
     pub attribute_store: AttributeStoreRef,
     pub attributes: Vec<Attribute>,
 }
 
-impl fmt::Display for AddAttributes {
+impl fmt::Display for AddAttributeStoreAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
@@ -85,7 +85,7 @@ impl fmt::Display for AddAttributes {
     }
 }
 
-impl fmt::Debug for AddAttributes {
+impl fmt::Debug for AddAttributeStoreAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -97,7 +97,7 @@ impl fmt::Debug for AddAttributes {
 
 #[async_trait]
 #[typetag::serde]
-impl Change for AddAttributes {
+impl Change for AddAttributeStoreAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
 
@@ -428,7 +428,7 @@ impl AttributeStore {
         }
 
         if !new_attributes.is_empty() {
-            changes.push(Box::new(AddAttributes {
+            changes.push(Box::new(AddAttributeStoreAttributes {
                 attribute_store: self.into(),
                 attributes: new_attributes,
             }));

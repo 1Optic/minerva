@@ -21,3 +21,8 @@ attributes:
   unit: null
   description: Coordinate of equipment location
   extra_data: null
+- name: test
+  data_type: numeric
+  unit: null
+  description: test attribute
+  extra_data: null
