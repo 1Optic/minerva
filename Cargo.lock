@@ -894,9 +894,9 @@ dependencies = [
 
 [[package]]
 name = "comfy-table"
-version = "7.2.1"
+version = "7.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b03b7db8e0b4b2fdad6c551e634134e99ec000e5c8c3b6856c65e8bbaded7a3b"
+checksum = "958c5d6ecf1f214b4c2bbbbf6ab9523a864bd136dcf71a7e8904799acfe1ad47"
 dependencies = [
  "crossterm",
  "unicode-segmentation",
@@ -2111,7 +2111,7 @@ dependencies = [
 
 [[package]]
 name = "integration-tests"
-version = "9.40.0"
+version = "9.41.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2443,7 +2443,7 @@ dependencies = [
 
 [[package]]
 name = "minerva"
-version = "9.40.0"
+version = "9.41.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2488,7 +2488,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-cli"
-version = "9.40.0"
+version = "9.41.0"
 dependencies = [
  "actix-cors",
  "actix-rt",
@@ -2535,7 +2535,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-event-service"
-version = "9.40.0"
+version = "9.41.0"
 dependencies = [
  "chrono",
  "deadpool-postgres",
@@ -2557,7 +2557,7 @@ dependencies = [
 
 [[package]]
 name = "minerva-service"
-version = "9.40.0"
+version = "9.41.0"
 dependencies = [
  "actix-cors",
  "actix-web",
