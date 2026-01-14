@@ -1695,7 +1695,8 @@ pub async fn load_trend_store_part<T: GenericClient>(
     conn: &T,
     name: &str,
 ) -> Result<TrendStorePart, LoadTrendStorePartError> {
-    let trend_store_part_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
+    let trend_store_part_query =
+        "SELECT id, primary_alias FROM trend_directory.trend_store_part WHERE name = $1";
 
     let rows = conn.query(trend_store_part_query, &[&name]).await?;
 
@@ -1765,7 +1766,7 @@ pub async fn load_trend_store_part<T: GenericClient>(
         generated_trends: Vec::new(),
         has_alias_column,
         entity_id_type,
-    }
+    })
 }
 
 async fn load_trend_store_parts<T: GenericClient>(
