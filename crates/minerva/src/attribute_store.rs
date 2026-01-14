@@ -158,7 +158,7 @@ impl fmt::Display for AddedAttributes {
 #[typetag::serde]
 impl Changed for AddedAttributes {
     fn revert(&self) -> Option<Box<dyn Change>> {
-        Some(Box::new(RemoveAttributes {
+        Some(Box::new(RemoveAttributeStoreAttributes {
             attribute_store: self.attribute_store.clone(),
             attributes: self.attributes.clone(),
         }))
@@ -167,12 +167,12 @@ impl Changed for AddedAttributes {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct RemoveAttributes {
+pub struct RemoveAttributeStoreAttributes {
     pub attribute_store: AttributeStoreRef,
     pub attributes: Vec<String>,
 }
 
-impl fmt::Display for RemoveAttributes {
+impl fmt::Display for RemoveAttributeStoreAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
@@ -189,7 +189,7 @@ impl fmt::Display for RemoveAttributes {
     }
 }
 
-impl fmt::Debug for RemoveAttributes {
+impl fmt::Debug for RemoveAttributeStoreAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -201,7 +201,7 @@ impl fmt::Debug for RemoveAttributes {
 
 #[async_trait]
 #[typetag::serde]
-impl Change for RemoveAttributes {
+impl Change for RemoveAttributeStoreAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut attributes: Vec<Attribute> = Vec::new();
         let tx = client.transaction().await?;
@@ -553,7 +553,7 @@ impl AttributeStore {
         }
 
         if !options.ignore_deletions && !removed_attributes.is_empty() {
-            changes.push(Box::new(RemoveAttributes {
+            changes.push(Box::new(RemoveAttributeStoreAttributes {
                 attribute_store: self.into(),
                 attributes: removed_attributes,
             }));
