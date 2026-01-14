@@ -17,7 +17,7 @@ type PostgresName = String;
 
 use super::change::{Change, ChangeResult, InformationOption};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
-use crate::change::MinervaObjectRef;
+use crate::change::{Changed, MinervaObjectRef};
 use crate::meas_value::DataType;
 
 pub mod compact;
@@ -131,10 +131,37 @@ impl Change for AddAttributeStoreAttributes {
 
         tx.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(AddedAttributes {
+            attribute_store: self.attribute_store.clone(),
+            attributes: self.attributes.iter().map(|a| a.name.clone()).collect(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct AddedAttributes {
+    pub attribute_store: AttributeStoreRef,
+    pub attributes: Vec<String>,
+}
+
+impl fmt::Display for AddedAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Added attributes to attribute store '{}'",
-            self.attribute_store,
-        ))
+            self.attribute_store
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedAttributes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveAttributes {
+            attribute_store: self.attribute_store.clone(),
+            attributes: self.attributes.clone(),
+        }))
     }
 }
 
@@ -176,6 +203,7 @@ impl fmt::Debug for RemoveAttributes {
 #[typetag::serde]
 impl Change for RemoveAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut attributes: Vec<Attribute> = Vec::new();
         let tx = client.transaction().await?;
 
         let query = concat!(
@@ -187,6 +215,10 @@ impl Change for RemoveAttributes {
         );
 
         for attribute in &self.attributes {
+            let full_attribute = load_attribute(&tx, &self.attribute_store, attribute).await?;
+
+            attributes.push(full_attribute);
+
             tx.query(
                 query,
                 &[
@@ -205,11 +237,10 @@ impl Change for RemoveAttributes {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Removed {} attributes from attribute store '{}'",
-            &self.attributes.len(),
-            &self.attribute_store
-        ))
+        Ok(Box::new(RemovedAttributes {
+            attribute_store: self.attribute_store.clone(),
+            attributes,
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -218,6 +249,34 @@ impl Change for RemoveAttributes {
             entity_type: self.attribute_store.entity_type.clone(),
             attribute_names: self.attributes.clone(),
         })]
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct RemovedAttributes {
+    pub attribute_store: AttributeStoreRef,
+    pub attributes: Vec<Attribute>,
+}
+
+impl Display for RemovedAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Removed {} attributes from attribute store '{}'",
+            &self.attributes.len(),
+            &self.attribute_store
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedAttributes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddAttributeStoreAttributes {
+            attribute_store: self.attribute_store.clone(),
+            attributes: self.attributes.clone(),
+        }))
     }
 }
 
@@ -292,7 +351,8 @@ impl Display for AttributeRemoveValueInformation {
 #[serde(tag = "type")]
 pub struct ChangeAttribute {
     pub attribute_store: AttributeStoreRef,
-    pub attribute: Attribute,
+    pub attribute_name: String,
+    pub data_type: DataType,
 }
 
 impl fmt::Display for ChangeAttribute {
@@ -300,7 +360,7 @@ impl fmt::Display for ChangeAttribute {
         write!(
             f,
             "ChangeAttribute({}, {})",
-            &self.attribute_store, &self.attribute.name
+            &self.attribute_store, &self.attribute_name
         )
     }
 }
@@ -310,7 +370,7 @@ impl fmt::Debug for ChangeAttribute {
         write!(
             f,
             "ChangeAttribute({}, {})",
-            &self.attribute_store, &self.attribute
+            &self.attribute_store, &self.attribute_name
         )
     }
 }
@@ -320,6 +380,14 @@ impl fmt::Debug for ChangeAttribute {
 impl Change for ChangeAttribute {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
+
+        tx.execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[])
+            .await?;
+
+        // Load information for later reverting this change
+        let original_attribute = load_attribute(&tx, &self.attribute_store, &self.attribute_name)
+            .await
+            .map_err(|e| RuntimeError::from_msg(format!("Could not load attribute: {e}")))?;
 
         let query = concat!(
             "UPDATE attribute_directory.attribute ",
@@ -334,21 +402,23 @@ impl Change for ChangeAttribute {
         tx.execute(
             query,
             &[
-                &self.attribute.data_type,
-                &self.attribute.name,
+                &self.data_type,
+                &self.attribute_name,
                 &self.attribute_store.data_source,
                 &self.attribute_store.entity_type,
             ],
         )
         .await
-        .map_err(|e| DatabaseError::from_msg(format!("Error changing trend data type: {e}")))?;
+        .map_err(|e| DatabaseError::from_postgres_error("Error changing attribute data type", e))?;
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Changed type of attribute '{}' in store '{}'",
-            &self.attribute, &self.attribute_store
-        ))
+        Ok(Box::new(ChangedAttributeDataType {
+            attribute_store: self.attribute_store.clone(),
+            attribute_name: self.attribute_name.clone(),
+            original_data_type: original_attribute.data_type,
+            new_data_type: self.data_type,
+        }))
     }
 
     fn existing_object(&self) -> Option<MinervaObjectRef> {
@@ -359,12 +429,42 @@ impl Change for ChangeAttribute {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ChangedAttributeDataType {
+    pub attribute_store: AttributeStoreRef,
+    pub attribute_name: String,
+    pub original_data_type: DataType,
+    pub new_data_type: DataType,
+}
+
+impl Display for ChangedAttributeDataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Changed type of attribute '{}' in store '{}'",
+            &self.attribute_name, &self.attribute_store
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for ChangedAttributeDataType {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(ChangeAttribute {
+            attribute_store: self.attribute_store.clone(),
+            attribute_name: self.attribute_name.clone(),
+            data_type: self.original_data_type,
+        }))
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct AttributeStoreDiffOptions {
     pub ignore_deletions: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AttributeStoreRef {
     pub data_source: String,
     pub entity_type: String,
@@ -417,7 +517,8 @@ impl AttributeStore {
                     if my_part.data_type != other_attribute.data_type {
                         changes.push(Box::new(ChangeAttribute {
                             attribute_store: self.into(),
-                            attribute: other_attribute.clone(),
+                            attribute_name: other_attribute.name.clone(),
+                            data_type: other_attribute.data_type,
                         }));
                     }
                 }
@@ -523,10 +624,52 @@ impl Change for AddAttributeStore {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Created attribute store '{}'",
-            &self.attribute_store
-        ))
+        Ok(Box::new(AddedAttributeStore {
+            attribute_store: (&self.attribute_store).into(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedAttributeStore {
+    pub attribute_store: AttributeStoreRef,
+}
+
+impl Display for AddedAttributeStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Created attribute store '{}'", &self.attribute_store)
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedAttributeStore {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveAttributeStore {
+            attribute_store: self.attribute_store.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemoveAttributeStore {
+    pub attribute_store: AttributeStoreRef,
+}
+
+impl Display for RemoveAttributeStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoveAttributeStore({})", &self.attribute_store)
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for RemoveAttributeStore {
+    async fn apply(&self, _client: &mut Client) -> ChangeResult {
+        Err(Error::Runtime(RuntimeError {
+            msg: "Not implemented".to_string(),
+        }))
     }
 }
 
@@ -618,6 +761,54 @@ pub async fn load_attributes<T: GenericClient + Send + Sync>(
     }
 
     attributes
+}
+
+pub async fn load_attribute<T: GenericClient + Send + Sync>(
+    conn: &T,
+    attribute_store: &AttributeStoreRef,
+    attribute_name: &str,
+) -> Result<Attribute, String> {
+    let attribute_query = concat!(
+        "SELECT att.name, att.data_type, att.description, att.extra_data ",
+        "FROM attribute_directory.attribute att ",
+        "JOIN attribute_directory.attribute_store ast ON att.attribute_store_id = ast.id ",
+        "JOIN directory.data_source ds ON ds.id = ast.data_source_id ",
+        "JOIN directory.entity_type et ON et.id = ast.entity_type_id ",
+        "WHERE ds.name = $1 AND et.name = $2 AND att.name = $3"
+    );
+
+    let attribute_result = conn
+        .query(
+            attribute_query,
+            &[
+                &attribute_store.data_source,
+                &attribute_store.entity_type,
+                &attribute_name,
+            ],
+        )
+        .await
+        .unwrap();
+
+    if attribute_result.is_empty() {
+        return Err(format!(
+            "No such attribute '{}_{}'.'{}'",
+            attribute_store.data_source, attribute_store.entity_type, attribute_name
+        ));
+    }
+
+    let attribute_row = attribute_result.first().unwrap();
+
+    let attribute_name: &str = attribute_row.get(0);
+    let attribute_data_type: &str = attribute_row.get(1);
+    let attribute_description: Option<String> = attribute_row.get(2);
+    let extra_data: Value = attribute_row.get(3);
+
+    Ok(Attribute {
+        name: String::from(attribute_name),
+        data_type: DataType::from(attribute_data_type),
+        description: attribute_description.unwrap_or_default(),
+        extra_data,
+    })
 }
 
 pub async fn load_attribute_names<T: GenericClient + Send + Sync>(

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::fmt::Display;
 use std::path::Path;
 
 use async_trait::async_trait;
@@ -13,6 +14,7 @@ use crate::attribute_store::load_attribute_names;
 use crate::attribute_store::materialize_curr_ptr::{
     materialize_curr_ptr_by_name, MaterializeCurrPtrError, MaterializeCurrPtrResult,
 };
+use crate::change::Changed;
 
 pub const MATERIALIZATION_VIEW_SCHEMA: &str = "attribute";
 
@@ -25,6 +27,27 @@ pub struct AttributeMaterializationTarget {
 impl fmt::Display for AttributeMaterializationTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}_{}", &self.data_source, &self.entity_type)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AttributeMaterializationRef {
+    pub data_source: String,
+    pub entity_type: String,
+}
+
+impl fmt::Display for AttributeMaterializationRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}_{}", &self.data_source, &self.entity_type)
+    }
+}
+
+impl From<&AttributeMaterialization> for AttributeMaterializationRef {
+    fn from(value: &AttributeMaterialization) -> Self {
+        AttributeMaterializationRef {
+            data_source: value.attribute_store.data_source.clone(),
+            entity_type: value.attribute_store.entity_type.clone(),
+        }
     }
 }
 
@@ -359,10 +382,11 @@ impl Change for AddAttributeMaterialization {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Added attribute materialization '{}'",
-            &self.attribute_materialization
-        ))
+        Ok(Box::new(AddedAttributeMaterialization {
+            attribute_materialization: AttributeMaterializationRef::from(
+                &self.attribute_materialization,
+            ),
+        }))
     }
 }
 
@@ -374,7 +398,55 @@ impl From<AttributeMaterialization> for AddAttributeMaterialization {
     }
 }
 
-use std::fmt::Display;
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct AddedAttributeMaterialization {
+    attribute_materialization: AttributeMaterializationRef,
+}
+
+#[typetag::serde]
+impl Changed for AddedAttributeMaterialization {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveAttributeMaterialization {
+            attribute_materialization: self.attribute_materialization.clone(),
+        }))
+    }
+}
+
+impl Display for AddedAttributeMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Added attribute materialization '{}'",
+            self.attribute_materialization
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct RemoveAttributeMaterialization {
+    attribute_materialization: AttributeMaterializationRef,
+}
+
+impl Display for RemoveAttributeMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Removed attribute materialization '{}'",
+            self.attribute_materialization
+        )
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for RemoveAttributeMaterialization {
+    async fn apply(&self, _client: &mut Client) -> ChangeResult {
+        Err(Error::Runtime(RuntimeError {
+            msg: "Not implemented".to_string(),
+        }))
+    }
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum AttributeMaterializeError {

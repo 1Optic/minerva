@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
@@ -14,19 +14,24 @@ use tokio_postgres::{Client, GenericClient, Row, Transaction};
 
 use async_trait::async_trait;
 
+use crate::change::Changed;
 use crate::interval::parse_interval;
 
 use super::change::{Change, ChangeResult};
-use super::error::{ConfigurationError, DatabaseError, DatabaseErrorKind, Error, RuntimeError};
+use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 use super::notification_store::notification_store_exists;
 
 type PostgresName = String;
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum TriggerError {
+    #[error("Database error: {0}")]
     DatabaseError(DatabaseError),
+    #[error("Not found: {0}")]
     NotFound(DatabaseError),
+    #[error("Granularity error: {0}")]
     GranularityError(String),
+    #[error("Function error: {0}")]
     FunctionError(String),
 }
 
@@ -249,7 +254,7 @@ impl AddTrigger {
         Ok(())
     }
 
-    async fn apply2(&self, transaction: &mut Transaction<'_>) -> Result<String, Error> {
+    async fn apply2(&self, transaction: &mut Transaction<'_>) -> Result<Option<String>, Error> {
         trace!("Adding trigger (part 2)");
         if self.trigger.name.len() > MAX_TRIGGER_NAME_LENGTH {
             error!("Trigger name too long: {}", self.trigger.name);
@@ -287,19 +292,12 @@ impl AddTrigger {
         set_enabled(transaction, &self.trigger.name, self.trigger.enabled).await?;
         trace!("Enabled/disabled set");
 
-        let mut check_result: String = "No check has run".to_string();
-
         if self.verify {
             trace!("Doing verification");
-            check_result = run_checks(&self.trigger.name, transaction).await?;
+            Ok(Some(run_checks(&self.trigger.name, transaction).await?))
+        } else {
+            Ok(None)
         }
-
-        let message = match self.verify {
-            false => format!("Created trigger '{}'", &self.trigger.name),
-            true => format!("Created trigger '{}': {}", &self.trigger.name, check_result),
-        };
-
-        Ok(message)
     }
 }
 
@@ -312,17 +310,49 @@ impl Change for AddTrigger {
         tx1.commit().await?;
 
         let mut tx2 = client.transaction().await?;
-        let result = self.apply2(&mut tx2).await?;
+        let check_result = self.apply2(&mut tx2).await?;
         tx2.commit().await?;
 
-        Ok(result)
+        Ok(Box::new(AddedTrigger {
+            trigger_name: self.trigger.name.clone(),
+            check_result,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedTrigger {
+    pub trigger_name: String,
+    pub check_result: Option<String>,
+}
+
+impl Display for AddedTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.check_result {
+            Some(result) => {
+                write!(f, "Created trigger '{}': {}", &self.trigger_name, result)
+            }
+            None => {
+                write!(f, "Created trigger '{}'", &self.trigger_name)
+            }
+        }
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(DeleteTrigger {
+            trigger_name: self.trigger_name.clone(),
+        }))
     }
 }
 
 async fn create_type<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let type_name = format!("{}_kpi", &trigger.name);
 
     let query = format!(
@@ -369,7 +399,7 @@ async fn create_type<T: GenericClient + Sync + Send>(
 async fn cleanup_rule<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "SELECT trigger.cleanup_rule(rule) FROM trigger.rule WHERE name = $1";
 
     client
@@ -384,7 +414,7 @@ async fn rename_trigger<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     old_name: &str,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "UPDATE trigger.rule SET name = $1 WHERE name = $2";
 
     client
@@ -401,7 +431,7 @@ async fn rename_trigger<T: GenericClient + Sync + Send>(
 async fn create_kpi_function<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let function_name = format!("{}_kpi", &trigger.name);
     let type_name = format!("{}_kpi", &trigger.name);
 
@@ -426,7 +456,7 @@ async fn create_kpi_function<T: GenericClient + Sync + Send>(
 async fn create_rule<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = format!(
         "SELECT * FROM trigger.create_rule($1, array[{}]::trigger.threshold_def[])",
         trigger
@@ -483,7 +513,7 @@ async fn create_rule<T: GenericClient + Sync + Send>(
 async fn setup_rule<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = format!(
         "SELECT trigger.setup_rule(rule, array[{}]::trigger.threshold_def[]) FROM trigger.rule WHERE name = $1",
         trigger.thresholds.iter().map(|threshold| { format!("({}, {})", escape_literal(&threshold.name), escape_literal(&threshold.data_type)) }).collect::<Vec<String>>().join(",")
@@ -524,16 +554,7 @@ async fn setup_rule<T: GenericClient + Sync + Send>(
 async fn set_weight<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
-    let query = "SELECT name FROM trigger.rule";
-    let rows = client.query(query, &[]).await.unwrap();
-    debug!(
-        "result: {:?}",
-        rows.into_iter()
-            .map(|r| r.get::<usize, String>(0))
-            .collect::<Vec<String>>()
-    );
-
+) -> Result<String, Error> {
     let query = "SELECT trigger.set_weight($1::name, $2::text)";
 
     client
@@ -547,7 +568,7 @@ async fn set_weight<T: GenericClient + Sync + Send>(
 pub async fn set_thresholds<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let function_name = format!("{}_set_thresholds", &trigger.name);
     let function_args = trigger
         .thresholds
@@ -573,7 +594,7 @@ pub async fn set_thresholds<T: GenericClient + Sync + Send>(
 async fn set_condition<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "SELECT trigger.set_condition(rule, $1) FROM trigger.rule WHERE name = $2";
 
     client
@@ -587,7 +608,7 @@ async fn set_condition<T: GenericClient + Sync + Send>(
 async fn define_notification_message<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "SELECT trigger.define_notification_message($1, $2)";
     debug!(
         "query: SELECT trigger.define_notification_message('{}', '{}')",
@@ -605,7 +626,7 @@ async fn define_notification_message<T: GenericClient + Sync + Send>(
 async fn define_notification_data<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "SELECT trigger.define_notification_data($1, $2)";
 
     client
@@ -619,7 +640,7 @@ async fn define_notification_data<T: GenericClient + Sync + Send>(
 async fn drop_notification_data_function<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let function_name = format!("{}_notification_data", &trigger.name);
 
     let query = format!(
@@ -641,7 +662,7 @@ async fn drop_notification_data_function<T: GenericClient + Sync + Send>(
 async fn create_mapping_functions<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     for mapping_function in &trigger.mapping_functions {
         let query = format!(
             "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS SETOF timestamp with time zone AS $${}$$ LANGUAGE sql STABLE",
@@ -663,7 +684,7 @@ async fn create_mapping_functions<T: GenericClient + Sync + Send>(
 async fn link_trend_stores<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     for trend_store_link in &trigger.trend_store_links {
         let mapping_function = format!(
             "trend.{}(timestamp with time zone)",
@@ -701,7 +722,7 @@ async fn link_trend_stores<T: GenericClient + Sync + Send>(
 async fn set_description<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "UPDATE trigger.rule SET description = $1 WHERE name = $2";
 
     client
@@ -724,7 +745,7 @@ pub async fn set_enabled<T: GenericClient + Sync + Send>(
     client: &mut T,
     trigger_name: &str,
     enabled: bool,
-) -> ChangeResult {
+) -> Result<(), Error> {
     let query = "UPDATE trigger.rule SET enabled = $1 WHERE name = $2";
 
     client
@@ -736,9 +757,7 @@ pub async fn set_enabled<T: GenericClient + Sync + Send>(
             ))
         })?;
 
-    Ok(format!(
-        "Set enabled state of trigger '{trigger_name}' to '{enabled}'"
-    ))
+    Ok(())
 }
 
 /// Truncate a reference timestamp to the nearest timestamp for a specified granularity.
@@ -829,7 +848,7 @@ pub async fn trigger_exists<T: GenericClient + Sync + Send>(
 async fn run_checks<T: GenericClient + Sync + Send>(
     trigger_name: &str,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let result = load_trigger(client, trigger_name).await;
 
     match result {
@@ -860,7 +879,7 @@ async fn run_checks<T: GenericClient + Sync + Send>(
 async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
-) -> ChangeResult {
+) -> Result<String, Error> {
     let query = "DELETE FROM trigger.rule_trend_store_link USING trigger.rule WHERE rule_id = rule.id AND rule.name = $1";
 
     client
@@ -890,7 +909,13 @@ impl fmt::Display for DeleteTrigger {
 #[typetag::serde]
 impl Change for DeleteTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
-        let tx = client.transaction().await?;
+        let mut tx = client.transaction().await?;
+
+        let trigger = load_trigger(&mut tx, &self.trigger_name)
+            .await
+            .map_err(|e| {
+                RuntimeError::from_msg(format!("Could not load current trigger definition: {e}"))
+            })?;
 
         let row = tx
             .query_one(
@@ -917,7 +942,29 @@ impl Change for DeleteTrigger {
 
         tx.commit().await?;
 
-        Ok(format!("Removed trigger '{}'", &self.trigger_name))
+        Ok(Box::new(DeletedTrigger { trigger }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct DeletedTrigger {
+    pub trigger: Trigger,
+}
+
+impl Display for DeletedTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Removed trigger '{}'", &self.trigger.name)
+    }
+}
+
+#[typetag::serde]
+impl Changed for DeletedTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddTrigger {
+            trigger: self.trigger.clone(),
+            verify: false,
+        }))
     }
 }
 
@@ -1020,20 +1067,45 @@ impl Change for UpdateTrigger {
 
         set_enabled(&mut transaction, &self.trigger.name, self.trigger.enabled).await?;
 
-        let mut check_result: String = "No check has run".to_string();
-
-        if self.verify {
-            check_result = run_checks(&self.trigger.name, &mut transaction).await?;
-        }
+        let check_result = if self.verify {
+            Some(run_checks(&self.trigger.name, &mut transaction).await?)
+        } else {
+            None
+        };
 
         transaction.commit().await?;
 
-        let message = match self.verify {
-            false => format!("Updated trigger '{}'", &self.trigger.name),
-            true => format!("Updated trigger '{}': {}", &self.trigger.name, check_result),
-        };
+        Ok(Box::new(UpdatedTrigger {
+            trigger_name: self.trigger.name.clone(),
+            check_result,
+        }))
+    }
+}
 
-        Ok(message)
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTrigger {
+    pub trigger_name: String,
+    pub check_result: Option<String>,
+}
+
+impl Display for UpdatedTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.check_result {
+            Some(result) => {
+                write!(f, "Updated trigger '{}': {}", &self.trigger_name, result)
+            }
+            None => {
+                write!(f, "Updated trigger '{}'", &self.trigger_name)
+            }
+        }
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -1109,26 +1181,55 @@ impl Change for RenameTrigger {
 
         link_trend_stores(&self.trigger, &mut transaction).await?;
 
-        let mut check_result: String = "No check has run".to_string();
-
-        if self.verify {
-            check_result = run_checks(&self.trigger.name, &mut transaction).await?;
-        }
+        let check_result = if self.verify {
+            Some(run_checks(&self.trigger.name, &mut transaction).await?)
+        } else {
+            None
+        };
 
         transaction.commit().await?;
 
-        let message = match self.verify {
-            false => format!(
-                "Renamed trigger '{}' to '{}'",
-                &self.old_name, &self.trigger.name
-            ),
-            true => format!(
-                "Renamed trigger '{}' to '{}': {}",
-                &self.old_name, &self.trigger.name, check_result
-            ),
-        };
+        Ok(Box::new(RenamedTrigger {
+            old_name: self.old_name.clone(),
+            new_name: self.trigger.name.clone(),
+            check_result,
+        }))
+    }
+}
 
-        Ok(message)
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RenamedTrigger {
+    pub old_name: String,
+    pub new_name: String,
+    pub check_result: Option<String>,
+}
+
+impl Display for RenamedTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.check_result {
+            Some(result) => {
+                write!(
+                    f,
+                    "Renamed trigger '{}' to '{}': {}",
+                    &self.old_name, &self.new_name, result
+                )
+            }
+            None => {
+                write!(
+                    f,
+                    "Renamed trigger '{}' to '{}'",
+                    &self.old_name, &self.new_name
+                )
+            }
+        }
+    }
+}
+
+#[typetag::serde]
+impl Changed for RenamedTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -1154,7 +1255,30 @@ impl Change for VerifyTrigger {
 
         transaction.commit().await?;
 
-        Ok(message)
+        Ok(Box::new(VerifiedTrigger {
+            trigger_name: self.trigger_name.clone(),
+            result: message,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct VerifiedTrigger {
+    pub trigger_name: String,
+    pub result: String,
+}
+
+impl Display for VerifiedTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.result)
+    }
+}
+
+#[typetag::serde]
+impl Changed for VerifiedTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -1176,11 +1300,38 @@ impl Change for EnableTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        let message = set_enabled(&mut transaction, &self.trigger_name, true).await?;
+        set_enabled(&mut transaction, &self.trigger_name, true).await?;
 
         transaction.commit().await?;
 
-        Ok(message)
+        Ok(Box::new(EnabledTrigger {
+            trigger_name: self.trigger_name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct EnabledTrigger {
+    pub trigger_name: String,
+}
+
+impl Display for EnabledTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Set enabled state of trigger '{}' to 'true'",
+            self.trigger_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for EnabledTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(DisableTrigger {
+            trigger_name: self.trigger_name.clone(),
+        }))
     }
 }
 
@@ -1202,11 +1353,38 @@ impl Change for DisableTrigger {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        let message = set_enabled(&mut transaction, &self.trigger_name, false).await?;
+        set_enabled(&mut transaction, &self.trigger_name, false).await?;
 
         transaction.commit().await?;
 
-        Ok(message)
+        Ok(Box::new(DisabledTrigger {
+            trigger_name: self.trigger_name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct DisabledTrigger {
+    pub trigger_name: String,
+}
+
+impl Display for DisabledTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Set enabled state of trigger '{}' to 'false'",
+            self.trigger_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for DisabledTrigger {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(EnableTrigger {
+            trigger_name: self.trigger_name.clone(),
+        }))
     }
 }
 
@@ -1218,10 +1396,9 @@ fn extract_rule_from_src(src: &str) -> Result<String, TriggerError> {
     let condition = match captures {
         Some(c) => c.get(1).unwrap().as_str(),
         None => {
-            return Err(TriggerError::DatabaseError(DatabaseError {
-                msg: format!("Could not extract condition from SQL: '{src}'"),
-                kind: DatabaseErrorKind::Default,
-            }))
+            return Err(TriggerError::DatabaseError(DatabaseError::Default(
+                format!("Could not extract condition from SQL: '{src}'"),
+            )))
         }
     };
 
@@ -1402,12 +1579,41 @@ where
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        let message =
+        let notification_count =
             create_notifications(&mut transaction, &self.trigger_name, self.timestamp).await?;
 
         transaction.commit().await?;
 
-        Ok(message)
+        Ok(Box::new(CreatedNotifications {
+            trigger_name: self.trigger_name.clone(),
+            timestamp: self.timestamp,
+            notification_count,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct CreatedNotifications {
+    pub trigger_name: String,
+    pub timestamp: DateTime<Utc>,
+    pub notification_count: i32,
+}
+
+impl Display for CreatedNotifications {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Created {} notifications for trigger '{}'({})",
+            self.notification_count, self.trigger_name, self.timestamp
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for CreatedNotifications {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -1415,7 +1621,7 @@ pub async fn create_notifications<T>(
     conn: &mut T,
     name: &str,
     timestamp: chrono::DateTime<Utc>,
-) -> Result<String, Error>
+) -> Result<i32, Error>
 where
     T: GenericClient + Send + Sync,
 {
@@ -1428,9 +1634,7 @@ where
 
     let notification_count: i32 = row.try_get(0)?;
 
-    Ok(format!(
-        "Created {notification_count} notifications for trigger '{name}'"
-    ))
+    Ok(notification_count)
 }
 
 async fn load_kpi_data_columns<T: GenericClient + Send + Sync>(

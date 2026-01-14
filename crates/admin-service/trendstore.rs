@@ -15,6 +15,7 @@ use minerva::interval::parse_interval;
 use minerva::trend_store::create::create_trend_store_part;
 use minerva::trend_store::{
     get_trend_store_id, load_trend_store, GeneratedTrend, Trend, TrendStore, TrendStorePart,
+    TrendStoreRef,
 };
 
 use minerva::meas_value::DataType;
@@ -187,13 +188,13 @@ pub struct TrendStoreBasicData {
 
 impl TrendStoreBasicData {
     async fn as_minerva(&self, transaction: &mut Transaction<'_>) -> Result<TrendStore, String> {
-        let result = load_trend_store(
-            transaction,
-            &self.data_source,
-            &self.entity_type,
-            &self.granularity,
-        )
-        .await;
+        let trend_store_ref = TrendStoreRef {
+            data_source: self.data_source.clone(),
+            entity_type: self.entity_type.clone(),
+            granularity: self.granularity,
+        };
+
+        let result = load_trend_store(transaction, &trend_store_ref).await;
 
         if let Ok(trendstore) = result {
             Ok(trendstore)

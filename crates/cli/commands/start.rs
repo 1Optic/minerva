@@ -11,7 +11,7 @@ use tokio::signal;
 
 use minerva::cluster::{BuildImageProvider, MinervaCluster, MinervaClusterConfig};
 use minerva::error::{Error, RuntimeError};
-use minerva::instance::{load_instance_config, MinervaInstance};
+use minerva::instance::{initialize_from, load_instance_config};
 use minerva::schema::migrate;
 use minerva::trend_store::create_partitions;
 
@@ -115,14 +115,12 @@ impl StartOpt {
                     minerva_instance_root.to_string_lossy()
                 );
 
-                let minerva_instance = MinervaInstance::load_from(&minerva_instance_root)?;
-
                 env.push((
                     "MINERVA_INSTANCE_ROOT".to_string(),
                     minerva_instance_root.to_string_lossy().to_string(),
                 ));
 
-                minerva_instance.initialize(&mut client, &env).await?;
+                initialize_from(&minerva_instance_root, &mut client, &env).await?;
 
                 if self.create_partitions {
                     create_partitions(&mut client, None).await?;

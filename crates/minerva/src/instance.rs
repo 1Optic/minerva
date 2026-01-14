@@ -5,10 +5,10 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use erased_serde::{Serialize, Serializer};
 use glob::glob;
 use log::error;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
 use tokio_postgres::Client;
@@ -16,9 +16,12 @@ use tokio_postgres::Client;
 use crate::attribute_materialization::AddAttributeMaterialization;
 use crate::changes::trend_store::{RemoveTrendStore, RemoveTrendStorePart};
 use crate::entity_type::{load_entity_types, load_entity_types_from, AddEntityType, EntityType};
+use crate::error::RuntimeError;
 use crate::graph::GraphNode;
 use crate::meas_value::DataType;
+use crate::relation::{load_relations_from_db, RemoveRelation};
 use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
+use crate::virtual_entity::{load_virtual_entities_from_db, RemoveVirtualEntity};
 
 use super::attribute_materialization::{
     load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
@@ -47,7 +50,7 @@ use super::virtual_entity::{
     VirtualEntity,
 };
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum AggregationType {
     #[serde(rename = "VIEW")]
     View,
@@ -67,21 +70,21 @@ pub struct DiffOptions {
     pub stage_deletions: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct EntityAggregationHint {
     pub relation: String,
     pub materialization_type: AggregationType,
     pub prefix: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct InstanceDockerImage {
     pub image_name: String,
     pub image_tag: String,
     pub path: PathBuf,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct RetentionConfig {
     #[serde(with = "humantime_serde")]
     pub granularity: Duration,
@@ -89,7 +92,7 @@ pub struct RetentionConfig {
     pub retention_period: Duration,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum TrendChange {
     DataType,
     ExtraData,
@@ -97,25 +100,25 @@ pub enum TrendChange {
     Add,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct DeploymentIgnoreTrend {
     pub change: TrendChange,
     pub trend_store_part: String,
     pub trend_match_regex: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum DeploymentIgnore {
     Trend(DeploymentIgnoreTrend),
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct DeploymentConfig {
     pub ignore: Vec<DeploymentIgnore>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct AddAttribute {
     pub name: String,
     pub data_type: DataType,
@@ -124,20 +127,20 @@ pub struct AddAttribute {
     pub extra_data: Value,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct AddAttributes {
     pub entity_type: String,
     pub description: String,
     pub attributes: Vec<AddAttribute>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct AttributeExtraction {
     pub data_source: String,
     pub add_attributes: Option<Vec<AddAttributes>>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct InstanceConfig {
     pub docker_image: Option<InstanceDockerImage>,
     pub deployment: Option<DeploymentConfig>,
@@ -198,8 +201,8 @@ pub fn load_instance_config(
     Ok(image_config)
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct MinervaInstance {
-    pub instance_root: Option<PathBuf>,
     pub entity_types: Vec<EntityType>,
     pub trend_stores: Vec<TrendStore>,
     pub attribute_stores: Vec<AttributeStore>,
@@ -212,6 +215,93 @@ pub struct MinervaInstance {
     pub entity_sets: Vec<EntitySet>,
 }
 
+pub async fn initialize_from<K, V>(
+    instance_root: &Path,
+    client: &mut Client,
+    env: &[(K, V)],
+) -> Result<(), Error>
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    let minerva_instance = MinervaInstance::load_from(instance_root)?;
+
+    initialize_custom(
+        client,
+        &format!("{}/custom/pre-init/**/*", instance_root.to_string_lossy()),
+        env,
+    )
+    .await;
+
+    initialize_entity_types(client, &minerva_instance.entity_types).await?;
+
+    initialize_attribute_stores(client, &minerva_instance.attribute_stores).await?;
+
+    initialize_trend_stores(client, &minerva_instance.trend_stores).await?;
+
+    initialize_custom(
+        client,
+        &format!(
+            "{}/custom/pre-notification-init/**/*",
+            instance_root.to_string_lossy()
+        ),
+        env,
+    )
+    .await;
+
+    initialize_notification_stores(client, &minerva_instance.notification_stores).await?;
+
+    initialize_virtual_entities(client, &minerva_instance.virtual_entities).await?;
+
+    initialize_custom(
+        client,
+        &format!(
+            "{}/custom/pre-relation-init/**/*",
+            instance_root.to_string_lossy()
+        ),
+        env,
+    )
+    .await;
+
+    initialize_relations(client, &minerva_instance.relations).await?;
+
+    initialize_custom(
+        client,
+        &format!(
+            "{}/custom/pre-materialization-init/**/*",
+            instance_root.to_string_lossy()
+        ),
+        env,
+    )
+    .await;
+
+    initialize_trend_materializations(client, &minerva_instance.trend_materializations).await?;
+
+    initialize_attribute_materializations(client, &minerva_instance.attribute_materializations)
+        .await?;
+
+    initialize_custom(
+        client,
+        &format!(
+            "{}/custom/pre-trigger-init/**/*",
+            instance_root.to_string_lossy()
+        ),
+        env,
+    )
+    .await;
+
+    initialize_triggers(client, &minerva_instance.triggers).await?;
+
+    initialize_custom(
+        client,
+        &format!("{}/custom/post-init/**/*", instance_root.to_string_lossy()),
+        env,
+    )
+    .await;
+
+    Ok(())
+}
+
 impl MinervaInstance {
     pub async fn load_from_db(client: &mut Client) -> Result<MinervaInstance, Error> {
         let entity_types = load_entity_types(client).await?;
@@ -222,15 +312,13 @@ impl MinervaInstance {
 
         let notification_stores = load_notification_stores(client).await?;
 
-        //let virtual_entities = load_virtual_entities(client)?;
+        let virtual_entities = load_virtual_entities_from_db(client).await?;
 
-        let virtual_entities = Vec::new();
+        let relations = load_relations_from_db(client).await?;
 
-        //let relations = load_relations(client)?;
-
-        let relations = Vec::new();
-
-        let trend_materializations = load_materializations(client).await?;
+        let trend_materializations = load_materializations(client)
+            .await
+            .map_err(|e| RuntimeError::from_msg(format!("Could not load materializations: {e}")))?;
 
         let attribute_materializations = load_attribute_materializations(client).await?;
 
@@ -241,7 +329,6 @@ impl MinervaInstance {
         let entity_sets = load_entity_sets(client).await?;
 
         Ok(MinervaInstance {
-            instance_root: None,
             entity_types,
             trend_stores,
             attribute_stores,
@@ -270,7 +357,6 @@ impl MinervaInstance {
         let entity_sets: Vec<EntitySet> = vec![];
 
         Ok(MinervaInstance {
-            instance_root: Some(PathBuf::from(minerva_instance_root)),
             entity_types,
             trend_stores,
             attribute_stores,
@@ -282,98 +368,6 @@ impl MinervaInstance {
             triggers,
             entity_sets,
         })
-    }
-
-    pub async fn initialize<K, V>(&self, client: &mut Client, env: &[(K, V)]) -> Result<(), Error>
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!("{}/custom/pre-init/**/*", instance_root.to_string_lossy()),
-                env,
-            )
-            .await;
-        }
-
-        initialize_entity_types(client, &self.entity_types).await?;
-
-        initialize_attribute_stores(client, &self.attribute_stores).await?;
-
-        initialize_trend_stores(client, &self.trend_stores).await?;
-
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!(
-                    "{}/custom/pre-notification-init/**/*",
-                    instance_root.to_string_lossy()
-                ),
-                env,
-            )
-            .await;
-        }
-
-        initialize_notification_stores(client, &self.notification_stores).await?;
-
-        initialize_virtual_entities(client, &self.virtual_entities).await?;
-
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!(
-                    "{}/custom/pre-relation-init/**/*",
-                    instance_root.to_string_lossy()
-                ),
-                env,
-            )
-            .await;
-        }
-
-        initialize_relations(client, &self.relations).await?;
-
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!(
-                    "{}/custom/pre-materialization-init/**/*",
-                    instance_root.to_string_lossy()
-                ),
-                env,
-            )
-            .await;
-        }
-
-        initialize_trend_materializations(client, &self.trend_materializations).await?;
-
-        initialize_attribute_materializations(client, &self.attribute_materializations).await?;
-
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!(
-                    "{}/custom/pre-trigger-init/**/*",
-                    instance_root.to_string_lossy()
-                ),
-                env,
-            )
-            .await;
-        }
-
-        initialize_triggers(client, &self.triggers).await?;
-
-        if let Some(instance_root) = &self.instance_root {
-            initialize_custom(
-                client,
-                &format!("{}/custom/post-init/**/*", instance_root.to_string_lossy()),
-                env,
-            )
-            .await;
-        }
-
-        Ok(())
     }
 
     pub fn dependency_graph(&self) -> petgraph::Graph<GraphNode, String> {
@@ -804,6 +798,66 @@ impl MinervaInstance {
             }
         }
 
+        // Check for virtual entities to add
+        for other_virtual_entity in &other.virtual_entities {
+            match self
+                .virtual_entities
+                .iter()
+                .find(|my_virtual_entity| my_virtual_entity.name == other_virtual_entity.name)
+            {
+                Some(_my_virtual_entity) => {
+                    // changes.append(my_virtual_entity.diff(&other_virtual_entity));
+                }
+                None => {
+                    changes.push(Box::new(AddVirtualEntity {
+                        virtual_entity: other_virtual_entity.clone(),
+                    }));
+                }
+            }
+        }
+
+        // Check for virtual entities to remove
+        for my_virtual_entity in &self.virtual_entities {
+            if !other
+                .virtual_entities
+                .iter()
+                .any(|other_virtual_entity| other_virtual_entity.name == my_virtual_entity.name)
+            {
+                changes.push(Box::new(RemoveVirtualEntity {
+                    name: my_virtual_entity.name.clone(),
+                }))
+            }
+        }
+
+        // Check for relations to add
+        for other_relation in &other.relations {
+            match self
+                .relations
+                .iter()
+                .find(|my_relation| my_relation.name == other_relation.name)
+            {
+                Some(_my_relation) => {}
+                None => {
+                    changes.push(Box::new(AddRelation {
+                        relation: other_relation.clone(),
+                    }));
+                }
+            }
+        }
+
+        // Check for relations to remove
+        for my_relation in &self.relations {
+            if !other
+                .relations
+                .iter()
+                .any(|other_relation| other_relation.name == my_relation.name)
+            {
+                changes.push(Box::new(RemoveRelation {
+                    relation_name: my_relation.name.clone(),
+                }))
+            }
+        }
+
         changes
     }
 
@@ -826,15 +880,6 @@ impl MinervaInstance {
             }
         }
 
-        // Materializations have no diff mechanism yet, so just update
-        for materialization in &other.trend_materializations {
-            let result = materialization.update(client).await;
-
-            if let Err(e) = result {
-                println!("Erro updating trend materialization: {e}");
-            }
-        }
-
         Ok(())
     }
 }
@@ -843,18 +888,14 @@ pub async fn dump(client: &mut Client) {
     let minerva_instance: MinervaInstance = match MinervaInstance::load_from_db(client).await {
         Ok(i) => i,
         Err(e) => {
-            println!("Error loading instance from database: {e}");
+            eprintln!("Error loading instance from database: {e}");
             return;
         }
     };
 
-    for attribute_store in minerva_instance.attribute_stores {
-        println!("{:?}", &attribute_store);
-    }
-
-    for trend_store in minerva_instance.trend_stores {
-        println!("{:?}", &trend_store);
-    }
+    let json = &mut serde_json::Serializer::pretty(std::io::stdout());
+    let mut serializer = Box::new(<dyn Serializer>::erase(json));
+    let _ = minerva_instance.erased_serialize(&mut serializer);
 }
 
 fn load_attribute_stores_from(

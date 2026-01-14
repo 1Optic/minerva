@@ -9,6 +9,7 @@ pub mod graph;
 pub mod initialize;
 pub mod loaddata;
 pub mod relation;
+pub mod revert;
 pub mod schema;
 pub mod start;
 pub mod trendmaterialization;

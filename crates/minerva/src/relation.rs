@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio_postgres::{Client, GenericClient, Transaction};
 
-use crate::change::ChangeResult;
+use crate::change::{ChangeResult, Changed};
+use crate::error::postgres_error_to_string;
 
 use super::change::Change;
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
@@ -63,6 +64,62 @@ pub fn load_relation_from_file(path: &PathBuf) -> Result<Relation, Error> {
     }
 }
 
+pub async fn load_relation_from_db<T: GenericClient + Send + Sync>(
+    conn: &mut T,
+    name: &str,
+) -> Result<Relation, String> {
+    let query = concat!(
+        "select ",
+        "relname, ",
+        "pg_get_viewdef(ev_class) ",
+        "from pg_rewrite r ",
+        "join pg_class c on c.oid = ev_class ",
+        "join pg_namespace nsp on nsp.oid = c.relnamespace ",
+        "where nspname = 'relation_def' and relname = $1"
+    );
+
+    let rows = conn.query(query, &[&name]).await.unwrap();
+
+    if rows.is_empty() {
+        return Err(format!("No such relation '{name}'"));
+    }
+
+    let row = rows.first().unwrap();
+
+    let relation = Relation {
+        name: row.get(0),
+        query: row.get(1),
+    };
+
+    Ok(relation)
+}
+
+pub async fn load_relations_from_db<T: GenericClient + Send + Sync>(
+    conn: &mut T,
+) -> Result<Vec<Relation>, String> {
+    let query = concat!(
+        "select ",
+        "relname, ",
+        "pg_get_viewdef(ev_class) ",
+        "from pg_rewrite r ",
+        "join pg_class c on c.oid = ev_class ",
+        "join pg_namespace nsp on nsp.oid = c.relnamespace ",
+        "where nspname = 'relation_def'"
+    );
+
+    let rows = conn.query(query, &[]).await.unwrap();
+
+    let relations = rows
+        .iter()
+        .map(|row| Relation {
+            name: row.get(0),
+            query: row.get(1),
+        })
+        .collect();
+
+    Ok(relations)
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddRelation {
@@ -87,13 +144,34 @@ impl Change for AddRelation {
 
         tx.commit().await?;
 
-        Ok(format!("Added relation '{}'", &self.relation))
+        Ok(Box::new(AddedRelation {
+            relation_name: self.relation.name.clone(),
+        }))
     }
 }
 
 impl From<Relation> for AddRelation {
     fn from(relation: Relation) -> Self {
         AddRelation { relation }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedRelation {
+    pub relation_name: String,
+}
+
+impl Display for AddedRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Added relation '{}'", &self.relation_name)
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedRelation {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -116,8 +194,9 @@ impl Change for UpdateRelation {
         let tx = client.transaction().await?;
 
         let query = format!(
-            "CREATE OR REPLACE VIEW relation_def.\"{}\" AS {}",
-            self.relation.name, self.relation.query
+            "CREATE OR REPLACE VIEW relation_def.{} AS {}",
+            escape_identifier(&self.relation.name),
+            self.relation.query
         );
 
         tx.query(&query, &[])
@@ -126,13 +205,34 @@ impl Change for UpdateRelation {
 
         tx.commit().await?;
 
-        Ok(format!("Updated relation {}", &self.relation))
+        Ok(Box::new(UpdatedRelation {
+            relation_name: self.relation.name.clone(),
+        }))
     }
 }
 
 impl From<Relation> for UpdateRelation {
     fn from(relation: Relation) -> Self {
         UpdateRelation { relation }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedRelation {
+    pub relation_name: String,
+}
+
+impl Display for UpdatedRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Updated relation {}", &self.relation_name)
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedRelation {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -246,4 +346,104 @@ pub async fn create_relation<T: GenericClient>(
         .map_err(|e| CreateRelationError::Database(format!("Error registering relation: {e}")))?;
 
     Ok(())
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RemoveRelationError {
+    #[error("{0}")]
+    Database(String),
+    #[error("No such relation registration")]
+    NoSuchRegistration,
+}
+
+impl RemoveRelationError {
+    fn from_postgres_error(msg: &str, e: tokio_postgres::Error) -> RemoveRelationError {
+        RemoveRelationError::Database(format!("{msg}: {}", postgres_error_to_string(e)))
+    }
+}
+
+pub async fn remove_relation<T: GenericClient>(
+    client: &mut T,
+    relation_name: &str,
+) -> Result<(), RemoveRelationError> {
+    let query = format!(
+        "DROP TABLE IF EXISTS relation.{}",
+        escape_identifier(relation_name),
+    );
+
+    client.query(&query, &[]).await.map_err(|e| {
+        RemoveRelationError::from_postgres_error("Error dropping relation table", e)
+    })?;
+
+    let query = format!(
+        "DROP VIEW IF EXISTS relation_def.{}",
+        escape_identifier(relation_name)
+    );
+
+    client
+        .query(&query, &[])
+        .await
+        .map_err(|e| RemoveRelationError::from_postgres_error("Error dropping relation view", e))?;
+
+    let query = "DELETE FROM relation_directory.type WHERE name = $1";
+
+    let delete_count = client
+        .execute(query, &[&relation_name])
+        .await
+        .map_err(|e| RemoveRelationError::from_postgres_error("Error unregistering relation", e))?;
+
+    if delete_count == 0 {
+        return Err(RemoveRelationError::NoSuchRegistration);
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemoveRelation {
+    pub relation_name: String,
+}
+
+impl fmt::Display for RemoveRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoveRelation({})", &self.relation_name)
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for RemoveRelation {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut tx = client.transaction().await?;
+
+        let relation = load_relation_from_db(&mut tx, &self.relation_name).await?;
+
+        remove_relation(&mut tx, &self.relation_name)
+            .await
+            .map_err(|e| format!("Could not remove relation '{}': {e}", self.relation_name))?;
+
+        tx.commit().await?;
+
+        Ok(Box::new(RemovedRelation { relation }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedRelation {
+    pub relation: Relation,
+}
+
+impl Display for RemovedRelation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Removed relation '{}'", &self.relation.name)
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedRelation {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
+    }
 }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{Client, GenericClient};
@@ -7,6 +7,8 @@ use tokio_postgres::{Client, GenericClient};
 use async_trait::async_trait;
 
 type PostgresName = String;
+
+use crate::change::Changed;
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
@@ -27,7 +29,7 @@ fn default_empty_string() -> String {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct AddNotificationStoreAttributes {
-    pub notification_store: NotificationStore,
+    pub notification_store: NotificationStoreRef,
     pub attributes: Vec<Attribute>,
 }
 
@@ -75,10 +77,51 @@ impl Change for AddNotificationStoreAttributes {
 
         tx.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(AddedAttributes {
+            notification_store: self.notification_store.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedAttributes {
+    pub notification_store: NotificationStoreRef,
+}
+
+impl Display for AddedAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Added attributes to notification store '{}'",
             &self.notification_store
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedAttributes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct NotificationStoreRef {
+    pub data_source: String,
+}
+
+impl Display for NotificationStoreRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NotificationStore({})", &self.data_source)
+    }
+}
+
+impl From<&NotificationStore> for NotificationStoreRef {
+    fn from(value: &NotificationStore) -> Self {
+        NotificationStoreRef {
+            data_source: value.data_source.clone(),
+        }
     }
 }
 
@@ -113,7 +156,7 @@ impl NotificationStore {
 
         if !new_attributes.is_empty() {
             changes.push(Box::new(AddNotificationStoreAttributes {
-                notification_store: self.clone(),
+                notification_store: self.into(),
                 attributes: new_attributes,
             }));
         }
@@ -159,10 +202,28 @@ impl Change for AddNotificationStore {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Created attribute store '{}'",
-            &self.notification_store
-        ))
+        Ok(Box::new(AddedNotificationStore {
+            notification_store: (&self.notification_store).into(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedNotificationStore {
+    pub notification_store: NotificationStoreRef,
+}
+
+impl Display for AddedNotificationStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Created attribute store '{}'", &self.notification_store)
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedNotificationStore {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 

@@ -19,6 +19,7 @@ use crate::commands::graph::GraphOpt;
 use crate::commands::initialize::InitializeOpt;
 use crate::commands::loaddata::LoadDataOpt;
 use crate::commands::relation::RelationOpt;
+use crate::commands::revert::RevertOpt;
 use crate::commands::schema::SchemaOpt;
 use crate::commands::start::StartOpt;
 use crate::commands::trendmaterialization::TrendMaterializationOpt;
@@ -64,6 +65,8 @@ enum Commands {
     LoadData(LoadDataOpt),
     #[command(about = "Manage relations")]
     Relation(RelationOpt),
+    #[command(about = "Revert previously applied changes")]
+    Revert(RevertOpt),
     #[command(about = "Start Minerva instance")]
     Start(StartOpt),
     #[command(about = "Generate standard aggregations")]
@@ -117,6 +120,7 @@ fn main() -> ExitCode {
         Some(Commands::TrendMaterialization(trend_materialization)) => trend_materialization.run(),
         Some(Commands::LoadData(load_data)) => load_data.run(),
         Some(Commands::Relation(relation)) => relation.run(),
+        Some(Commands::Revert(revert)) => revert.run(),
         Some(Commands::Start(start)) => start.run(),
         Some(Commands::Aggregation(aggregation)) => aggregation.run(),
         Some(Commands::VirtualEntity(virtual_entity)) => virtual_entity.run(),

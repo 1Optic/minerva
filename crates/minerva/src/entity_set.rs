@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,8 +7,10 @@ use tokio_postgres::{Client, Transaction};
 
 use async_trait::async_trait;
 
+use crate::change::Changed;
+
 use super::change::{Change, ChangeResult};
-use super::error::{DatabaseError, DatabaseErrorKind, Error, RuntimeError};
+use super::error::{DatabaseError, Error, RuntimeError};
 
 type PostgresName = String;
 
@@ -53,10 +55,7 @@ impl From<DatabaseError> for EntitySetError {
 
 impl From<String> for EntitySetError {
     fn from(e: String) -> EntitySetError {
-        EntitySetError::DatabaseError(DatabaseError {
-            msg: e,
-            kind: DatabaseErrorKind::Default,
-        })
+        EntitySetError::DatabaseError(DatabaseError::Default(e))
     }
 }
 
@@ -280,13 +279,12 @@ impl Change for ChangeEntitySet {
 
         self.entity_set.update(&mut tx).await.map_err(|e| match e {
             EntitySetError::DatabaseError(err) => Error::Database(err),
-            EntitySetError::ExistingEntitySet(name, owner) => Error::Database(DatabaseError {
-                msg: format!(
+            EntitySetError::ExistingEntitySet(name, owner) => {
+                Error::Database(DatabaseError::UniqueViolation(format!(
                     "An entity set with name {} and owner {} already exists.",
                     &name, &owner,
-                ),
-                kind: DatabaseErrorKind::UniqueViolation,
-            }),
+                )))
+            }
             EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
                 "Entity sets cannot be empty".to_string(),
             )),
@@ -296,15 +294,35 @@ impl Change for ChangeEntitySet {
                     missing_entities.join(", ")
                 )))
             }
-            _ => Error::Database(DatabaseError {
-                msg: "Unexpected Error".to_string(),
-                kind: DatabaseErrorKind::Default,
-            }),
+            _ => Error::Database(DatabaseError::Default("Unexpected Error".to_string())),
         })?;
 
         tx.commit().await?;
 
-        Ok("Entity set updated".to_string())
+        Ok(Box::new(ChangedEntitySet {
+            owner: self.entity_set.owner.clone(),
+            name: self.entity_set.name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ChangedEntitySet {
+    pub owner: String,
+    pub name: String,
+}
+
+impl Display for ChangedEntitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Entity set '{}'.'{}' updated", &self.owner, &self.name)
+    }
+}
+
+#[typetag::serde]
+impl Changed for ChangedEntitySet {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -363,7 +381,7 @@ impl NewEntitySet {
                 "SELECT entity_id, first_appearance, modified FROM attribute.minerva_entity_set es WHERE name = $1 AND owner = $2",
                     &[&self.name, &self.owner,])
                 .await
-                .map_err(|e| EntitySetError::DatabaseError(DatabaseError{msg: e.to_string(), kind: DatabaseErrorKind::Default}))?;
+                .map_err(|e| DatabaseError::Default(e.to_string()))?;
             let created_entity_set = EntitySet {
                 id: iddata.get(0),
                 name: self.name.clone(),
@@ -406,13 +424,12 @@ impl Change for CreateEntitySet {
 
         let entity_set = self.entity_set.create(&mut tx).await.map_err(|e| match e {
             EntitySetError::DatabaseError(err) => Error::Database(err),
-            EntitySetError::ExistingEntitySet(name, owner) => Error::Database(DatabaseError {
-                msg: format!(
+            EntitySetError::ExistingEntitySet(name, owner) => {
+                Error::Database(DatabaseError::UniqueViolation(format!(
                     "An entity set with name {} and owner {} already exists.",
                     &name, &owner,
-                ),
-                kind: DatabaseErrorKind::UniqueViolation,
-            }),
+                )))
+            }
             EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
                 "Entity sets cannot be empty".to_string(),
             )),
@@ -430,6 +447,33 @@ impl Change for CreateEntitySet {
 
         tx.commit().await?;
 
-        Ok(format!("Entity set number {} created", &entity_set.id))
+        Ok(Box::new(CreatedEntitySet {
+            owner: entity_set.owner.clone(),
+            name: entity_set.name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct CreatedEntitySet {
+    pub name: String,
+    pub owner: String,
+}
+
+impl Display for CreatedEntitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Entity set number '{}':'{}' created",
+            &self.owner, &self.name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for CreatedEntitySet {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }

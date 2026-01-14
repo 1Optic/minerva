@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 use minerva::entity_set::{
     load_entity_set, load_entity_sets, EntitySet, EntitySetError, NewEntitySet,
 };
-use minerva::error::DatabaseError;
 
 use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};
 use crate::error::{CreationSuccess, Error, Success};
@@ -139,7 +138,7 @@ async fn change_entity_set_fn(
                 message: "Entity set updated".into(),
             }))
         }
-        Err(EntitySetError::NotFound(DatabaseError { msg: e, kind: _ })) => {
+        Err(EntitySetError::NotFound(e)) => {
             let mut messages = Map::new();
             messages.insert(
                 "id".to_string(),
@@ -155,7 +154,7 @@ async fn change_entity_set_fn(
             }
             Ok(HttpResponse::Conflict().json(messages))
         }
-        Err(EntitySetError::DatabaseError(DatabaseError { msg: e, kind: _ })) => {
+        Err(EntitySetError::DatabaseError(e)) => {
             let mut messages = Map::new();
             messages.insert("general".to_string(), e.to_string().into());
             Ok(HttpResponse::InternalServerError().json(messages))
@@ -244,7 +243,7 @@ async fn create_entity_set_fn(
                 id: Some(entity_set.id),
             }))
         }
-        Err(EntitySetError::DatabaseError(DatabaseError { msg: e, kind: _ })) => {
+        Err(EntitySetError::DatabaseError(e)) => {
             let mut messages = Map::new();
             messages.insert("general".to_string(), e.to_string().into());
             Ok(HttpResponse::InternalServerError().json(messages))

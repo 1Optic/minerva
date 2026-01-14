@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use minerva::trend_materialization::load_materializations;
+use minerva::{error::RuntimeError, trend_materialization::load_materializations};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -14,7 +14,9 @@ impl TrendMaterializationDump {
     async fn dump(&self) -> CmdResult {
         let mut client = connect_db().await?;
 
-        let materializations = load_materializations(&mut client).await?;
+        let materializations = load_materializations(&mut client)
+            .await
+            .map_err(|e| RuntimeError::from_msg(format!("Could not load materializations: {e}")))?;
 
         for materialization in materializations {
             let materialization_name = materialization.name();

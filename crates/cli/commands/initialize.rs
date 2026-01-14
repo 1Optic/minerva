@@ -6,7 +6,7 @@ use clap::Parser;
 
 use minerva::database::{create_database, ClusterConfig};
 use minerva::error::{ConfigurationError, Error};
-use minerva::instance::MinervaInstance;
+use minerva::instance::initialize_from;
 use minerva::schema::create_schema;
 use minerva::trend_store::create_partitions;
 
@@ -110,9 +110,7 @@ impl InitializeOpt {
             self.instance_root.to_string_lossy(),
         )];
 
-        MinervaInstance::load_from(&self.instance_root)?
-            .initialize(&mut client, env.as_slice())
-            .await?;
+        initialize_from(&self.instance_root, &mut client, env.as_slice()).await?;
 
         if self.create_partitions {
             create_partitions(&mut client, None).await?;

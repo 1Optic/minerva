@@ -11,7 +11,6 @@ use serde_json::Map;
 use utoipa::ToSchema;
 
 use minerva::change::Change;
-use minerva::error::DatabaseError;
 use minerva::trigger::{
     list_triggers, load_thresholds_with_client, load_trigger, set_enabled, set_thresholds,
     AddTrigger, DeleteTrigger, Threshold, TriggerError,
@@ -250,9 +249,9 @@ async fn change_thresholds_fn(
     let result = load_trigger(&mut transaction, &data.name).await;
 
     match result {
-        Err(TriggerError::DatabaseError(DatabaseError { msg, kind: _ })) => {
+        Err(TriggerError::DatabaseError(e)) => {
             let mut messages = Map::new();
-            messages.insert("general".to_string(), msg.into());
+            messages.insert("general".to_string(), e.to_string().into());
             Ok(HttpResponse::InternalServerError().json(messages))
         }
         Err(TriggerError::NotFound(_)) => {
@@ -477,12 +476,15 @@ async fn delete_trigger_by_name(
         trigger_name: trigger_name.clone(),
     };
 
-    let message = delete_change
+    let changed = delete_change
         .apply(client)
         .await
         .map_err(ExtendedServiceError::from)?;
 
-    Ok(HttpResponse::Ok().json(Success { code: 200, message }))
+    Ok(HttpResponse::Ok().json(Success {
+        code: 200,
+        message: changed.to_string(),
+    }))
 }
 
 #[utoipa::path(
@@ -537,7 +539,7 @@ pub(super) async fn get_templates(pool: Data<Pool>) -> impl Responder {
                 ),
                 Err(TriggerTemplateError::DatabaseError(e)) => {
                     let mut messages = Map::new();
-                    messages.insert("general".to_string(), e.msg.into());
+                    messages.insert("general".to_string(), e.to_string().into());
                     HttpResponse::InternalServerError().json(messages)
                 }
                 Err(_) => {
@@ -577,7 +579,7 @@ pub(super) async fn get_template(pool: Data<Pool>, id: Path<i32>) -> impl Respon
                 Ok(template) => HttpResponse::Ok().json(TemplateData::from(template)),
                 Err(TriggerTemplateError::DatabaseError(e)) => {
                     let mut messages = Map::new();
-                    messages.insert("general".to_string(), e.msg.into());
+                    messages.insert("general".to_string(), e.to_string().into());
                     HttpResponse::InternalServerError().json(messages)
                 }
                 Err(TriggerTemplateError::NoTemplate(back_id)) => {
@@ -632,7 +634,7 @@ async fn create_trigger_fn(
             }
             TriggerTemplateError::DatabaseError(e) => {
                 let mut messages = Map::new();
-                messages.insert("general".to_string(), e.msg.into());
+                messages.insert("general".to_string(), e.to_string().into());
                 ExtendedServiceError {
                     kind: ServiceErrorKind::InternalError,
                     messages,
@@ -721,7 +723,7 @@ async fn create_trigger_fn(
             }
             TriggerTemplateError::DatabaseError(e2) => {
                 let mut messages = Map::new();
-                messages.insert("general".to_string(), e2.msg.into());
+                messages.insert("general".to_string(), e2.to_string().into());
                 ExtendedServiceError {
                     kind: ServiceErrorKind::InternalError,
                     messages,
@@ -729,7 +731,7 @@ async fn create_trigger_fn(
             }
             TriggerTemplateError::TriggerError(TriggerError::DatabaseError(e2)) => {
                 let mut messages = Map::new();
-                messages.insert("general".to_string(), e2.msg.into());
+                messages.insert("general".to_string(), e2.to_string().into());
                 ExtendedServiceError {
                     kind: ServiceErrorKind::InternalError,
                     messages,
@@ -786,13 +788,14 @@ async fn create_trigger_fn(
         verify: false,
     };
 
-    let message = change.apply(client).await?;
-
-    debug!("Returned message {message}");
+    let changed = change.apply(client).await?;
 
     trace!("Transaction committed");
 
-    Ok(HttpResponse::Ok().json(Success { code: 200, message }))
+    Ok(HttpResponse::Ok().json(Success {
+        code: 200,
+        message: changed.to_string(),
+    }))
 }
 
 // curl -H "Content-Type: application/json" -X POST -d '{"name": "high_downtime", "description": "downtime higher than maximum", "thresholds": [{"name": "max_downtime", "data_type": "numeric", "value": "50"}], "entity_type": "v-cell", "granularity": "15m", "weight": 100, "enabled": true, "template_instance": {"template_id": 1, "parameters": [{"parameter": "counter", "value": "L.Cell.Unavail.Dur.Sys"}, {"parameter": "comparison", "value": ">"}, {"parameter": "value", "value": "max_downtime"}]}}' localhost:8000/triggers

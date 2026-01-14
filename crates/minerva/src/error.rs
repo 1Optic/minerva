@@ -4,42 +4,48 @@ use tokio_postgres::{self, error::SqlState};
 
 use crate::entity::EntityMappingError;
 
-#[derive(Debug)]
-pub enum DatabaseErrorKind {
-    Default,
-    UniqueViolation,
-}
-
-#[derive(Debug)]
-pub struct DatabaseError {
-    pub msg: String,
-    pub kind: DatabaseErrorKind,
-}
-
-fn map_error_kind(sql_state: &SqlState) -> DatabaseErrorKind {
-    match sql_state {
-        &SqlState::UNIQUE_VIOLATION => DatabaseErrorKind::UniqueViolation,
-        _ => DatabaseErrorKind::Default,
-    }
+#[derive(thiserror::Error, Debug)]
+pub enum DatabaseError {
+    #[error("0")]
+    Default(String),
+    #[error("0")]
+    UniqueViolation(String),
 }
 
 impl DatabaseError {
     #[must_use]
     pub fn from_msg(msg: String) -> DatabaseError {
-        DatabaseError {
-            msg,
-            kind: DatabaseErrorKind::Default,
-        }
+        DatabaseError::Default(msg)
+    }
+
+    pub fn from_postgres_error(msg: &str, e: tokio_postgres::Error) -> DatabaseError {
+        DatabaseError::Default(format!("{msg}: {}", postgres_error_to_string(e)))
+    }
+}
+
+pub fn postgres_error_to_string(error: tokio_postgres::Error) -> String {
+    match error.as_db_error() {
+        Some(db_error) => match db_error.detail() {
+            Some(detail) => format!("{}: {}", db_error.message(), detail),
+            None => db_error.message().to_string(),
+        },
+        None => error.to_string(),
     }
 }
 
 impl From<tokio_postgres::Error> for DatabaseError {
     fn from(err: tokio_postgres::Error) -> DatabaseError {
-        DatabaseError {
-            msg: format!("{err}"),
-            kind: err
-                .code()
-                .map_or(DatabaseErrorKind::Default, map_error_kind),
+        let error_msg = match err.as_db_error() {
+            Some(db_error) => match db_error.detail() {
+                Some(detail) => format!("{}: {}", db_error.message(), detail),
+                None => db_error.message().to_string(),
+            },
+            None => err.to_string(),
+        };
+
+        match err.code() {
+            Some(&SqlState::UNIQUE_VIOLATION) => DatabaseError::UniqueViolation(error_msg),
+            _ => DatabaseError::Default(error_msg),
         }
     }
 }
@@ -102,7 +108,7 @@ impl std::error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Database(e) => write!(f, "{}", &e.msg),
+            Error::Database(e) => write!(f, "{}", &e),
             Error::Configuration(e) => write!(f, "{}", &e.msg),
             Error::Runtime(e) => write!(f, "{}", &e.msg),
         }

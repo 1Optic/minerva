@@ -584,6 +584,8 @@ enum StoreCopyFromError {
     UniqueViolation(String),
     #[error("Could not write package for COPY command: {0}")]
     Write(DataPackageWriteError),
+    #[error("Could not load trend store part: {0}")]
+    LoadTrendStorePart(#[from] LoadTrendStorePartError),
     #[error("{0}")]
     Generic(String),
 }
@@ -983,7 +985,7 @@ impl TrendStorePart {
     ) -> Result<Vec<String>, StoreCopyFromError> {
         let mut mismatches: Vec<String> = Vec::new();
 
-        let trend_store_part = load_trend_store_part(client, &self.name).await;
+        let trend_store_part = load_trend_store_part(client, &self.name).await?;
 
         for trend_name in trends {
             let own_trend_result = self.trends.iter().find(|t| t.name.eq(trend_name)).unwrap();
@@ -1293,7 +1295,7 @@ impl TrendStorePart {
 
         if self.has_alias_column && !other.has_alias_column && !options.ignore_deletions {
             changes.push(Box::new(RemoveAliasColumn {
-                trend_store_part: self.clone(),
+                trend_store_part_name: self.name.clone(),
             }))
         }
 
@@ -1351,7 +1353,7 @@ impl TrendStoreDiffOptions {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TrendStoreRef {
     pub data_source: String,
     pub entity_type: String,
@@ -1537,9 +1539,7 @@ pub async fn get_trend_store_id<T: GenericClient>(
 
 pub async fn load_trend_store<T: GenericClient>(
     conn: &T,
-    data_source: &str,
-    entity_type: &str,
-    granularity: &Duration,
+    trend_store_ref: &TrendStoreRef,
 ) -> Result<TrendStore, Error> {
     let query = concat!(
         "SELECT trend_store.id, partition_size::text, retention_period::text ",
@@ -1549,36 +1549,94 @@ pub async fn load_trend_store<T: GenericClient>(
         "WHERE data_source.name = $1 AND entity_type.name = $2 AND granularity = $3::text::interval"
     );
 
-    let granularity_str: String = format_duration(*granularity).to_string();
+    let granularity_str: String = format_duration(trend_store_ref.granularity).to_string();
 
-    let result = conn
-        .query_one(query, &[&data_source, &entity_type, &granularity_str])
+    let rows = conn
+        .query(
+            query,
+            &[
+                &trend_store_ref.data_source,
+                &trend_store_ref.entity_type,
+                &granularity_str,
+            ],
+        )
         .await?;
 
-    let parts = load_trend_store_parts(conn, result.get::<usize, i32>(0)).await;
+    if rows.is_empty() {
+        return Err(Error::Runtime(RuntimeError::from_msg(format!(
+            "No such trend store: {}",
+            trend_store_ref
+        ))));
+    }
 
-    let partition_size_str = result.get::<usize, String>(1);
+    let row = rows.first().unwrap();
+
+    let parts = load_trend_store_parts(conn, row.get::<usize, i32>(0)).await;
+
+    let partition_size_str = row.get::<usize, String>(1);
     let partition_size = parse_interval(&partition_size_str).unwrap();
-    let retention_period_str = result.get::<usize, String>(2);
+    let retention_period_str = row.get::<usize, String>(2);
     let retention_period = parse_interval(&retention_period_str).unwrap();
 
     Ok(TrendStore {
         title: None,
-        data_source: String::from(data_source),
-        entity_type: String::from(entity_type),
-        granularity: *granularity,
+        data_source: trend_store_ref.data_source.clone(),
+        entity_type: trend_store_ref.entity_type.clone(),
+        granularity: trend_store_ref.granularity,
         partition_size,
         retention_period,
         parts,
     })
 }
 
-async fn load_trend_store_part<T: GenericClient>(conn: &T, name: &str) -> TrendStorePart {
+pub async fn load_trend_store_ref_for_part<T: GenericClient>(
+    conn: &T,
+    name: &str,
+) -> Result<TrendStoreRef, String> {
+    let query = concat!(
+        "SELECT ds.name, et.name, ts.granularity::text ",
+        "FROM trend_directory.trend_store_part tsp ",
+        "JOIN trend_directory.trend_store ts ON ts.id = tsp.trend_store_id ",
+        "JOIN directory.data_source ds ON ds.id = ts.data_source_id ",
+        "JOIN directory.entity_type et ON et.id = ts.entity_type_id ",
+        "WHERE tsp.name = $1"
+    );
+
+    let row = conn.query_one(query, &[&name]).await.unwrap();
+
+    let granularity_str: String = row.get(2);
+
+    let granularity = parse_interval(&granularity_str)
+        .map_err(|e| format!("Error parsing granularity '{}': {}", &granularity_str, e))?;
+
+    Ok(TrendStoreRef {
+        data_source: row.get(0),
+        entity_type: row.get(1),
+        granularity,
+    })
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum LoadTrendStorePartError {
+    #[error("No such trend store part '{0}'")]
+    NoSuchTrendStorePart(String),
+    #[error("Database error: {0}")]
+    Unepected(#[from] tokio_postgres::error::Error),
+}
+
+pub async fn load_trend_store_part<T: GenericClient>(
+    conn: &T,
+    name: &str,
+) -> Result<TrendStorePart, LoadTrendStorePartError> {
     let trend_store_part_query = "SELECT id FROM trend_directory.trend_store_part WHERE name = $1";
 
-    let trend_store_part_result = conn.query(trend_store_part_query, &[&name]).await.unwrap();
+    let rows = conn.query(trend_store_part_query, &[&name]).await?;
 
-    let trend_store_part_row = trend_store_part_result.first().unwrap();
+    let trend_store_part_row =
+        rows.first()
+            .ok_or(LoadTrendStorePartError::NoSuchTrendStorePart(
+                name.to_string(),
+            ))?;
 
     let trend_store_part_id: i32 = trend_store_part_row.get(0);
 
@@ -1588,10 +1646,7 @@ async fn load_trend_store_part<T: GenericClient>(conn: &T, name: &str) -> TrendS
         "WHERE trend_store_part_id = $1",
     );
 
-    let trend_result = conn
-        .query(trend_query, &[&trend_store_part_id])
-        .await
-        .unwrap();
+    let trend_result = conn.query(trend_query, &[&trend_store_part_id]).await?;
 
     let mut trends = Vec::new();
 
@@ -1613,12 +1668,12 @@ async fn load_trend_store_part<T: GenericClient>(conn: &T, name: &str) -> TrendS
         });
     }
 
-    TrendStorePart {
+    Ok(TrendStorePart {
         name: String::from(name),
         trends,
         generated_trends: Vec::new(),
         has_alias_column: false,
-    }
+    })
 }
 
 async fn load_trend_store_parts<T: GenericClient>(

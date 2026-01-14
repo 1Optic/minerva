@@ -48,6 +48,7 @@ pub fn generate_all_standard_aggregations(
                 // For now, we determine the raw data trend stores based on the title, but this
                 // should be done based on the fact that there is no materialization as source.
                 generate_standard_aggregations(
+                    instance_root,
                     &mut instance,
                     &config,
                     trend_store,
@@ -61,6 +62,7 @@ pub fn generate_all_standard_aggregations(
 }
 
 fn generate_standard_aggregations(
+    instance_root: &Path,
     minerva_instance: &mut MinervaInstance,
     instance_config: &InstanceConfig,
     trend_store: TrendStore,
@@ -90,6 +92,7 @@ fn generate_standard_aggregations(
 
     for (relation, target_type) in &entity_relations {
         build_entity_aggregation(
+            instance_root,
             minerva_instance,
             instance_config,
             &trend_store,
@@ -142,6 +145,7 @@ fn generate_standard_aggregations(
 
     for (source_granularity, target_granularity) in aggregations {
         let target_trend_store = build_time_aggregation(
+            instance_root,
             minerva_instance,
             instance_config,
             &trend_store,
@@ -156,6 +160,7 @@ fn generate_standard_aggregations(
 
         for (relation, target_type) in &entity_relations {
             build_entity_aggregation(
+                instance_root,
                 minerva_instance,
                 instance_config,
                 &target_trend_store,
@@ -171,6 +176,7 @@ fn generate_standard_aggregations(
 }
 
 fn build_time_aggregation(
+    instance_root: &Path,
     minerva_instance: &MinervaInstance,
     instance_config: &InstanceConfig,
     trend_store: &TrendStore,
@@ -180,21 +186,28 @@ fn build_time_aggregation(
     let time_aggregation =
         generate_time_aggregation(trend_store, source_granularity, target_granularity)?;
 
-    compile_time_aggregation(minerva_instance, instance_config, &time_aggregation)
+    compile_time_aggregation(
+        instance_root,
+        minerva_instance,
+        instance_config,
+        &time_aggregation,
+    )
 }
 
 fn compile_time_aggregation(
+    instance_root: &Path,
     minerva_instance: &MinervaInstance,
     instance_config: &InstanceConfig,
     aggregation: &TimeAggregation,
 ) -> Result<TrendStore, String> {
-    let target_trend_store =
-        write_time_aggregations(minerva_instance, instance_config, aggregation)?;
-
-    save_trend_store(
-        &minerva_instance.instance_root.clone().unwrap(),
-        &target_trend_store,
+    let target_trend_store = write_time_aggregations(
+        instance_root,
+        minerva_instance,
+        instance_config,
+        aggregation,
     )?;
+
+    save_trend_store(instance_root, &target_trend_store)?;
 
     Ok(target_trend_store)
 }
@@ -242,6 +255,7 @@ fn trend_store_name(trend_store: &TrendStore) -> Result<String, String> {
 }
 
 fn write_time_aggregations(
+    instance_root: &Path,
     minerva_instance: &MinervaInstance,
     instance_config: &InstanceConfig,
     aggregation: &TimeAggregation,
@@ -272,7 +286,7 @@ fn write_time_aggregations(
             ))?;
 
         let materialization_file_path: PathBuf = [
-            minerva_instance.instance_root.clone().unwrap(),
+            instance_root.into(),
             PathBuf::from("materialization"),
             PathBuf::from(format!("{}.yaml", agg_part.name)),
         ]
@@ -578,6 +592,7 @@ fn translate_time_aggregation_part_name(
 }
 
 fn build_entity_aggregation(
+    instance_root: &Path,
     minerva_instance: &mut MinervaInstance,
     instance_config: &InstanceConfig,
     trend_store: &TrendStore,
@@ -618,7 +633,12 @@ fn build_entity_aggregation(
         aggregation_file_path,
     };
 
-    compile_entity_aggregation(minerva_instance, instance_config, &aggregation_context)?;
+    compile_entity_aggregation(
+        instance_root,
+        minerva_instance,
+        instance_config,
+        &aggregation_context,
+    )?;
 
     Ok(())
 }
@@ -692,6 +712,7 @@ fn generate_entity_aggregation(
 }
 
 fn compile_entity_aggregation(
+    instance_root: &Path,
     minerva_instance: &mut MinervaInstance,
     instance_config: &InstanceConfig,
     aggregation_context: &AggregationContext,
@@ -703,11 +724,11 @@ fn compile_entity_aggregation(
                 aggregation_context.aggregation_file_path.to_string_lossy()
             );
             write_function_entity_aggregations(
-                minerva_instance,
+                instance_root,
                 instance_config,
                 aggregation_context,
             )?;
-            add_to_aggregate_trend_store(minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
+            add_to_aggregate_trend_store(instance_root, minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
         }
         AggregationType::View => {
             generate_view_entity_aggregation(minerva_instance, aggregation_context)
@@ -723,6 +744,7 @@ fn compile_entity_aggregation(
 }
 
 fn add_to_aggregate_trend_store(
+    instance_root: &Path,
     minerva_instance: &mut MinervaInstance,
     aggregation_context: &AggregationContext,
 ) -> Result<(), String> {
@@ -759,15 +781,9 @@ fn add_to_aggregate_trend_store(
             existing_trend_store.parts.push(part);
         }
 
-        save_trend_store(
-            &minerva_instance.instance_root.clone().unwrap(),
-            existing_trend_store,
-        )?;
+        save_trend_store(instance_root, existing_trend_store)?;
     } else {
-        save_trend_store(
-            &minerva_instance.instance_root.clone().unwrap(),
-            &aggregate_trend_store,
-        )?;
+        save_trend_store(instance_root, &aggregate_trend_store)?;
 
         minerva_instance.trend_stores.push(aggregate_trend_store);
     }
@@ -845,7 +861,7 @@ fn define_entity_aggregate_trend(trend: &Trend) -> Trend {
 }
 
 fn write_function_entity_aggregations(
-    minerva_instance: &MinervaInstance,
+    instance_root: &Path,
     instance_config: &InstanceConfig,
     aggregation_context: &AggregationContext,
 ) -> Result<(), String> {
@@ -870,7 +886,7 @@ fn write_function_entity_aggregations(
         );
 
         let file_path: PathBuf = [
-            minerva_instance.instance_root.clone().unwrap(),
+            instance_root.into(),
             PathBuf::from("materialization"),
             PathBuf::from(format!("{}.yaml", aggregation.name())),
         ]

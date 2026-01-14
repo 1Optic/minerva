@@ -14,15 +14,18 @@ use std::fmt::{self, Display};
 use thiserror::Error;
 use tokio_postgres::{Client, GenericClient};
 
-use crate::change::{Change, ChangeResult, InformationOption, MinervaObjectRef};
-use crate::error::DatabaseError;
+use crate::change::{Change, ChangeResult, Changed, InformationOption, MinervaObjectRef};
+use crate::error::{DatabaseError, RuntimeError};
 use crate::interval::parse_interval;
 use crate::meas_value::DataType;
 use crate::trend_store::create::{
     create_trend_store, create_trend_store_part, remove_trend_store_part,
 };
 use crate::trend_store::remove::remove_trend_store;
-use crate::trend_store::{get_trend_store_id, Trend, TrendStore, TrendStorePart, TrendStoreRef};
+use crate::trend_store::{
+    get_trend_store_id, load_trend_store, load_trend_store_part, load_trend_store_ref_for_part,
+    Trend, TrendStore, TrendStorePart, TrendStoreRef,
+};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -146,11 +149,10 @@ impl Change for StageTrendsForDeletion {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Staged {} trends for deletion in trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
-        ))
+        Ok(Box::new(TrendsStagedForDeletion {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends: self.trends.clone(),
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -161,7 +163,104 @@ impl Change for StageTrendsForDeletion {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct TrendsStagedForDeletion {
+    pub trend_store_part_name: String,
+    pub trends: Vec<String>,
+}
+
+impl Display for TrendsStagedForDeletion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Staged {} trends for deletion in trend store part '{}'",
+            &self.trends.len(),
+            &self.trend_store_part_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for TrendsStagedForDeletion {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RestoreTrendsStagedForDeletion {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends: self.trends.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct RestoreTrendsStagedForDeletion {
+    pub trend_store_part_name: String,
+    pub trends: Vec<String>,
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for RestoreTrendsStagedForDeletion {
+    async fn apply(&self, _client: &mut Client) -> ChangeResult {
+        Err(crate::error::Error::Runtime(RuntimeError {
+            msg: "Not implemented".to_string(),
+        }))
+    }
+}
+
+impl Display for RestoreTrendsStagedForDeletion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Staged {} trends for deletion in trend store part '{}'",
+            &self.trends.len(),
+            &self.trend_store_part_name
+        )
+    }
+}
+
 /////////////// RemoveTrends ////////////
+
+async fn load_trend<T: GenericClient>(
+    client: &mut T,
+    trend_store_part_name: &str,
+    trend_name: &str,
+) -> Result<Trend, String> {
+    let trend_query = concat!(
+        "SELECT tt.name, tt.data_type, tt.description, tt.entity_aggregation, tt.time_aggregation, tt.extra_data ",
+        "FROM trend_directory.table_trend tt ",
+        "JOIN trend_directory.trend_store_part tsp ON tsp.id = tt.trend_store_part_id ",
+        "WHERE tsp.name = $1 AND tt.name = $2",
+    );
+
+    let rows = client
+        .query(trend_query, &[&trend_store_part_name, &trend_name])
+        .await
+        .unwrap();
+
+    if rows.is_empty() {
+        return Err("No such trend".to_string());
+    }
+
+    let trend_row = rows.first().unwrap();
+
+    let trend_name: &str = trend_row.get(0);
+    let trend_data_type: &str = trend_row.get(1);
+    let trend_description: &str = trend_row.get(2);
+    let trend_entity_aggregation: &str = trend_row.get(3);
+    let trend_time_aggregation: &str = trend_row.get(4);
+    let trend_extra_data: Value = trend_row.get(5);
+
+    let trend = Trend {
+        name: String::from(trend_name),
+        data_type: DataType::from(trend_data_type),
+        description: String::from(trend_description),
+        entity_aggregation: String::from(trend_entity_aggregation),
+        time_aggregation: String::from(trend_time_aggregation),
+        extra_data: trend_extra_data,
+    };
+
+    Ok(trend)
+}
 
 #[derive(Error, Debug)]
 enum TrendRemoveError {
@@ -284,9 +383,21 @@ impl fmt::Debug for RemoveTrends {
 #[typetag::serde]
 impl Change for RemoveTrends {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut trends: Vec<Trend> = Vec::new();
         let mut tx = client.transaction().await?;
 
         for trend_name in &self.trends {
+            let trend: Trend = load_trend(&mut tx, &self.trend_store_part_name, trend_name)
+                .await
+                .map_err(|e| {
+                    DatabaseError::from_msg(format!(
+                        "Could not load trend '{}' definition from the database: {}",
+                        &trend_name, e
+                    ))
+                })?;
+
+            trends.push(trend);
+
             let remove = TrendRemove {
                 trend_store_part_name: self.trend_store_part_name.clone(),
                 trend_name: trend_name.clone(),
@@ -302,11 +413,10 @@ impl Change for RemoveTrends {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Removed {} trends from trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
-        ))
+        Ok(Box::new(RemovedTrends {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends,
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -314,6 +424,34 @@ impl Change for RemoveTrends {
             trend_store_part_name: self.trend_store_part_name.clone(),
             trend_names: self.trends.to_vec(),
         })]
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct RemovedTrends {
+    pub trend_store_part_name: String,
+    pub trends: Vec<Trend>,
+}
+
+impl Display for RemovedTrends {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Removed {} trends from trend store part '{}'",
+            &self.trends.len(),
+            &self.trend_store_part_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedTrends {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddTrends {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends: self.trends.clone(),
+        }))
     }
 }
 
@@ -375,11 +513,38 @@ impl Change for AddTrends {
 
         tx.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(AddedTrends {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends: self.trends.iter().map(|t| t.name.clone()).collect(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+struct AddedTrends {
+    pub trend_store_part_name: String,
+    pub trends: Vec<String>,
+}
+
+impl Display for AddedTrends {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Added {} trends to trend store part '{}'",
             &self.trends.len(),
             &self.trend_store_part_name
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedTrends {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveTrends {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trends: self.trends.clone(),
+        }))
     }
 }
 
@@ -496,22 +661,46 @@ impl Change for AddAliasColumn {
 
         tx.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(AddedAliasColumn {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedAliasColumn {
+    pub trend_store_part_name: String,
+}
+
+impl Display for AddedAliasColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Added alias column to trend store part '{}'",
             &self.trend_store_part_name
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedAliasColumn {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveAliasColumn {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+        }))
     }
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct RemoveAliasColumn {
-    pub trend_store_part: TrendStorePart,
+    pub trend_store_part_name: String,
 }
 
 impl fmt::Display for RemoveAliasColumn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "RemoveAlias({}):", &self.trend_store_part)?;
+        writeln!(f, "RemoveAlias({}):", &self.trend_store_part_name)?;
 
         Ok(())
     }
@@ -537,7 +726,7 @@ impl Change for RemoveAliasColumn {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
-        remove_alias_column(&mut tx, &self.trend_store_part.name)
+        remove_alias_column(&mut tx, &self.trend_store_part_name)
             .await
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
@@ -547,10 +736,34 @@ impl Change for RemoveAliasColumn {
 
         tx.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(RemovedAliasColumn {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedAliasColumn {
+    pub trend_store_part_name: String,
+}
+
+impl Display for RemovedAliasColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Removed alias column to trend store part '{}'",
-            &self.trend_store_part.name
-        ))
+            &self.trend_store_part_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedAliasColumn {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddAliasColumn {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+        }))
     }
 }
 
@@ -711,10 +924,11 @@ impl Change for ModifyTrendDataTypes {
             return Err(DatabaseError::from_msg(format!("Error committing changes: {e}")).into());
         }
 
-        Ok(format!(
-            "Altered trend data types for trend store part '{}'",
-            &self.trend_store_part_name
-        ))
+        Ok(Box::new(ModifiedTrendDataTypes {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            modifications: self.modifications.clone(),
+            total_trend_count: self.total_trend_count,
+        }))
     }
 
     fn existing_object(&self) -> Option<MinervaObjectRef> {
@@ -728,6 +942,43 @@ impl Change for ModifyTrendDataTypes {
             trend_store_part_name: self.trend_store_part_name.clone(),
             trend_changes: self.modifications.clone(),
         })]
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ModifiedTrendDataTypes {
+    pub trend_store_part_name: String,
+    pub modifications: Vec<ModifyTrendDataType>,
+    pub total_trend_count: usize,
+}
+
+impl Display for ModifiedTrendDataTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Altered trend data types for trend store part '{}'",
+            &self.trend_store_part_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for ModifiedTrendDataTypes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(ModifyTrendDataTypes {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            modifications: self
+                .modifications
+                .iter()
+                .map(|m| ModifyTrendDataType {
+                    trend_name: m.trend_name.clone(),
+                    from_type: m.to_type,
+                    to_type: m.from_type,
+                })
+                .collect(),
+            total_trend_count: self.total_trend_count,
+        }))
     }
 }
 
@@ -936,7 +1187,10 @@ impl fmt::Display for ModifyTrendExtraData {
 #[typetag::serde]
 impl Change for ModifyTrendExtraData {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
-        let tx = client.transaction().await?;
+        let mut tx = client.transaction().await?;
+
+        let original_trend =
+            load_trend(&mut tx, &self.trend_store_part_name, &self.trend_name).await?;
 
         let query = concat!(
             "UPDATE trend_directory.table_trend tt ",
@@ -958,10 +1212,12 @@ impl Change for ModifyTrendExtraData {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Altered extra_data for trend '{}'.'{}'",
-            &self.trend_store_part_name, &self.trend_name,
-        ))
+        Ok(Box::new(ModifiedTrendExtraData {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trend_name: self.trend_name.clone(),
+            from_extra_data: original_trend.extra_data.clone(),
+            to_extra_data: self.to_extra_data.clone(),
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -969,6 +1225,37 @@ impl Change for ModifyTrendExtraData {
             from_extra_data: self.from_extra_data.clone(),
             to_extra_data: self.to_extra_data.clone(),
         })]
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ModifiedTrendExtraData {
+    pub trend_store_part_name: String,
+    pub trend_name: String,
+    pub from_extra_data: Value,
+    pub to_extra_data: Value,
+}
+
+impl Display for ModifiedTrendExtraData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Altered extra_data for trend '{}'.'{}'",
+            &self.trend_store_part_name, &self.trend_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for ModifiedTrendExtraData {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(ModifyTrendExtraData {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+            trend_name: self.trend_name.clone(),
+            from_extra_data: self.to_extra_data.clone(),
+            to_extra_data: self.from_extra_data.clone(),
+        }))
     }
 }
 
@@ -1011,6 +1298,16 @@ async fn define_table_trends<T: GenericClient>(
     Ok(())
 }
 
+impl fmt::Display for AddTrendStorePart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AddTrendStorePart({}, {})",
+            &self.trend_store, &self.trend_store_part
+        )
+    }
+}
+
 #[async_trait]
 #[typetag::serde]
 impl Change for AddTrendStorePart {
@@ -1036,20 +1333,36 @@ impl Change for AddTrendStorePart {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Added trend store part '{}' to trend store '{}'",
-            &self.trend_store_part.name, &self.trend_store
-        ))
+        Ok(Box::new(AddedTrendStorePart {
+            trend_store: self.trend_store.clone(),
+            trend_store_part_name: self.trend_store_part.name.clone(),
+        }))
     }
 }
 
-impl fmt::Display for AddTrendStorePart {
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedTrendStorePart {
+    pub trend_store: TrendStoreRef,
+    pub trend_store_part_name: String,
+}
+
+impl Display for AddedTrendStorePart {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AddTrendStorePart({}, {})",
-            &self.trend_store, &self.trend_store_part
+            "Added trend store part '{}' to trend store '{}'",
+            &self.trend_store_part_name, &self.trend_store
         )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedTrendStorePart {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveTrendStorePart {
+            name: self.trend_store_part_name.clone(),
+        }))
     }
 }
 
@@ -1059,11 +1372,24 @@ pub struct RemoveTrendStorePart {
     pub name: String,
 }
 
+impl fmt::Display for RemoveTrendStorePart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoveTrendStorePart({})", &self.name)
+    }
+}
+
 #[async_trait]
 #[typetag::serde]
 impl Change for RemoveTrendStorePart {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
+
+        let trend_store_part = load_trend_store_part(&tx, &self.name)
+            .await
+            .map_err(|e| RuntimeError::from_msg(format!("{e}")))?;
+        let trend_store_ref = load_trend_store_ref_for_part(&tx, &self.name)
+            .await
+            .map_err(RuntimeError::from_msg)?;
 
         remove_trend_store_part(&mut tx, &self.name)
             .await
@@ -1076,13 +1402,37 @@ impl Change for RemoveTrendStorePart {
 
         tx.commit().await?;
 
-        Ok(format!("Removed trend store part '{}'", &self.name,))
+        Ok(Box::new(RemovedTrendStorePart {
+            trend_store: trend_store_ref,
+            trend_store_part,
+        }))
     }
 }
 
-impl fmt::Display for RemoveTrendStorePart {
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedTrendStorePart {
+    pub trend_store: TrendStoreRef,
+    pub trend_store_part: TrendStorePart,
+}
+
+impl Display for RemovedTrendStorePart {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveTrendStorePart({})", &self.name)
+        write!(
+            f,
+            "Removed trend store part '{}'",
+            &self.trend_store_part.name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedTrendStorePart {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddTrendStorePart {
+            trend_store: self.trend_store.clone(),
+            trend_store_part: self.trend_store_part.clone(),
+        }))
     }
 }
 
@@ -1116,7 +1466,30 @@ impl Change for AddTrendStore {
 
         tx.commit().await?;
 
-        Ok(format!("Added trend store {}", &self.trend_store))
+        Ok(Box::new(AddedTrendStore {
+            trend_store: (&self.trend_store).into(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedTrendStore {
+    pub trend_store: TrendStoreRef,
+}
+
+impl Display for AddedTrendStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Added trend store {}", &self.trend_store)
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedTrendStore {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveTrendStore {
+            trend_store: self.trend_store.clone(),
+        }))
     }
 }
 
@@ -1140,13 +1513,44 @@ impl Change for RemoveTrendStore {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
+        // Load the trend store we are about to delete to store it for later reverting this change
+        let trend_store = load_trend_store(&tx, &self.trend_store)
+            .await
+            .map_err(|e| {
+                RuntimeError::from_msg(format!(
+                    "Could not load trend store {}: {e}",
+                    &self.trend_store
+                ))
+            })?;
+
         remove_trend_store(&mut tx, &self.trend_store)
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error removing trend store: {e}")))?;
 
         tx.commit().await?;
 
-        Ok(format!("Removed trend store {}", self.trend_store))
+        Ok(Box::new(RemovedTrendStore { trend_store }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedTrendStore {
+    pub trend_store: TrendStore,
+}
+
+impl Display for RemovedTrendStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Removed trend store {}", self.trend_store)
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedTrendStore {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddTrendStore {
+            trend_store: self.trend_store.clone(),
+        }))
     }
 }
 
@@ -1179,7 +1583,6 @@ impl Change for CreateStatistics {
                     "WHERE tsp.name = {}",
                 );
                 client.execute(query, &[&tsp]).await?;
-                Ok(format!("Created statistics for trend store part {}", &tsp))
             }
             None => {
                 let query = concat!(
@@ -1187,8 +1590,37 @@ impl Change for CreateStatistics {
                     "FROM trend_directory.table_trend tt",
                 );
                 client.execute(query, &[]).await?;
-                Ok("Created statistics for all trend store parts".to_string())
             }
         }
+
+        Ok(Box::new(CreatedStatistics {
+            trend_store_part_name: self.trend_store_part_name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct CreatedStatistics {
+    pub trend_store_part_name: Option<String>,
+}
+
+impl Display for CreatedStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.trend_store_part_name {
+            Some(name) => {
+                write!(f, "Created statistics for trend store part {}", &name)
+            }
+            None => {
+                write!(f, "Created statistics for all trend store parts")
+            }
+        }
+    }
+}
+
+#[typetag::serde]
+impl Changed for CreatedStatistics {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }

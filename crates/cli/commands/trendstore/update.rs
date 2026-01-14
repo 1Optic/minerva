@@ -30,13 +30,7 @@ impl TrendStoreUpdate {
 
         let mut client = connect_db().await?;
 
-        let result = load_trend_store(
-            &client,
-            &trend_store.data_source,
-            &trend_store.entity_type,
-            &trend_store.granularity,
-        )
-        .await;
+        let result = load_trend_store(&client, &(&trend_store).into()).await;
 
         match result {
             Ok(trend_store_db) => {

@@ -12,11 +12,11 @@ use crate::entity::CachingEntityMapping;
 use crate::error::{Error, RuntimeError};
 use crate::interval::parse_interval;
 use crate::job::{end_job, start_job};
-use crate::trend_store::get_trend_store_id;
 use crate::trend_store::{
     create_partitions_for_trend_store_and_timestamp, load_trend_store, RawMeasurementStore,
     TrendStore,
 };
+use crate::trend_store::{get_trend_store_id, TrendStoreRef};
 
 #[derive(Serialize, Deserialize)]
 pub struct TrendsFromHeader {
@@ -118,7 +118,13 @@ pub async fn load_data<P: AsRef<Path>>(
 
     let granularity = parse_interval(&parser_config.granularity).unwrap();
 
-    let trend_store: TrendStore = load_trend_store(client, data_source, &parser_config.entity_type, &granularity)
+    let trend_store_ref = TrendStoreRef {
+        data_source: data_source.to_string(),
+        entity_type: parser_config.entity_type.clone(),
+        granularity,
+    };
+
+    let trend_store: TrendStore = load_trend_store(client, &trend_store_ref)
         .await
         .map_err(|e| format!("Error loading trend store for data source '{data_source}', entity type '{}' and granularity '{}': {e}", parser_config.entity_type, parser_config.granularity))?;
 

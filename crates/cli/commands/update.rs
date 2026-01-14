@@ -1,10 +1,16 @@
 use std::env;
+use std::fs::create_dir_all;
+use std::fs::File;
 use std::io::BufReader;
+use std::io::BufWriter;
+use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
 
+use erased_serde::Serializer;
 use minerva::change::Change;
+use minerva::error::RuntimeError;
 use minerva::graph::dependee_graph;
 use minerva::graph::node_index_by_name;
 use minerva::graph::render_graph_with_changes;
@@ -41,10 +47,24 @@ pub struct UpdateOpt {
     from_diff: Option<PathBuf>,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
     plan_only: Option<String>,
+    #[arg(long)]
+    log_dir: Option<PathBuf>,
 }
 
 impl UpdateOpt {
     async fn update(&self) -> CmdResult {
+        let default_log_dir = PathBuf::from("/var/lib/minerva/log");
+        let log_dir = self.log_dir.clone().unwrap_or(default_log_dir);
+
+        if !log_dir.exists() {
+            create_dir_all(&log_dir).map_err(|e| {
+                RuntimeError::from_msg(format!(
+                    "Could not create log directory '{}': {e}",
+                    log_dir.to_string_lossy()
+                ))
+            })?;
+        }
+
         let mut client = connect_db().await?;
 
         let update_plan = match &self.from_diff {
@@ -116,7 +136,13 @@ impl UpdateOpt {
 
             Ok(())
         } else {
-            update(&mut client, update_plan.changes, !self.non_interactive).await
+            update(
+                &mut client,
+                &log_dir,
+                update_plan.changes,
+                !self.non_interactive,
+            )
+            .await
         }
     }
 }
@@ -212,6 +238,7 @@ fn plan_update(
 
 async fn update(
     client: &mut Client,
+    log_dir: &Path,
     changes: Vec<Box<dyn Change + std::marker::Send>>,
     interactive: bool,
 ) -> CmdResult {
@@ -224,8 +251,27 @@ async fn update(
 
         if !interactive || interact(client, change.as_ref()).await? {
             match change.apply(client).await {
-                Ok(message) => {
-                    println!("> {}", &message);
+                Ok(changed) => {
+                    let now = chrono::offset::Local::now();
+
+                    let mut file_path: PathBuf = log_dir.into();
+
+                    file_path.push(format!("{}.json", now.to_rfc3339()));
+
+                    let file = File::create(file_path.clone()).map_err(|e| {
+                        format!(
+                            "Could not write entity materialization to '{}': {e}",
+                            file_path.to_string_lossy()
+                        )
+                    })?;
+
+                    let writer = BufWriter::new(file);
+
+                    let json = &mut serde_json::Serializer::new(writer);
+                    let mut serializer = Box::new(<dyn Serializer>::erase(json));
+                    let _ = changed.erased_serialize(&mut serializer);
+
+                    println!("> {}", &changed);
                 }
                 Err(err) => {
                     println!("! Error applying change: {}", &err);

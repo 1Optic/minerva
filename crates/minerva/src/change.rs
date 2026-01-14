@@ -1,11 +1,15 @@
-use std::fmt::{self, Display};
-
 use super::error::Error;
 use async_trait::async_trait;
+use std::fmt::{self, Display};
 use std::marker::{Send, Sync};
 use tokio_postgres::Client;
 
-pub type ChangeResult = Result<String, Error>;
+#[typetag::serde(tag = "type")]
+pub trait Changed: erased_serde::Serialize + Display + Send + Sync {
+    fn revert(&self) -> Option<Box<dyn Change>>;
+}
+
+pub type ChangeResult = Result<Box<dyn Changed>, Error>;
 
 #[async_trait]
 pub trait InformationOption: fmt::Display + Send + Sync {

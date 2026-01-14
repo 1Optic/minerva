@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{Client, GenericClient};
 
-use crate::change::ChangeResult;
+use crate::change::{ChangeResult, Changed};
 
 use super::change::Change;
 use super::error::{ConfigurationError, Error, RuntimeError};
@@ -94,10 +94,34 @@ impl Change for AddPrimaryAlias {
 
         transaction.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(AddedPrimaryAlias {
+            entity_type: self.entity_type.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedPrimaryAlias {
+    pub entity_type: String,
+}
+
+impl Display for AddedPrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Added primary alias to entity type '{}'",
             self.entity_type
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedPrimaryAlias {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemovePrimaryAlias {
+            entity_type: self.entity_type.clone(),
+        }))
     }
 }
 
@@ -121,6 +145,15 @@ impl Change for RemovePrimaryAlias {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let transaction = client.transaction().await?;
 
+        let row = transaction
+            .query_one(
+                "SELECT primary_alias FROM directory.entity_type WHERE name = $1",
+                &[&self.entity_type],
+            )
+            .await?;
+
+        let primary_alias: String = row.get(0);
+
         transaction
             .execute(
                 "UPDATE directory.entity_type SET primary_alias = NULL WHERE name = $1",
@@ -137,10 +170,37 @@ impl Change for RemovePrimaryAlias {
 
         transaction.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(RemovedPrimaryAlias {
+            entity_type: self.entity_type.clone(),
+            primary_alias,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedPrimaryAlias {
+    pub entity_type: String,
+    pub primary_alias: String,
+}
+
+impl Display for RemovedPrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Removed primary alias from entity type '{}'",
             self.entity_type
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedPrimaryAlias {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddPrimaryAlias {
+            entity_type: self.entity_type.clone(),
+            primary_alias: self.primary_alias.clone(),
+        }))
     }
 }
 
@@ -185,10 +245,34 @@ impl Change for ChangePrimaryAlias {
 
         transaction.commit().await?;
 
-        Ok(format!(
+        Ok(Box::new(ChangedPrimaryAlias {
+            entity_type: self.entity_type.clone(),
+            new_primary_alias: self.primary_alias.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ChangedPrimaryAlias {
+    pub entity_type: String,
+    pub new_primary_alias: String,
+}
+
+impl Display for ChangedPrimaryAlias {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "Changed primary alias of entity type '{}'",
             self.entity_type
-        ))
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for ChangedPrimaryAlias {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 
@@ -253,7 +337,29 @@ impl Change for AddEntityType {
             .map_err(|e| format!("Could not create entity type: {e}"))?;
 
         tx.commit().await?;
-        Ok(format!("Created entity_type '{}'", &self.entity_type.name))
+
+        Ok(Box::new(AddedEntityType {
+            entity_type: self.entity_type.name.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedEntityType {
+    pub entity_type: String,
+}
+
+impl Display for AddedEntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Created entity_type '{}'", &self.entity_type)
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedEntityType {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        None
     }
 }
 

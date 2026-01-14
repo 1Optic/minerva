@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::Parser;
 
-use minerva::trend_store::load_trend_store;
+use minerva::trend_store::{load_trend_store, TrendStoreRef};
 
 use crate::commands::common::{connect_db, Cmd, CmdResult};
 
@@ -23,13 +23,13 @@ impl TrendStoreDump {
     async fn dump(&self) -> CmdResult {
         let client = connect_db().await?;
 
-        let trend_store = load_trend_store(
-            &client,
-            &self.data_source,
-            &self.entity_type,
-            &self.granularity,
-        )
-        .await?;
+        let trend_store_ref = TrendStoreRef {
+            data_source: self.data_source.clone(),
+            entity_type: self.entity_type.clone(),
+            granularity: self.granularity,
+        };
+
+        let trend_store = load_trend_store(&client, &trend_store_ref).await?;
 
         let trend_store_definition = trend_store.dump()?;
 

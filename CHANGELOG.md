@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.42.0] - 2026-01-14
+
+### Added
+
+- CLI: Add logging of changes that can be reverted when running update
+
 ## [9.41.0] - 2026-01-12
 
 ### Fixed
@@ -590,4 +596,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.39.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.38.0...9.39.0
 [9.40.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.39.1...9.40.0
 [9.41.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.40.0...9.41.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.41.0...HEAD
+[9.42.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.41.0...9.42.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.42.0...HEAD

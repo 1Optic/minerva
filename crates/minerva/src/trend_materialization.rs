@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use console::Style;
 use similar::{ChangeTag, TextDiff};
 
-use crate::change::MinervaObjectRef;
+use crate::change::{Changed, MinervaObjectRef};
 use crate::error::ConfigurationError;
 
 use super::change::{Change, ChangeResult, InformationOption};
@@ -27,6 +27,36 @@ use super::error::{DatabaseError, Error, RuntimeError};
 use super::interval::parse_interval;
 
 pub const MATERIALIZATION_FUNCTION_SCHEMA: &str = "trend";
+
+#[derive(Serialize, Deserialize)]
+pub enum TrendMaterializationRef {
+    View(TrendViewMaterializationRef),
+    Function(TrendFunctionMaterializationRef),
+}
+
+impl Display for TrendMaterializationRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrendMaterializationRef::View(view_ref) => {
+                write!(f, "{}", view_ref.target_trend_store_part)
+            }
+            TrendMaterializationRef::Function(function_ref) => {
+                write!(f, "{}", function_ref.target_trend_store_part)
+            }
+        }
+    }
+}
+
+impl TrendMaterializationRef {
+    fn name(&self) -> String {
+        match self {
+            TrendMaterializationRef::View(view_ref) => view_ref.target_trend_store_part.clone(),
+            TrendMaterializationRef::Function(function_ref) => {
+                function_ref.target_trend_store_part.clone()
+            }
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendMaterializationTrendSource {
@@ -52,9 +82,15 @@ pub enum TrendMaterializationSource {
     Attribute(TrendMaterializationAttributeSource),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TrendViewMaterializationRef {
     pub target_trend_store_part: String,
+}
+
+impl Display for TrendViewMaterializationRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.target_trend_store_part)
+    }
 }
 
 impl From<&TrendViewMaterialization> for TrendViewMaterializationRef {
@@ -408,6 +444,10 @@ impl DiffItem for TrendMaterializationAttributes {
             optional_to_string(self.old_data_stability_delay.map(format_duration))
         ));
 
+        if let Some(description) = &self.description {
+            lines.push(format!("description: {}", description,));
+        }
+
         lines.join("\n")
     }
 }
@@ -435,7 +475,11 @@ impl Change for UpdateTrendViewMaterializationAttributes {
 
         tx.commit().await?;
 
-        Ok("Updated attributes of view materialization".into())
+        Ok(Box::new(UpdatedTrendViewMaterializationAttributes {
+            trend_view_materialization: self.trend_view_materialization.clone(),
+            source_attributes: self.source_attributes.clone(),
+            target_attributes: self.target_attributes.clone(),
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -446,12 +490,41 @@ impl Change for UpdateTrendViewMaterializationAttributes {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTrendViewMaterializationAttributes {
+    pub trend_view_materialization: TrendViewMaterializationRef,
+    pub source_attributes: TrendMaterializationAttributes,
+    pub target_attributes: TrendMaterializationAttributes,
+}
+
+impl Display for UpdatedTrendViewMaterializationAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated attributes of view materialization '{}'",
+            self.trend_view_materialization
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTrendViewMaterializationAttributes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateTrendViewMaterializationAttributes {
+            trend_view_materialization: self.trend_view_materialization.clone(),
+            source_attributes: self.target_attributes.clone(),
+            target_attributes: self.source_attributes.clone(),
+        }))
+    }
+}
+
 impl fmt::Display for UpdateTrendViewMaterializationAttributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "UpdateTrendViewMaterializationAttributes({})",
-            &self.trend_view_materialization.target_trend_store_part,
+            &self.trend_view_materialization,
         )
     }
 }
@@ -534,7 +607,11 @@ impl Change for UpdateTrendFunctionMaterializationAttributes {
 
         tx.commit().await?;
 
-        Ok("Updated attributes of function materialization".into())
+        Ok(Box::new(UpdatedTrendFunctionMaterializationAttributes {
+            trend_function_materialization: self.trend_function_materialization.clone(),
+            source_attributes: self.source_attributes.clone(),
+            target_attributes: self.target_attributes.clone(),
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -544,6 +621,35 @@ impl Change for UpdateTrendFunctionMaterializationAttributes {
             to_src: FunctionMaterializationAttributesDiffItem::from(&self.target_attributes)
                 .textualize(),
         })]
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTrendFunctionMaterializationAttributes {
+    pub trend_function_materialization: TrendFunctionMaterializationRef,
+    pub source_attributes: TrendMaterializationAttributes,
+    pub target_attributes: TrendMaterializationAttributes,
+}
+
+impl Display for UpdatedTrendFunctionMaterializationAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated attributes of function materialization '{}'",
+            self.trend_function_materialization
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTrendFunctionMaterializationAttributes {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateTrendFunctionMaterializationAttributes {
+            trend_function_materialization: self.trend_function_materialization.clone(),
+            source_attributes: self.target_attributes.clone(),
+            target_attributes: self.source_attributes.clone(),
+        }))
     }
 }
 
@@ -565,6 +671,17 @@ pub struct UpdateView {
     pub trend_view_materialization: TrendViewMaterializationRef,
 }
 
+impl fmt::Display for UpdateView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UpdateView({}, {})",
+            &self.trend_view_materialization.target_trend_store_part,
+            materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
+        )
+    }
+}
+
 #[async_trait]
 #[typetag::serde]
 impl Change for UpdateView {
@@ -584,10 +701,11 @@ impl Change for UpdateView {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Updated view {}",
-            materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
-        ))
+        Ok(Box::new(UpdatedView {
+            trend_view_materialization: self.trend_view_materialization.clone(),
+            original_definition: self.original_definition.clone(),
+            new_definition: self.new_definition.clone(),
+        }))
     }
 
     fn information_options(&self) -> Vec<Box<dyn InformationOption>> {
@@ -598,14 +716,32 @@ impl Change for UpdateView {
     }
 }
 
-impl fmt::Display for UpdateView {
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedView {
+    pub trend_view_materialization: TrendViewMaterializationRef,
+    pub original_definition: String,
+    pub new_definition: String,
+}
+
+impl Display for UpdatedView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "UpdateView({}, {})",
-            &self.trend_view_materialization.target_trend_store_part,
+            "Updated view {}",
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedView {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateView {
+            trend_view_materialization: self.trend_view_materialization.clone(),
+            original_definition: self.new_definition.clone(),
+            new_definition: self.original_definition.clone(),
+        }))
     }
 }
 
@@ -652,10 +788,11 @@ impl Change for UpdateFunction {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Updated function '{}'",
-            &self.trend_function_materialization.target_trend_store_part
-        ))
+        Ok(Box::new(UpdatedFunction {
+            trend_function_materialization: self.trend_function_materialization.clone(),
+            from_func: self.original_definition.clone(),
+            to_func: self.new_definition.clone(),
+        }))
     }
 
     fn existing_object(&self) -> Option<MinervaObjectRef> {
@@ -711,6 +848,35 @@ impl Display for FunctionDiff {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedFunction {
+    pub trend_function_materialization: TrendFunctionMaterializationRef,
+    pub from_func: TrendMaterializationFunction,
+    pub to_func: TrendMaterializationFunction,
+}
+
+impl Display for UpdatedFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated function '{}'",
+            &self.trend_function_materialization.target_trend_store_part
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedFunction {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateFunction {
+            trend_function_materialization: self.trend_function_materialization.clone(),
+            original_definition: self.to_func.clone(),
+            new_definition: self.from_func.clone(),
+        }))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrendMaterializationFunction {
     pub return_type: String,
@@ -730,9 +896,15 @@ impl TrendMaterializationFunction {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TrendFunctionMaterializationRef {
     pub target_trend_store_part: String,
+}
+
+impl Display for TrendFunctionMaterializationRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.target_trend_store_part)
+    }
 }
 
 impl From<&TrendFunctionMaterialization> for TrendFunctionMaterializationRef {
@@ -822,23 +994,16 @@ impl TrendMaterializationAttributes {
         client: &mut T,
         target_trend_store_part: &str,
     ) -> Result<(), Error> {
-        let query = format!(
-            concat!(
-                "UPDATE trend_directory.materialization ",
-                "SET processing_delay = $1::text::interval, ",
-                "stability_delay = $2::text::interval, ",
-                "reprocessing_period = $3::text::interval, ",
-                "enabled = $4, ",
-                "description = '{}'::jsonb, ",
-                "old_data_threshold = $5::text::interval, ",
-                "old_data_stability_delay = $6::text::interval ",
-                "WHERE materialization::text = $7",
-            ),
-            &self
-                .description
-                .as_ref()
-                .unwrap_or(&serde_json::json!("{}"))
-                .to_string(),
+        let query = concat!(
+            "UPDATE trend_directory.materialization ",
+            "SET processing_delay = $1::text::interval, ",
+            "stability_delay = $2::text::interval, ",
+            "reprocessing_period = $3::text::interval, ",
+            "enabled = $4, ",
+            "description = $5::jsonb, ",
+            "old_data_threshold = $6::text::interval, ",
+            "old_data_stability_delay = $7::text::interval ",
+            "WHERE materialization::text = $8",
         );
 
         let query_args: &[&(dyn ToSql + Sync)] = &[
@@ -846,6 +1011,7 @@ impl TrendMaterializationAttributes {
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
             &self.enabled,
+            &self.description.as_ref().unwrap_or(&Value::Null),
             &self
                 .old_data_threshold
                 .map(|v| format_duration(v).to_string()),
@@ -855,11 +1021,12 @@ impl TrendMaterializationAttributes {
             &target_trend_store_part,
         ];
 
-        match client.execute(&query, query_args).await {
+        match client.execute(query, query_args).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(Error::Database(DatabaseError::from_msg(format!(
-                "Error updating materialization attributes: {e}"
-            )))),
+            Err(e) => Err(Error::Database(DatabaseError::from_postgres_error(
+                "Error updating materialization attributes",
+                e,
+            ))),
         }
     }
 }
@@ -1102,6 +1269,23 @@ impl fmt::Display for TrendMaterialization {
                 "TrendFunctionMaterialization('{}')",
                 &function_materialization.target_trend_store_part
             ),
+        }
+    }
+}
+
+impl From<&TrendMaterialization> for TrendMaterializationRef {
+    fn from(value: &TrendMaterialization) -> Self {
+        match value {
+            TrendMaterialization::View(view) => {
+                TrendMaterializationRef::View(TrendViewMaterializationRef {
+                    target_trend_store_part: view.target_trend_store_part.clone(),
+                })
+            }
+            TrendMaterialization::Function(function) => {
+                TrendMaterializationRef::Function(TrendFunctionMaterializationRef {
+                    target_trend_store_part: function.target_trend_store_part.clone(),
+                })
+            }
         }
     }
 }
@@ -1361,13 +1545,11 @@ pub fn map_sql_to_plpgsql(src: String) -> String {
 
 /// Citus does not support the construct with parameterized queries in plain sql functions. The use
 /// of plpgsql functions is a work-around for this.
-fn coorce_to_plpgsql((lang, src): (String, String)) -> Result<(String, String), Error> {
+fn coorce_to_plpgsql((lang, src): (String, String)) -> Result<(String, String), String> {
     match lang.as_str() {
         "sql" => Ok(("plpgsql".into(), map_sql_to_plpgsql(src))),
         "plpgsql" => Ok((lang, src)),
-        _ => Err(Error::Runtime(RuntimeError::from_msg(format!(
-            "Unexpected language '{lang}'"
-        )))),
+        _ => Err(format!("Unexpected language '{lang}'")),
     }
 }
 
@@ -1663,7 +1845,7 @@ pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
 ) -> Result<TrendMaterialization, LoadTrendMaterializationError> {
     let query = concat!(
         "SELECT m.id, m.processing_delay::text, m.stability_delay::text, m.reprocessing_period::text, ",
-        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold, m.old_data_stability_delay ",
+        "m.enabled, m.description, tsp.name, vm.src_view, fm.src_function, m.old_data_threshold::text, m.old_data_stability_delay::text ",
         "FROM trend_directory.materialization AS m ",
         "JOIN trend_directory.trend_store_part AS tsp ON tsp.id = m.dst_trend_store_part_id ",
         "LEFT JOIN trend_directory.view_materialization AS vm ON vm.materialization_id = m.id ",
@@ -1688,9 +1870,19 @@ pub async fn load_trend_materialization<T: GenericClient + Send + Sync>(
     trend_materialization_from_row(client, row).await
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum LoadMaterializationsError {
+    #[error("No such view '{0}' for trend materialization '{1}'")]
+    NoSuchView(String, String),
+    #[error("Database error: {0}")]
+    Database(#[from] tokio_postgres::Error),
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
+}
+
 pub async fn load_materializations<T: GenericClient + Send + Sync>(
     conn: &mut T,
-) -> Result<Vec<TrendMaterialization>, Error> {
+) -> Result<Vec<TrendMaterialization>, LoadMaterializationsError> {
     let mut trend_materializations: Vec<TrendMaterialization> = Vec::new();
 
     let query = concat!(
@@ -1702,9 +1894,7 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
         "LEFT JOIN trend_directory.function_materialization AS fm ON fm.materialization_id = m.id ",
     );
 
-    let result = conn.query(query, &[]).await.map_err(|e| {
-        DatabaseError::from_msg(format!("Error loading trend materializations: {e}"))
-    })?;
+    let result = conn.query(query, &[]).await?;
 
     for row in result {
         let materialization_id: i32 = row.get(0);
@@ -1729,13 +1919,13 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
                 ));
 
         let processing_delay = parse_interval(&processing_delay_str)
-            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of processing_delay: {e}"))))?;
+            .map_err(|e| LoadMaterializationsError::Unexpected(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of processing_delay: {e}")))?;
 
         let reprocessing_period = parse_interval(&reprocessing_period_str)
-            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of reprocessing_period: {e}"))))?;
+            .map_err(|e| LoadMaterializationsError::Unexpected(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of reprocessing_period: {e}")))?;
 
         let stability_delay = parse_interval(&stability_delay_str)
-            .map_err(|e| Error::Runtime(RuntimeError::from_msg(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}"))))?;
+            .map_err(|e| LoadMaterializationsError::Unexpected(format!("Could not load materialization '{target_trend_store_part}' due to failure in parsing of stability_delay: {e}")))?;
 
         let old_data_threshold: Option<Duration> =
             old_data_threshold_str.map(|value| parse_interval(&value).unwrap());
@@ -1744,7 +1934,13 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
             old_data_stability_delay_str.map(|value| parse_interval(&value).unwrap());
 
         if let Some(view) = src_view {
-            let view_def = get_view_def(conn, &view).await.unwrap();
+            let view_def =
+                get_view_def(conn, &view)
+                    .await
+                    .ok_or(LoadMaterializationsError::NoSuchView(
+                        view,
+                        target_trend_store_part.clone(),
+                    ))?;
             let sources = load_sources(conn, materialization_id).await?;
 
             let trend_materialization_attributes = TrendMaterializationAttributes {
@@ -1778,7 +1974,11 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
                         "failed getting language".into(),
                         "failed getting sources".into(),
                     )),
-            )?;
+            )
+            .map_err(|e| {
+                LoadMaterializationsError::Unexpected(format!("Could not coerce to plpgsql: {e}"))
+            })?;
+
             let return_type = get_function_return_type(
                 conn,
                 MATERIALIZATION_FUNCTION_SCHEMA,
@@ -1823,9 +2023,7 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
 async fn load_sources<T: GenericClient + Send + Sync>(
     conn: &mut T,
     materialization_id: i32,
-) -> Result<Vec<TrendMaterializationSource>, Error> {
-    let mut sources: Vec<TrendMaterializationSource> = Vec::new();
-
+) -> Result<Vec<TrendMaterializationSource>, tokio_postgres::Error> {
     let query = concat!(
         "SELECT tsp.name, mtsl.timestamp_mapping_func::regproc::text ",
         "FROM trend_directory.materialization_trend_store_link mtsl ",
@@ -1833,24 +2031,20 @@ async fn load_sources<T: GenericClient + Send + Sync>(
         "WHERE mtsl.materialization_id = $1"
     );
 
-    let result = conn
-        .query(query, &[&materialization_id])
-        .await
-        .map_err(|e| {
-            DatabaseError::from_msg(format!("Error loading trend materializations: {e}"))
-        })?;
+    let rows = conn.query(query, &[&materialization_id]).await?;
 
-    for row in result {
-        let trend_store_part: String = row.get(0);
-        let mapping_function: String = row.get(1);
+    let sources: Vec<TrendMaterializationSource> = rows
+        .iter()
+        .map(|row| {
+            let trend_store_part: String = row.get(0);
+            let mapping_function: String = row.get(1);
 
-        sources.push(TrendMaterializationSource::Trend(
-            TrendMaterializationTrendSource {
+            TrendMaterializationSource::Trend(TrendMaterializationTrendSource {
                 trend_store_part,
                 mapping_function,
-            },
-        ));
-    }
+            })
+        })
+        .collect();
 
     Ok(sources)
 }
@@ -2008,10 +2202,9 @@ impl Change for AddTrendMaterialization {
 
         tx.commit().await?;
 
-        Ok(format!(
-            "Added trend materialization '{}'",
-            &self.trend_materialization
-        ))
+        Ok(Box::new(AddedTrendMaterialization {
+            trend_materialization: (&self.trend_materialization).into(),
+        }))
     }
 }
 
@@ -2020,6 +2213,31 @@ impl From<TrendMaterialization> for AddTrendMaterialization {
         AddTrendMaterialization {
             trend_materialization,
         }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct AddedTrendMaterialization {
+    pub trend_materialization: TrendMaterializationRef,
+}
+
+impl Display for AddedTrendMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Added trend materialization '{}'",
+            &self.trend_materialization
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for AddedTrendMaterialization {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(RemoveTrendMaterialization {
+            name: self.trend_materialization.name(),
+        }))
     }
 }
 
@@ -2041,6 +2259,17 @@ impl Change for RemoveTrendMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
+        let trend_materialization = load_trend_materialization(&mut tx, &self.name)
+            .await
+            .map_err(|e| {
+                Error::Runtime(RuntimeError {
+                    msg: format!(
+                        "Error loading trend materialization '{}': {}",
+                        &self.name, e
+                    ),
+                })
+            })?;
+
         remove_trend_materialization(&mut tx, &self.name)
             .await
             .map_err(|e| {
@@ -2054,7 +2283,34 @@ impl Change for RemoveTrendMaterialization {
 
         tx.commit().await?;
 
-        Ok(format!("Removed trend materialization '{}'", &self.name,))
+        Ok(Box::new(RemovedTrendMaterialization {
+            trend_materialization,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct RemovedTrendMaterialization {
+    pub trend_materialization: TrendMaterialization,
+}
+
+impl Display for RemovedTrendMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Removed trend materialization '{}'",
+            &self.trend_materialization.name()
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for RemovedTrendMaterialization {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(AddTrendMaterialization {
+            trend_materialization: self.trend_materialization.clone(),
+        }))
     }
 }
 
@@ -2080,24 +2336,62 @@ impl Change for UpdateTrendMaterialization {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let mut tx = client.transaction().await?;
 
+        let original_trend_materialization =
+            load_trend_materialization(&mut tx, self.trend_materialization.name())
+                .await
+                .map_err(|e| {
+                    RuntimeError::from_msg(format!(
+                        "Could not load trend materialization '{}': {e}",
+                        self.trend_materialization.name()
+                    ))
+                })?;
+
         match self.trend_materialization.update(&mut tx).await {
             Ok(()) => {
                 tx.commit().await?;
-                Ok(format!(
-                    "Updated trend materialization '{}'",
-                    &self.trend_materialization
-                ))
             }
             Err(e) => {
                 tx.rollback().await?;
-                Err(Error::Runtime(RuntimeError {
+
+                return Err(Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error updating trend materialization '{}': {}",
                         &self.trend_materialization, e
                     ),
-                }))
+                }));
             }
         }
+
+        Ok(Box::new(UpdatedTrendMaterialization {
+            original_trend_materialization,
+            new_trend_materialization: self.trend_materialization.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTrendMaterialization {
+    pub original_trend_materialization: TrendMaterialization,
+    pub new_trend_materialization: TrendMaterialization,
+}
+
+impl Display for UpdatedTrendMaterialization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated trend materialization '{}'",
+            &self.new_trend_materialization
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTrendMaterialization {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateTrendMaterialization {
+            trend_materialization: self.original_trend_materialization.clone(),
+        }))
     }
 }
 
