@@ -2053,7 +2053,7 @@ pub async fn create_partitions_for_trend_store<T: GenericClient>(
             }
             Err(e) => {
                 transaction.rollback().await?;
-                println!("Error creating partition '{part_name}': {e}");
+                println!("Error creating partition with index {partition_index} for '{part_name}': {e}");
             }
         }
     }
