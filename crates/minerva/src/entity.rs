@@ -515,14 +515,12 @@ async fn create_entity_with_alias<T: GenericClient>(
     name: &str,
 ) -> Result<LargeEntity, EntityMappingError> {
     let query = format!(
-        "INSERT INTO entity.{}(name, primary_alias) VALUES($1, $2) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id::bigint, primary_alias",
+        "INSERT INTO entity.{}(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id::bigint, primary_alias",
         escape_identifier(entity_type_table)
     );
 
-    let primary_alias = format!("alias_for_{}", name);
-
     let rows = client
-        .query(&query, &[&name, &primary_alias])
+        .query(&query, &[&name])
         .await
         .map_err(EntityMappingError::DatabaseError)?;
 
