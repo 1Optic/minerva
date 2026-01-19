@@ -84,12 +84,20 @@ pub struct InstanceDockerImage {
     pub path: PathBuf,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RetentionConfig {
     #[serde(with = "humantime_serde")]
     pub granularity: Duration,
     #[serde(with = "humantime_serde")]
     pub retention_period: Duration,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct PartitionSizeConfig {
+    #[serde(with = "humantime_serde")]
+    pub granularity: Duration,
+    #[serde(with = "humantime_serde")]
+    pub partition_size: Duration,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -147,6 +155,7 @@ pub struct InstanceConfig {
     pub entity_aggregation_hints: Option<Vec<EntityAggregationHint>>,
     pub entity_types: Vec<String>,
     pub retention: Option<Vec<RetentionConfig>>,
+    pub partition_size: Option<Vec<PartitionSizeConfig>>,
     #[serde(with = "humantime_serde::option", default = "default_duration_none")]
     pub old_data_threshold: Option<Duration>,
     #[serde(with = "humantime_serde::option")]

@@ -11,7 +11,7 @@ use minerva::entity::default_entity_id_type;
 use minerva::error::RuntimeError;
 use minerva::instance::{load_instance_config, load_trend_stores_from, InstanceConfig};
 use minerva::meas_value::DataType;
-use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
+use minerva::trend_store::{Trend, TrendStore, TrendStorePart, TrendStoreRef};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -41,8 +41,8 @@ struct TrendDefinition {
 }
 
 impl TrendDefinition {
-    pub fn get_trend_store_key(&self) -> TrendStoreKey {
-        TrendStoreKey {
+    pub fn get_trend_store_key(&self) -> TrendStoreRef{
+        TrendStoreRef {
             data_source: self.data_source.clone(),
             entity_type: self.entity_type.clone(),
             granularity: self.granularity,
@@ -225,7 +225,7 @@ impl Default for TrendStorePartParameters {
 #[derive(PartialEq, Eq)]
 struct TrendStorePartHolder {
     base_name: String,
-    trend_store_key: TrendStoreKey,
+    trend_store_key: TrendStoreRef,
     parts: HashMap<String, TrendStorePart>,
 }
 
@@ -242,7 +242,7 @@ impl PartialOrd for TrendStorePartHolder {
 }
 
 impl TrendStorePartHolder {
-    pub fn new(base_name: String, trend_store_key: TrendStoreKey) -> Self {
+    pub fn new(base_name: String, trend_store_key: TrendStoreRef) -> Self {
         TrendStorePartHolder {
             base_name,
             trend_store_key,
@@ -314,13 +314,6 @@ fn calc_row_size(params: &TrendStorePartParameters, trend_store_part: &TrendStor
     params.base_width + num_columns * params.column_size
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
-struct TrendStoreKey {
-    data_source: String,
-    entity_type: String,
-    granularity: Duration,
-}
-
 fn define_trend_stores(
     trend_definitions: &[TrendDefinition],
     current_trend_stores: &[TrendStore],
@@ -386,7 +379,7 @@ fn define_trend_stores(
 
     // Collect the trend store parts into trend stores
 
-    let mut trend_stores: HashMap<TrendStoreKey, TrendStore> = HashMap::new();
+    let mut trend_stores: HashMap<TrendStoreRef, TrendStore> = HashMap::new();
 
     let mut part_holders: Vec<TrendStorePartHolder> = trend_store_parts.into_values().collect();
 
@@ -406,7 +399,7 @@ fn define_trend_stores(
                 .unwrap(),
                 retention_period: instance_config
                     .granularity_to_retention(part_holder.trend_store_key.granularity)
-                    .unwrap_or(Duration::from_secs(86400 * 30)),
+                    .unwrap_or(humantime::parse_duration("30d").unwrap()),
                 parts: Vec::new(),
             });
 
@@ -546,7 +539,7 @@ mod tests {
             entity_type: "node".to_string(),
             granularity: Duration::from_secs(900),
             partition_size: Duration::from_secs(86400),
-            retention_period: Duration::from_secs(86400 * 7),
+            retention_period: humantime::parse_duration("7d").unwrap(),
             parts: vec![TrendStorePart {
                 name: "my-test_node_traffic_15m".to_string(),
                 trends: vec![Trend {
@@ -576,6 +569,7 @@ mod tests {
             entity_types: Vec::new(),
             old_data_stability_delay: Some(Duration::from_secs(3600 * 3)),
             old_data_threshold: Some(Duration::from_secs(3600 * 6)),
+            partition_size: Some(Vec::new()),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),
@@ -653,6 +647,7 @@ mod tests {
             entity_types: Vec::new(),
             old_data_stability_delay: Some(Duration::from_secs(3600 * 3)),
             old_data_threshold: Some(Duration::from_secs(3600 * 6)),
+            partition_size: Some(vec![]),
             retention: Some(vec![RetentionConfig {
                 granularity: humantime::parse_duration("15m").unwrap(),
                 retention_period: humantime::parse_duration("14d").unwrap(),

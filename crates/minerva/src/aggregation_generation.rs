@@ -381,7 +381,7 @@ fn define_part_time_aggregation(
         enabled: true,
         processing_delay: Duration::from_secs(1800),
         stability_delay: Duration::from_secs(300),
-        reprocessing_period: humantime::parse_duration("1w").unwrap(),
+        reprocessing_period: humantime::parse_duration("7d").unwrap(),
         description: None,
         old_data_threshold: config.old_data_threshold,
         old_data_stability_delay: config.old_data_stability_delay,

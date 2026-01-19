@@ -32,7 +32,7 @@ pub async fn get_and_create_entity_sets(
             entity_type: "pvpanel".to_string(),
             granularity: Duration::from_secs(300),
             partition_size: Duration::from_secs(86400),
-            retention_period: Duration::from_secs(86400 * 365),
+            retention_period: humantime::parse_duration("1y").unwrap(),
             parts: [].to_vec(),
         };
 

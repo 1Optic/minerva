@@ -207,7 +207,7 @@ impl TrendStoreBasicData {
                 entity_type: self.entity_type.clone(),
                 granularity: self.granularity,
                 partition_size: *PARTITION_SIZE.get(&self.granularity.clone()).unwrap(),
-                retention_period: Duration::from_secs(86400 * 365),
+                retention_period: humantime::parse_duration("1y").unwrap(),
                 parts: vec![],
             };
 

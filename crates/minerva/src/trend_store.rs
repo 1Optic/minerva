@@ -1420,7 +1420,7 @@ impl TrendStoreDiffOptions {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct TrendStoreRef {
     pub data_source: String,
     pub entity_type: String,
@@ -1464,7 +1464,7 @@ pub struct TrendStore {
 }
 
 fn default_retention_period() -> Duration {
-    Duration::from_secs(86400 * 30)
+    humantime::parse_duration("1month").unwrap()
 }
 
 impl TrendStore {
