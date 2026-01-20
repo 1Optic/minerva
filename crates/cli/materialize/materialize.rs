@@ -17,6 +17,8 @@ use tokio_postgres::GenericClient;
 use tokio_postgres::NoTls;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+use crate::pgpass;
+
 pub const CONNECTION_CHECK_INTERVAL: u64 = 60;
 pub const MAX_CONNECTION_AGE: u64 = 3600;
 
@@ -402,6 +404,7 @@ pub struct DBConfig {
     pub pg_port: u16,
     pub pg_user: String,
     pub pg_database: String,
+    pub pg_password: Option<String>,
     pub max_connection_age: Duration,
 }
 
@@ -415,6 +418,11 @@ impl DBConfig {
         let pg_database =
             std::env::var(VAR_PGDATABASE).unwrap_or_else(|_| DEFAULT_PGDATABASE.into());
 
+        let pg_password = match std::env::var("PGPASSWORD") {
+            Ok(v) => Some(v),
+            Err(_) => pgpass::lookup_password(&pg_host, pg_port, &pg_database, &pg_user),
+        };
+
         let max_connection_age_seconds: u64 =
             get_typed_var(VAR_DB_MAX_CONNECTION_AGE, DEFAULT_DB_MAX_CONNECTION_AGE)?;
 
@@ -425,6 +433,7 @@ impl DBConfig {
             pg_port,
             pg_user,
             pg_database,
+            pg_password,
             max_connection_age,
         })
     }
@@ -438,6 +447,7 @@ impl DBConfig {
         cfg.port = Some(self.pg_port);
         cfg.user = Some(self.pg_user.clone());
         cfg.dbname = Some(self.pg_database.clone());
+        cfg.password = self.pg_password.clone();
         cfg.manager = Some(deadpool_postgres::ManagerConfig {
             recycling_method: deadpool_postgres::RecyclingMethod::Fast,
         });

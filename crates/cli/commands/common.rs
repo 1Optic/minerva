@@ -8,6 +8,8 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 use minerva::error::{ConfigurationError, Error, RuntimeError};
 
+use crate::pgpass;
+
 pub type CmdResult = Result<(), Error>;
 
 pub static ENV_MINERVA_INSTANCE_ROOT: &str = "MINERVA_INSTANCE_ROOT";
@@ -73,18 +75,20 @@ pub fn get_db_config() -> Result<Config, Error> {
 
         let default_user_name = env::var("USER").unwrap_or("postgres".into());
 
-        let config = config
-            .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
-            .port(port)
-            .user(env::var("PGUSER").unwrap_or(default_user_name))
-            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
-            .ssl_mode(sslmode);
+        let host = env::var("PGHOST").unwrap_or("/var/run/postgresql".into());
+        let user = env::var("PGUSER").unwrap_or(default_user_name);
+        let dbname = env::var("PGDATABASE").unwrap_or("postgres".into());
+
+        let config = config.host(&host).port(port).user(&user).dbname(&dbname).ssl_mode(sslmode);
 
         let pg_password = env::var("PGPASSWORD");
 
         match pg_password {
             Ok(password) => config.password(password).clone(),
-            Err(_) => config.clone(),
+            Err(_) => match pgpass::lookup_password(&host, port, &dbname, &user) {
+                Some(password) => config.password(password).clone(),
+                None => config.clone(),
+            },
         }
     };
 

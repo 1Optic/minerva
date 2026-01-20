@@ -7,6 +7,7 @@ use std::process::ExitCode;
 
 pub mod commands;
 pub mod interact;
+pub mod pgpass;
 
 use crate::commands::aggregation::AggregationOpt;
 use crate::commands::attributestore::AttributeStoreOpt;

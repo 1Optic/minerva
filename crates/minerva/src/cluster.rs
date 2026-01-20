@@ -37,9 +37,10 @@ pub fn create_citus_container(
     exposed_port: Option<u16>,
     config_file: &Path,
 ) -> ContainerRequest<GenericImage> {
+    let container_config_path = "/etc/postgresql/postgresql.conf";
     let image = GenericImage::new(image_ref.image_name.clone(), image_ref.image_tag.clone())
         .with_wait_for(WaitFor::message_on_stdout(
-            "PostgreSQL init process complete; ready for start up.",
+            "database system is ready to accept connections",
         ));
 
     let image = match exposed_port {
@@ -52,9 +53,9 @@ pub fn create_citus_container(
         .with_container_name(name)
         .with_mount(Mount::bind_mount(
             config_file.to_string_lossy(),
-            "/etc/postgresql/postgresql.conf",
+            container_config_path,
         ))
-        .with_cmd(vec!["-c", "config-file=/etc/postgresql/postgresql.conf"])
+        .with_cmd(vec!["-c", &format!("config_file={container_config_path}")])
 }
 
 #[must_use]
