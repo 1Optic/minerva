@@ -42,9 +42,7 @@ fn split_pgpass_line(line: &str) -> Option<[String; 5]> {
 }
 
 fn default_pgpass_path() -> Option<PathBuf> {
-    let home = env::var("HOME")
-        .or_else(|_| env::var("USERPROFILE"))
-        .ok()?;
+    let home = env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()?;
 
     Some(PathBuf::from(home).join(".pgpass"))
 }

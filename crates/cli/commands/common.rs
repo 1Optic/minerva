@@ -79,7 +79,12 @@ pub fn get_db_config() -> Result<Config, Error> {
         let user = env::var("PGUSER").unwrap_or(default_user_name);
         let dbname = env::var("PGDATABASE").unwrap_or("postgres".into());
 
-        let config = config.host(&host).port(port).user(&user).dbname(&dbname).ssl_mode(sslmode);
+        let config = config
+            .host(&host)
+            .port(port)
+            .user(&user)
+            .dbname(&dbname)
+            .ssl_mode(sslmode);
 
         let pg_password = env::var("PGPASSWORD");
 
