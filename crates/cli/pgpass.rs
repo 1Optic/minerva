@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(parsed[1], "5432");
         assert_eq!(parsed[2], "mydb");
         assert_eq!(parsed[3], "me");
-        assert_eq!(parsed[4], "p:ass");
+        assert_eq!(parsed[4], "p:a\\ss");
     }
 
     #[test]
