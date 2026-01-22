@@ -1,67 +1,6 @@
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-fn split_pgpass_line(line: &str) -> Option<[String; 5]> {
-    let mut fields: Vec<String> = Vec::with_capacity(5);
-    let mut current = String::new();
-    let mut chars = line.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            '\\' => {
-                if let Some(next) = chars.next() {
-                    current.push(next);
-                } else {
-                    current.push('\\');
-                }
-            }
-            ':' => {
-                fields.push(std::mem::take(&mut current));
-                if fields.len() > 5 {
-                    return None;
-                }
-            }
-            _ => current.push(ch),
-        }
-    }
-
-    fields.push(current);
-
-    if fields.len() != 5 {
-        return None;
-    }
-
-    Some([
-        fields[0].clone(),
-        fields[1].clone(),
-        fields[2].clone(),
-        fields[3].clone(),
-        fields[4].clone(),
-    ])
-}
-
-fn default_pgpass_path() -> Option<PathBuf> {
-    let home = env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()?;
-
-    Some(PathBuf::from(home).join(".pgpass"))
-}
-
-fn pgpass_path_from_env() -> Option<PathBuf> {
-    if let Ok(v) = env::var("PGPASSFILE") {
-        if v.trim().is_empty() {
-            None
-        } else {
-            Some(PathBuf::from(v))
-        }
-    } else {
-        default_pgpass_path()
-    }
-}
-
-fn pgpass_field_matches(pattern: &str, value: &str) -> bool {
-    pattern == "*" || pattern == value
-}
+use postgres_secrets::PgPass;
 
 pub fn lookup_password_from_file(
     pgpass_file: &Path,
@@ -70,52 +9,48 @@ pub fn lookup_password_from_file(
     database: &str,
     user: &str,
 ) -> Option<String> {
-    let content = fs::read_to_string(pgpass_file).ok()?;
+    let pgpass = PgPass::open(pgpass_file).ok()?;
 
-    for raw_line in content.lines() {
-        let line = raw_line.trim_end_matches(['\n', '\r']);
-        let trimmed = line.trim_start();
+    let creds = pgpass
+        .query()
+        .hostname(host)
+        .ok()?
+        .port(port)
+        .ok()?
+        .database(database)
+        .ok()?
+        .username(user)
+        .ok()?
+        .find()
+        .ok()??;
 
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-
-        let Some([h, p, d, u, pw]) = split_pgpass_line(trimmed) else {
-            continue;
-        };
-
-        let port_str = port.to_string();
-
-        if pgpass_field_matches(&h, host)
-            && pgpass_field_matches(&p, &port_str)
-            && pgpass_field_matches(&d, database)
-            && pgpass_field_matches(&u, user)
-        {
-            return Some(pw);
-        }
-    }
-
-    None
+    Some(creds.password)
 }
 
 pub fn lookup_password(host: &str, port: u16, database: &str, user: &str) -> Option<String> {
-    let pgpass_file = pgpass_path_from_env()?;
-    lookup_password_from_file(&pgpass_file, host, port, database, user)
+    let pgpass = PgPass::load().ok()?;
+
+    let creds = pgpass
+        .query()
+        .hostname(host)
+        .ok()?
+        .port(port)
+        .ok()?
+        .database(database)
+        .ok()?
+        .username(user)
+        .ok()?
+        .find()
+        .ok()??;
+
+    Some(creds.password)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_split_pgpass_line() {
-        let parsed = split_pgpass_line(r"localhost:5432:mydb:me:p\:a\\ss").unwrap();
-        assert_eq!(parsed[0], "localhost");
-        assert_eq!(parsed[1], "5432");
-        assert_eq!(parsed[2], "mydb");
-        assert_eq!(parsed[3], "me");
-        assert_eq!(parsed[4], "p:a\\ss");
-    }
+    use std::env;
+    use std::fs;
 
     #[test]
     fn test_lookup_password_from_file_matches_first() {

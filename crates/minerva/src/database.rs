@@ -2,6 +2,7 @@ use std::env;
 use std::time::Duration;
 
 use log::debug;
+use postgres_secrets::PgPass;
 use rustls::ClientConfig as RustlsClientConfig;
 
 use tokio_postgres::{config::SslMode, Config};
@@ -50,18 +51,43 @@ pub fn get_db_config() -> Result<Config, Error> {
 
         let default_user_name = env::var("USER").unwrap_or("postgres".into());
 
+        let host = env::var("PGHOST").unwrap_or("/var/run/postgresql".into());
+        let user = env::var("PGUSER").unwrap_or(default_user_name);
+        let dbname = env::var("PGDATABASE").unwrap_or("postgres".into());
+
         let config = config
-            .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
+            .host(&host)
             .port(port)
-            .user(env::var("PGUSER").unwrap_or(default_user_name))
-            .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
+            .user(&user)
+            .dbname(&dbname)
             .ssl_mode(sslmode);
 
         let pg_password = env::var("PGPASSWORD");
 
         match pg_password {
             Ok(password) => config.password(password).clone(),
-            Err(_) => config.clone(),
+            Err(_) => {
+                let pgpass = PgPass::load();
+                match pgpass {
+                    Ok(pgpass) => {
+                        let query = pgpass
+                            .query()
+                            .hostname(&host)
+                            .and_then(|q| q.port(port))
+                            .and_then(|q| q.database(&dbname))
+                            .and_then(|q| q.username(&user));
+
+                        match query {
+                            Ok(q) => match q.find() {
+                                Ok(Some(creds)) => config.password(creds.password).clone(),
+                                _ => config.clone(),
+                            },
+                            Err(_) => config.clone(),
+                        }
+                    }
+                    Err(_) => config.clone(),
+                }
+            }
         }
     };
 
