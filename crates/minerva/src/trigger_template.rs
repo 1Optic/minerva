@@ -10,6 +10,9 @@ use crate::trigger::{
     trigger_exists, KPIDataColumn, Threshold, TrendStoreLink, Trigger, TriggerError,
 };
 
+const DEFAULT_THRESHOLD_DATA_TYPE: &str = "numeric";
+const DEFAULT_THRESHOLD_VALUE: &str = "0";
+
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum TriggerTemplateError {
@@ -66,7 +69,29 @@ pub struct ParameterValue {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExtendedParameterValue {
+    pub name: String,
+    pub value: String,
+    pub data_type: Option<String>,
+    pub default_value: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TemplatedTrigger {
+    pub template: Template,
+    pub name: String,
+    pub description: Option<String>,
+    pub parameters: Vec<ExtendedParameterValue>,
+    pub thresholds: Option<Vec<Threshold>>,
+    pub entity_type: String,
+    #[serde(with = "humantime_serde")]
+    pub granularity: Duration,
+    pub weight: i32,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FullTemplatedTrigger {
     pub template: Template,
     pub name: String,
     pub description: Option<String>,
@@ -77,6 +102,26 @@ pub struct TemplatedTrigger {
     pub granularity: Duration,
     pub weight: i32,
     pub enabled: bool,
+}
+
+impl From<ExtendedParameterValue> for ParameterValue {
+    fn from(epv: ExtendedParameterValue) -> Self {
+        ParameterValue {
+            name: epv.name,
+            value: epv.value,
+        }
+    }
+}
+
+impl From<ParameterValue> for ExtendedParameterValue {
+    fn from(pv: ParameterValue) -> Self {
+        ExtendedParameterValue {
+            name: pv.name,
+            value: pv.value,
+            default_value: None,
+            data_type: None,
+        }
+    }
 }
 
 impl From<DatabaseError> for TriggerTemplateError {
@@ -90,6 +135,81 @@ impl From<TriggerError> for TriggerTemplateError {
         match e {
             TriggerError::DatabaseError(e) => TriggerTemplateError::DatabaseError(e),
             te => TriggerTemplateError::TriggerError(te),
+        }
+    }
+}
+
+impl From<FullTemplatedTrigger> for TemplatedTrigger {
+    fn from(full: FullTemplatedTrigger) -> Self {
+        TemplatedTrigger {
+            template: full.template,
+            name: full.name,
+            description: full.description,
+            parameters: full.parameters.into_iter().map(|p| p.into()).collect(),
+            thresholds: Some(full.thresholds),
+            entity_type: full.entity_type,
+            granularity: full.granularity,
+            weight: full.weight,
+            enabled: full.enabled,
+        }
+    }
+}
+
+impl From<TemplatedTrigger> for FullTemplatedTrigger {
+    fn from(template: TemplatedTrigger) -> Self {
+        match template.thresholds {
+            Some(thresholds) => FullTemplatedTrigger {
+                template: template.template,
+                name: template.name,
+                description: template.description,
+                parameters: template.parameters.into_iter().map(|p| p.into()).collect(),
+                thresholds,
+                entity_type: template.entity_type,
+                granularity: template.granularity,
+                weight: template.weight,
+                enabled: template.enabled,
+            },
+            None => {
+                let thresholds: Vec<Threshold> = template
+                    .parameters
+                    .iter()
+                    .filter_map(|p| {
+                        let parameter = template.template.clone().get_parameter(&p.name);
+                        let ptype = match &parameter {
+                            Some(param) => param.parameter_type.clone(),
+                            None => panic!("Parameter {} not found in template", p.name),
+                        };
+                        if ptype == ParameterType::ThresholdVariable
+                            || ptype == ParameterType::LookbackVariable
+                        {
+                            Some(Threshold {
+                                name: p.value.clone(),
+                                data_type: p
+                                    .data_type
+                                    .clone()
+                                    .unwrap_or(DEFAULT_THRESHOLD_DATA_TYPE.to_string()),
+                                value: p
+                                    .default_value
+                                    .clone()
+                                    .unwrap_or(DEFAULT_THRESHOLD_VALUE.to_string()),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                FullTemplatedTrigger {
+                    template: template.template,
+                    name: template.name,
+                    description: template.description,
+                    parameters: template.parameters.into_iter().map(|p| p.into()).collect(),
+                    thresholds,
+                    entity_type: template.entity_type,
+                    granularity: template.granularity,
+                    weight: template.weight,
+                    enabled: template.enabled,
+                }
+            }
         }
     }
 }
@@ -114,7 +234,7 @@ impl Template {
     }
 }
 
-impl TemplatedTrigger {
+impl FullTemplatedTrigger {
     pub fn check_trigger(&self) -> Result<(), TriggerTemplateError> {
         if let Some(parm) = self.template.parameters.clone().into_iter().find(|p| {
             !self
