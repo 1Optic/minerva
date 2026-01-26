@@ -159,7 +159,7 @@ impl From<TemplatedTrigger> for FullTemplatedTrigger {
     fn from(template: TemplatedTrigger) -> Self {
         let any_thresholds = match template.thresholds.clone() {
             Some(thresholds) => !thresholds.is_empty(),
-            None => false,  
+            None => false,
         };
         if any_thresholds {
             FullTemplatedTrigger {
@@ -791,24 +791,26 @@ mod tests {
             name: "Test Template".to_string(),
             description: "Trigger when {trend} {comparison} {value}".to_string(),
             sql: "{trend} {comparison} {value}".to_string(),
-            parameters: vec![TemplateParameter {
-                name: "trend".to_string(),
-                parameter_type: ParameterType::Counter,
-                has_lookback: false,
-                lookback_parameter: None,
-            },
-            TemplateParameter {
-                name: "comparison".to_string(),
-                parameter_type: ParameterType::Default,
-                has_lookback: false,
-                lookback_parameter: None,
-            },
-            TemplateParameter {
-                name: "value".to_string(),
-                parameter_type: ParameterType::ThresholdVariable,
-                has_lookback: false,
-                lookback_parameter: None,
-            }],
+            parameters: vec![
+                TemplateParameter {
+                    name: "trend".to_string(),
+                    parameter_type: ParameterType::Counter,
+                    has_lookback: false,
+                    lookback_parameter: None,
+                },
+                TemplateParameter {
+                    name: "comparison".to_string(),
+                    parameter_type: ParameterType::Default,
+                    has_lookback: false,
+                    lookback_parameter: None,
+                },
+                TemplateParameter {
+                    name: "value".to_string(),
+                    parameter_type: ParameterType::ThresholdVariable,
+                    has_lookback: false,
+                    lookback_parameter: None,
+                },
+            ],
         };
         let templated_trigger1 = TemplatedTrigger {
             template: template.clone(),
@@ -840,8 +842,7 @@ mod tests {
             weight: 10,
             enabled: true,
         };
-        let full_templated_trigger1: FullTemplatedTrigger =
-            templated_trigger1.clone().into();
+        let full_templated_trigger1: FullTemplatedTrigger = templated_trigger1.clone().into();
         assert_eq!(full_templated_trigger1.thresholds.len(), 1);
         assert_eq!(full_templated_trigger1.thresholds[0].name, "min_usage");
         assert_eq!(full_templated_trigger1.thresholds[0].data_type, "numeric");
@@ -880,9 +881,8 @@ mod tests {
             granularity: Duration::from_secs(900),
             weight: 10,
             enabled: true,
-        };        
-        let full_templated_trigger2: FullTemplatedTrigger =
-            templated_trigger2.clone().into();
+        };
+        let full_templated_trigger2: FullTemplatedTrigger = templated_trigger2.clone().into();
         assert_eq!(full_templated_trigger2.thresholds.len(), 1);
         assert_eq!(full_templated_trigger2.thresholds[0].name, "min_usage");
         assert_eq!(full_templated_trigger2.thresholds[0].data_type, "numeric");
@@ -918,12 +918,10 @@ mod tests {
             weight: 10,
             enabled: true,
         };
-        let full_templated_trigger3: FullTemplatedTrigger =
-            templated_trigger3.clone().into();
+        let full_templated_trigger3: FullTemplatedTrigger = templated_trigger3.clone().into();
         assert_eq!(full_templated_trigger3.thresholds.len(), 1);
         assert_eq!(full_templated_trigger3.thresholds[0].name, "min_usage");
         assert_eq!(full_templated_trigger3.thresholds[0].data_type, "numeric");
         assert_eq!(full_templated_trigger3.thresholds[0].value, "80");
-
     }
 }
