@@ -157,8 +157,52 @@ impl From<FullTemplatedTrigger> for TemplatedTrigger {
 
 impl From<TemplatedTrigger> for FullTemplatedTrigger {
     fn from(template: TemplatedTrigger) -> Self {
-        match template.thresholds {
-            Some(thresholds) => FullTemplatedTrigger {
+        let any_thresholds = match template.thresholds.clone() {
+            Some(thresholds) => !thresholds.is_empty(),
+            None => false,  
+        };
+        if any_thresholds {
+            FullTemplatedTrigger {
+                template: template.template,
+                name: template.name,
+                description: template.description,
+                parameters: template.parameters.into_iter().map(|p| p.into()).collect(),
+                thresholds: template.thresholds.unwrap(),
+                entity_type: template.entity_type,
+                granularity: template.granularity,
+                weight: template.weight,
+                enabled: template.enabled,
+            }
+        } else {
+            let thresholds: Vec<Threshold> = template
+                .parameters
+                .iter()
+                .filter_map(|p| {
+                    let parameter = template.template.clone().get_parameter(&p.name);
+                    let ptype = match &parameter {
+                        Some(param) => param.parameter_type.clone(),
+                        None => panic!("Parameter {} not found in template", p.name),
+                    };
+                    if ptype == ParameterType::ThresholdVariable
+                        || ptype == ParameterType::LookbackVariable
+                    {
+                        Some(Threshold {
+                            name: p.value.clone(),
+                            data_type: p
+                                .data_type
+                                .clone()
+                                .unwrap_or(DEFAULT_THRESHOLD_DATA_TYPE.to_string()),
+                            value: p
+                                .default_value
+                                .clone()
+                                .unwrap_or(DEFAULT_THRESHOLD_VALUE.to_string()),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            FullTemplatedTrigger {
                 template: template.template,
                 name: template.name,
                 description: template.description,
@@ -168,47 +212,6 @@ impl From<TemplatedTrigger> for FullTemplatedTrigger {
                 granularity: template.granularity,
                 weight: template.weight,
                 enabled: template.enabled,
-            },
-            None => {
-                let thresholds: Vec<Threshold> = template
-                    .parameters
-                    .iter()
-                    .filter_map(|p| {
-                        let parameter = template.template.clone().get_parameter(&p.name);
-                        let ptype = match &parameter {
-                            Some(param) => param.parameter_type.clone(),
-                            None => panic!("Parameter {} not found in template", p.name),
-                        };
-                        if ptype == ParameterType::ThresholdVariable
-                            || ptype == ParameterType::LookbackVariable
-                        {
-                            Some(Threshold {
-                                name: p.value.clone(),
-                                data_type: p
-                                    .data_type
-                                    .clone()
-                                    .unwrap_or(DEFAULT_THRESHOLD_DATA_TYPE.to_string()),
-                                value: p
-                                    .default_value
-                                    .clone()
-                                    .unwrap_or(DEFAULT_THRESHOLD_VALUE.to_string()),
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                FullTemplatedTrigger {
-                    template: template.template,
-                    name: template.name,
-                    description: template.description,
-                    parameters: template.parameters.into_iter().map(|p| p.into()).collect(),
-                    thresholds,
-                    entity_type: template.entity_type,
-                    granularity: template.granularity,
-                    weight: template.weight,
-                    enabled: template.enabled,
-                }
             }
         }
     }
@@ -775,4 +778,152 @@ pub async fn get_template_from_id(
         sql: bare_template.sql_body,
         parameters,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_templated_trigger_to_full_templated_trigger() {
+        let template = Template {
+            id: 1,
+            name: "Test Template".to_string(),
+            description: "Trigger when {trend} {comparison} {value}".to_string(),
+            sql: "{trend} {comparison} {value}".to_string(),
+            parameters: vec![TemplateParameter {
+                name: "trend".to_string(),
+                parameter_type: ParameterType::Counter,
+                has_lookback: false,
+                lookback_parameter: None,
+            },
+            TemplateParameter {
+                name: "comparison".to_string(),
+                parameter_type: ParameterType::Default,
+                has_lookback: false,
+                lookback_parameter: None,
+            },
+            TemplateParameter {
+                name: "value".to_string(),
+                parameter_type: ParameterType::ThresholdVariable,
+                has_lookback: false,
+                lookback_parameter: None,
+            }],
+        };
+        let templated_trigger1 = TemplatedTrigger {
+            template: template.clone(),
+            name: "Test Trigger 1".to_string(),
+            description: Some("A test trigger".to_string()),
+            parameters: vec![
+                ExtendedParameterValue {
+                    name: "trend".to_string(),
+                    value: "cpu_usage".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "comparison".to_string(),
+                    value: ">".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "value".to_string(),
+                    value: "min_usage".to_string(),
+                    data_type: Some("numeric".to_string()),
+                    default_value: Some("80".to_string()),
+                },
+            ],
+            thresholds: None,
+            entity_type: "server".to_string(),
+            granularity: Duration::from_secs(900),
+            weight: 10,
+            enabled: true,
+        };
+        let full_templated_trigger1: FullTemplatedTrigger =
+            templated_trigger1.clone().into();
+        assert_eq!(full_templated_trigger1.thresholds.len(), 1);
+        assert_eq!(full_templated_trigger1.thresholds[0].name, "min_usage");
+        assert_eq!(full_templated_trigger1.thresholds[0].data_type, "numeric");
+        assert_eq!(full_templated_trigger1.thresholds[0].value, "80");
+
+        let templated_trigger2 = TemplatedTrigger {
+            template: template.clone(),
+            name: "Test Trigger 1".to_string(),
+            description: Some("A test trigger".to_string()),
+            parameters: vec![
+                ExtendedParameterValue {
+                    name: "trend".to_string(),
+                    value: "cpu_usage".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "comparison".to_string(),
+                    value: ">".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "value".to_string(),
+                    value: "min_usage".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+            ],
+            thresholds: Some(vec![Threshold {
+                name: "min_usage".to_string(),
+                data_type: "numeric".to_string(),
+                value: "80".to_string(),
+            }]),
+            entity_type: "server".to_string(),
+            granularity: Duration::from_secs(900),
+            weight: 10,
+            enabled: true,
+        };        
+        let full_templated_trigger2: FullTemplatedTrigger =
+            templated_trigger2.clone().into();
+        assert_eq!(full_templated_trigger2.thresholds.len(), 1);
+        assert_eq!(full_templated_trigger2.thresholds[0].name, "min_usage");
+        assert_eq!(full_templated_trigger2.thresholds[0].data_type, "numeric");
+        assert_eq!(full_templated_trigger2.thresholds[0].value, "80");
+
+        let templated_trigger3 = TemplatedTrigger {
+            template: template.clone(),
+            name: "Test Trigger 1".to_string(),
+            description: Some("A test trigger".to_string()),
+            parameters: vec![
+                ExtendedParameterValue {
+                    name: "trend".to_string(),
+                    value: "cpu_usage".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "comparison".to_string(),
+                    value: ">".to_string(),
+                    data_type: None,
+                    default_value: None,
+                },
+                ExtendedParameterValue {
+                    name: "value".to_string(),
+                    value: "min_usage".to_string(),
+                    data_type: Some("numeric".to_string()),
+                    default_value: Some("80".to_string()),
+                },
+            ],
+            thresholds: Some(vec![]),
+            entity_type: "server".to_string(),
+            granularity: Duration::from_secs(900),
+            weight: 10,
+            enabled: true,
+        };
+        let full_templated_trigger3: FullTemplatedTrigger =
+            templated_trigger3.clone().into();
+        assert_eq!(full_templated_trigger3.thresholds.len(), 1);
+        assert_eq!(full_templated_trigger3.thresholds[0].name, "min_usage");
+        assert_eq!(full_templated_trigger3.thresholds[0].data_type, "numeric");
+        assert_eq!(full_templated_trigger3.thresholds[0].value, "80");
+
+    }
 }
