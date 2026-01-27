@@ -2,6 +2,7 @@ use std::env;
 use std::time::Duration;
 
 use log::debug;
+use postgres_secrets::{pgpass::CredentialQuery, PgPass};
 use rustls::ClientConfig as RustlsClientConfig;
 
 use tokio_postgres::{config::SslMode, Config};
@@ -53,7 +54,7 @@ pub fn get_db_config() -> Result<Config, Error> {
         let config = config
             .host(env::var("PGHOST").unwrap_or("/var/run/postgresql".into()))
             .port(port)
-            .user(env::var("PGUSER").unwrap_or(default_user_name))
+            .user(env::var("PGUSER").unwrap_or(default_user_name.clone()))
             .dbname(env::var("PGDATABASE").unwrap_or("postgres".into()))
             .ssl_mode(sslmode);
 
@@ -61,7 +62,29 @@ pub fn get_db_config() -> Result<Config, Error> {
 
         match pg_password {
             Ok(password) => config.password(password).clone(),
-            Err(_) => config.clone(),
+            Err(_) => {
+                // PGPASSWORD not set, try pgpass file
+                if let Ok(pgpass) = PgPass::load() {
+                    let host = env::var("PGHOST").unwrap_or("/var/run/postgresql".into());
+                    let port = env::var("PGPORT").unwrap_or("5432".into());
+                    let user = env::var("PGUSER").unwrap_or(default_user_name);
+                    let dbname = env::var("PGDATABASE").unwrap_or("postgres".into());
+
+                    let query = CredentialQuery {
+                        hostname: Some(host.clone()),
+                        port: port.parse().ok(),
+                        database: Some(dbname.clone()),
+                        username: Some(user.clone()),
+                    };
+                    if let Ok(Some(credentials)) = pgpass.find(&query) {
+                        config.password(&credentials.password).clone()
+                    } else {
+                        config.clone()
+                    }
+                } else {
+                    config.clone()
+                }
+            }
         }
     };
 

@@ -2466,6 +2466,7 @@ dependencies = [
  "pg_query",
  "postgres-protocol",
  "postgres-types",
+ "postgres_secrets",
  "quick_cache",
  "rand 0.9.2",
  "refinery",
@@ -3037,6 +3038,20 @@ dependencies = [
  "postgres-protocol",
  "serde_core",
  "serde_json",
+]
+
+[[package]]
+name = "postgres_secrets"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81831384be7b02a24777c28c48596354dd03a1b95912edc9a6efaa740bfde3ee"
+dependencies = [
+ "home",
+ "log",
+ "nom",
+ "postgres",
+ "serde",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
