@@ -67,7 +67,7 @@ sets of 'v-cell' entities:
 
 ### Creation Of Entity Sets
 
-1. Create a new entity_set entity with a name of 'group=<group>,owner=<owner>,name=<entity_set_name>'.
+1. Create a new entity_set entity with a name of 'group=`group`,owner=`owner`,name=<entity_set_name>'.
 2. Insert record in the table `directory.entity_set` leaving
    `current_revision_id` with a NULL value.
 3. Check if there are already tables in the 'entity_set' schema for entity set
@@ -91,8 +91,7 @@ sets of 'v-cell' entities:
    created revision.
 3. Insert records for the updated set of entities in the entity set data table
    using the id of the newly created revision.
-5. Set the `current_revision_id` of the entity set to the id of the newly  
-   created revision.
+4. Set the `current_revision_id` of the entity set to the id of the newly created revision.
 
 ### Deleting Of Entity Sets
 

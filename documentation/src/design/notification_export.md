@@ -11,14 +11,14 @@ they already have. To do so, the service specifies the last notification
 that it has received.
 
 There are two functions to be created:
-notification\_directory.get\_notifications(notification\_store\_id, signifier, 
-number) asks for the next at most _number_ notifications, and 
-notification\_directory.get\_notifications(notification\_store\_id, signifier) 
-does the same with a default _number_. Signifier here is the id of the last 
+notification\_directory.get\_notifications(notification\_store\_id, signifier,
+number) asks for the next at most _number_ notifications, and
+notification\_directory.get\_notifications(notification\_store\_id, signifier)
+does the same with a default _number_. Signifier here is the id of the last
 message that has been received.
 
 There also has to be a possibility to receive the last messages, to start
-the receipt of messages from a new entity. This is done with a special 
+the receipt of messages from a new entity. This is done with a special
 function get\_last\_notifications(number), which receives the last _number_
 messages.
 
@@ -26,12 +26,13 @@ messages.
 
 The function returns a list of notification objects, where
 the notification object has the following components:
-* id <integer>: the id of the notification
-* timestamp <timestamp>: the timestamp to which the notification applies
-* rule <string>: the name of the rule that triggered the notification
-* entity <string>: the name of the entity to which the notification applies
-* details <string>: the details field of the notification
-* data <object>: the data field of the notification
+
+* id `integer`: the id of the notification
+* timestamp `timestamp`: the timestamp to which the notification applies
+* rule `string`: the name of the rule that triggered the notification
+* entity `string`: the name of the entity to which the notification applies
+* details `string`: the details field of the notification
+* data `object`: the data field of the notification
 
 This is a new type which I'll call notification.notification_description
 
@@ -43,14 +44,14 @@ a column is added to the notification with the entity\_type\_id.
 
 ## Functions
 
-notification\_directory.get\_notifications(notification\_store\_id, signifier, 
+notification\_directory.get\_notifications(notification\_store\_id, signifier,
 number) asks for the next at most _number_ notifications, and returns them
 as notification.notification_description objects.
 
-
 This way we get a function (untested):
-```
-CREATE FUNCTION notification_directory."get_notifications(notification_store_id integer, signifier integer, 
+
+```SQL
+CREATE FUNCTION notification_directory."get_notifications(notification_store_id integer, signifier integer,
 number integer)
   RETURNS SETOF notification.notification_description
 AS $$
@@ -83,11 +84,11 @@ The application can then easily turn this into JSON.
 
 To keep track of the last message that has been received by a service,
 a table is to be created where the name of the service and the last message
-received are saved. I propose to name this table 
+received are saved. I propose to name this table
 notification\_directory.receiving\_application with columns name,
-notification\_store\_id and last\_notification. Two functions are of course 
-needed: notification\_directory.get\_last\_notification\_id(name, 
-notification\_store\_id) and 
-notification\_directory.set\_last\_notification\_id(name, 
+notification\_store\_id and last\_notification. Two functions are of course
+needed: notification\_directory.get\_last\_notification\_id(name,
+notification\_store\_id) and
+notification\_directory.set\_last\_notification\_id(name,
 notification\_store\_id, number). notification\_id may be None, so that
 services can choose themselves whether they use this information or not.
