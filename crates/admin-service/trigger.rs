@@ -16,8 +16,8 @@ use minerva::trigger::{
     AddTrigger, DeleteTrigger, Threshold, TriggerError,
 };
 use minerva::trigger_template::{
-    get_bare_template, get_template_from_id, list_templates, BareTemplate, ParameterValue,
-    Template, TemplatedTrigger, TriggerTemplateError,
+    get_bare_template, get_template_from_id, list_templates, BareTemplate, ExtendedParameterValue,
+    FullTemplatedTrigger, ParameterValue, Template, TemplatedTrigger, TriggerTemplateError,
 };
 
 use super::serviceerror::{ExtendedServiceError, ServiceErrorKind};
@@ -56,6 +56,8 @@ pub struct ShortTemplateData {
 pub struct ParameterData {
     pub name: String,
     pub value: String,
+    pub data_type: Option<String>,
+    pub default_value: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -68,7 +70,7 @@ pub struct TemplateInstanceDefinition {
 pub struct TemplatedTriggerDefinition {
     pub name: String,
     pub description: Option<String>,
-    pub thresholds: Vec<ThresholdData>,
+    pub thresholds: Option<Vec<ThresholdData>>,
     pub entity_type: String,
     #[serde(with = "humantime_serde")]
     pub granularity: Duration,
@@ -135,21 +137,37 @@ impl From<Template> for ShortTemplateData {
     }
 }
 
-impl From<ParameterValue> for ParameterData {
-    fn from(parm: ParameterValue) -> Self {
+impl From<ExtendedParameterValue> for ParameterData {
+    fn from(parm: ExtendedParameterValue) -> Self {
         ParameterData {
             name: parm.name,
             value: parm.value,
+            data_type: parm.data_type,
+            default_value: parm.default_value,
+        }
+    }
+}
+
+impl From<ParameterValue> for ParameterData {
+    fn from(parm: ParameterValue) -> Self {
+        ExtendedParameterValue::from(parm).into()
+    }
+}
+
+impl From<ParameterData> for ExtendedParameterValue {
+    fn from(parm: ParameterData) -> Self {
+        ExtendedParameterValue {
+            name: parm.name,
+            value: parm.value,
+            data_type: parm.data_type,
+            default_value: parm.default_value,
         }
     }
 }
 
 impl From<ParameterData> for ParameterValue {
     fn from(parm: ParameterData) -> Self {
-        ParameterValue {
-            name: parm.name,
-            value: parm.value,
-        }
+        ExtendedParameterValue::from(parm).into()
     }
 }
 
@@ -670,22 +688,22 @@ async fn create_trigger_fn(
             .parameters
             .clone()
             .into_iter()
-            .map(ParameterValue::from)
+            .map(ExtendedParameterValue::from)
             .collect(),
         thresholds: data
             .thresholds
-            .clone()
-            .into_iter()
-            .map(Threshold::from)
-            .collect(),
+            .map(|thresholds| thresholds.into_iter().map(ThresholdData::into).collect()),
         entity_type: data.entity_type.clone(),
         granularity: data.granularity,
         weight: data.weight,
         enabled: data.enabled,
     };
-    debug!("Got trigger {templated_trigger:?}");
 
-    let trigger = templated_trigger
+    let full_templated_trigger: FullTemplatedTrigger = templated_trigger.clone().into();
+
+    debug!("Got trigger {full_templated_trigger:?}");
+
+    let trigger = full_templated_trigger
         .create_trigger(&mut transaction)
         .await
         .map_err(|e| match e {
