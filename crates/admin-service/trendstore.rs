@@ -11,6 +11,7 @@ use actix_web::{get, post, web::Data, web::Path, web::Query, HttpResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use minerva::entity::default_entity_id_type;
 use minerva::interval::parse_interval;
 use minerva::trend_store::create::create_trend_store_part;
 use minerva::trend_store::{
@@ -160,6 +161,7 @@ impl TrendStorePartData {
             trends,
             generated_trends,
             has_alias_column: false,
+            entity_id_type: default_entity_id_type(),
         }
     }
 }

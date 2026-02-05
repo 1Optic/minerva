@@ -18,6 +18,8 @@ pub enum AttributeStorageError {
     DatabaseError(tokio_postgres::Error),
     #[error("Could not map entities: {0}")]
     EntityMappingError(EntityMappingError),
+    #[error("Other error: {0}")]
+    OtherError(String),
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +120,7 @@ impl RawAttributeStore for AttributeStore {
 
         let entity_names: Vec<String> = rows.iter().map(|row| row.entity_name.clone()).collect();
 
-        let entity_ids: Vec<i32> = entity_mapping
+        let entity_ids: Vec<i64> = entity_mapping
             .names_to_entity_ids(tx, &self.entity_type, &entity_names)
             .await
             .map_err(AttributeStorageError::EntityMappingError)?;
@@ -169,7 +171,30 @@ impl RawAttributeStore for AttributeStore {
                 })
                 .collect();
 
-            let mut vs: Vec<&(dyn ToSql + Sync)> = vec![&entity_id, &row.timestamp];
+            let mut vs: Vec<&(dyn ToSql + Sync)> = vec![];
+            let i32_entity_id: i32;
+
+            match self.entity_id_type {
+                crate::entity::EntityIdType::I32 => {
+                    let entity_id_result: Result<i32, _> = entity_id.try_into();
+                    match entity_id_result {
+                        Ok(v) => {
+                            i32_entity_id = v;
+                            vs.push(&i32_entity_id);
+                        }
+                        Err(e) => {
+                            return Err(AttributeStorageError::OtherError(format!(
+                                "Entity ID {entity_id} cannot be represented as i32: {e}"
+                            )));
+                        }
+                    }
+                }
+                crate::entity::EntityIdType::I64 => {
+                    vs.push(&entity_id);
+                }
+            }
+
+            vs.push(&row.timestamp);
             vs.extend(attr_values.iter().map(map_value));
 
             binary_copy_writer

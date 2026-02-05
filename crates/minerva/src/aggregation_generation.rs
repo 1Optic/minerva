@@ -429,6 +429,7 @@ fn define_part_time_aggregation(
         trends: aggregate_trends,
         generated_trends: vec![],
         has_alias_column: source_part.has_alias_column,
+        entity_id_type: source_part.entity_id_type.clone(),
     };
 
     Ok((materialization, target_trend_store_part))
@@ -844,6 +845,7 @@ fn define_aggregate_trend_store(
                 trends,
                 generated_trends,
                 has_alias_column: src_part.has_alias_column,
+                entity_id_type: src_part.entity_id_type.clone(),
             })
         })
         .collect::<Result<Vec<TrendStorePart>, String>>()?;

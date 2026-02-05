@@ -7,6 +7,7 @@ use std::{collections::HashMap, path::PathBuf};
 use clap::Parser;
 use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_store};
 use minerva::attribute_store::{Attribute, AttributeStore};
+use minerva::entity::default_entity_id_type;
 use minerva::error::RuntimeError;
 use minerva::instance::{load_instance_config, load_trend_stores_from, InstanceConfig};
 use minerva::meas_value::DataType;
@@ -258,6 +259,7 @@ impl TrendStorePartHolder {
                 trends: Vec::new(),
                 generated_trends: Vec::new(),
                 has_alias_column: false,
+                entity_id_type: default_entity_id_type(),
             });
 
         part.trends.push(trend);
@@ -278,6 +280,7 @@ impl TrendStorePartHolder {
                 trends: Vec::new(),
                 generated_trends: Vec::new(),
                 has_alias_column: false,
+                entity_id_type: default_entity_id_type(),
             });
 
         let mut current_num = 1;
@@ -293,6 +296,7 @@ impl TrendStorePartHolder {
                     trends: Vec::new(),
                     generated_trends: Vec::new(),
                     has_alias_column: false,
+                    entity_id_type: default_entity_id_type(),
                 });
 
             current_num += 1;
@@ -441,6 +445,7 @@ fn define_attribute_stores(
                 data_source: attribute_definition.data_source.clone(),
                 entity_type: entity_type_name.clone(),
                 attributes: Vec::new(),
+                entity_id_type: default_entity_id_type(),
             });
 
         if attribute_store
@@ -469,6 +474,7 @@ fn define_attribute_stores(
                         data_source: instance_config.attribute_extraction.data_source.clone(),
                         entity_type: a.entity_type.clone(),
                         attributes: Vec::new(),
+                        entity_id_type: default_entity_id_type(),
                     });
 
             for add_attribute in &a.attributes {
@@ -500,7 +506,9 @@ mod tests {
         trend_store::{Trend, TrendStore, TrendStorePart},
     };
 
-    use crate::commands::define::{define_attribute_stores, AttributeDefinition, TrendDefinition};
+    use crate::commands::define::{
+        default_entity_id_type, define_attribute_stores, AttributeDefinition, TrendDefinition,
+    };
 
     use super::{define_trend_stores, TrendStorePartParameters};
 
@@ -551,6 +559,7 @@ mod tests {
                 }],
                 generated_trends: vec![],
                 has_alias_column: false,
+                entity_id_type: default_entity_id_type(),
             }],
         }];
 
