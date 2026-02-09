@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.43.0] - 2026-02-09
+
+### Added
+
+- admin-service: Allow putting threshold values in template parameters
+- cli: Add pgpass file support
+- design: Add multi-stage relation materialization
+- lib: Improve entity id and alias handling
+
+### Fixed
+
+- docs: Fix mdbook build and warnings
+- lib: Fix generated aggregation durations
+- lib: Fix cascade deletion of trigger-tables
+
 ## [9.42.0] - 2026-01-14
 
 ### Added
@@ -597,4 +612,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.40.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.39.1...9.40.0
 [9.41.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.40.0...9.41.0
 [9.42.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.41.0...9.42.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.42.0...HEAD
+[9.43.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.42.0...9.43.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.0...HEAD
