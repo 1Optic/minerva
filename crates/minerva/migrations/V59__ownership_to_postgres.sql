@@ -91,4 +91,3 @@ SELECT chown_all_functions('trigger');
 SELECT chown_all_functions('virtual_entity');
 
 DROP FUNCTION chown_all_functions(text);
-
