@@ -45,7 +45,7 @@ thiserror = "2.0.18"
 postgres-protocol = "0.6.10"
 ctor = "0.6.3"
 libtest-mimic = "0.8.1"
-futures = "0.3.31"
+futures = "0.3.32"
 
 [[test]]
 name = "integration_tests"
