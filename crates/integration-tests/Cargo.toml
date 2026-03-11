@@ -8,7 +8,7 @@ description = "Minerva integration tests"
 
 [dependencies]
 minerva = { version = "*", path = "../minerva" }
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 tokio-postgres = { version = "0.7.16", features = ["with-chrono-0_4", "with-serde_json-1"] }
 rustls = "0.23.37"
 rustls-native-certs = "0.8.3"
@@ -32,11 +32,11 @@ lazy_static = "1.5.0"
 assert_cmd = "2.2.0"
 predicates = "3.1.4"
 rand = "0.10.0"
-tempfile = "3.26.0"
+tempfile = "3.27.0"
 reqwest = { version = "0.13.2", features = ["json"] }
 rust_decimal = "1.40.0"
 rust_decimal_macros = "1.40.0"
-testcontainers = "0.25.2"
+testcontainers = "0.27.1"
 url = "2.5.8"
 log = "0.4.29"
 async-trait = "0.1.89"
