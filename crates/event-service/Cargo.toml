@@ -12,7 +12,7 @@ path = "main.rs"
 [dependencies]
 serde = "1.0.228"
 serde_json = "1.0.149"
-chrono = "0.4"
+chrono = "0.4.20"
 humantime-serde = "1.1.1"
 utoipa = "5.4.0"
 postgres = { version = "0.19.12", features = ["with-serde_json-1"] }
