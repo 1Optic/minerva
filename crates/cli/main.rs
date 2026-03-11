@@ -1,6 +1,6 @@
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
 use std::io;
 use std::process::ExitCode;
@@ -90,7 +90,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     if let Some(env_file) = &cli.env_file {
-        match dotenv::from_path(env_file) {
+        match dotenvy::from_path(env_file) {
             Ok(_) => (),
             Err(e) => {
                 eprintln!("Failed to load .env file from {env_file}: {e}");
