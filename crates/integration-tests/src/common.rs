@@ -10,7 +10,7 @@ use minerva::error::{Error, RuntimeError};
 use log::{debug, error, info};
 use postgres_protocol::escape::{escape_identifier, escape_literal};
 use rand::distr::{Alphanumeric, SampleString};
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use testcontainers::core::{ContainerPort, ContainerRequest};
 use testcontainers::runners::AsyncRunner;
