@@ -13,6 +13,15 @@ BEGIN
     PERFORM run_command_on_workers(format('ALTER VIEW %I.%I OWNER TO %I', $1, "view", $2));
     EXECUTE format('ALTER VIEW %I.%I OWNER TO %I', $1, "view", $2);
   END LOOP;
+  FOR "type" IN (
+    SELECT typname FROM pg_type t 
+      LEFT JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid 
+      LEFT JOIN pg_catalog.pg_class c ON c.oid = t.typrelid 
+    WHERE c.relkind = 'c' AND n.nspname = $1
+   ) LOOP
+    PERFORM run_command_on_workers(format('ALTER TYPE %I.%I OWNER TO %I', $1, "type", $2));
+    EXECUTE format('ALTER TYPE %I.%I OWNER TO %I', $1, "type", $2);
+  END LOOP;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
 
