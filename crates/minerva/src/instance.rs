@@ -408,25 +408,27 @@ impl MinervaInstance {
 
             table_node_map.insert(format!("relation.{}", &relation.name), relation_node_index);
 
-            // Parse the SQL with the relation definition to find what tables it has as
-            // dependencies
-            match pg_query::parse(&relation.query) {
-                Err(e) => {
-                    error!("Could not parse SQL of relation '{}': {e}", relation.name);
-                }
-                Ok(parse_result) => {
-                    for table_name in parse_result.tables() {
-                        let source_index = match table_node_map.get(table_name.as_str()) {
-                            None => {
-                                let node = GraphNode::Table(table_name.clone());
-                                let table_node_index = graph.add_node(node);
-                                table_node_map.insert(table_name, table_node_index);
-                                table_node_index
-                            }
-                            Some(index) => *index,
-                        };
+            if let Some(view_src) = &relation.query {
+                // Parse the SQL with the relation definition to find what tables it has as
+                // dependencies
+                match pg_query::parse(view_src) {
+                    Err(e) => {
+                        error!("Could not parse SQL of relation '{}': {e}", relation.name);
+                    }
+                    Ok(parse_result) => {
+                        for table_name in parse_result.tables() {
+                            let source_index = match table_node_map.get(table_name.as_str()) {
+                                None => {
+                                    let node = GraphNode::Table(table_name.clone());
+                                    let table_node_index = graph.add_node(node);
+                                    table_node_map.insert(table_name, table_node_index);
+                                    table_node_index
+                                }
+                                Some(index) => *index,
+                            };
 
-                        graph.add_edge(relation_node_index, source_index, "".to_string());
+                            graph.add_edge(relation_node_index, source_index, "".to_string());
+                        }
                     }
                 }
             }

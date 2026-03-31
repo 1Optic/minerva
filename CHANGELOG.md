@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [9.43.1] - 2026-02-09
+## [9.44.0] - 2026-03-31
+
+### Changed
+
+- lib: Allow relation definition without view in YAML
+- lib: Load relations with optional view from database
+
+## [9.43.1] - 2026-03-31
 
 ### Fixed
 
