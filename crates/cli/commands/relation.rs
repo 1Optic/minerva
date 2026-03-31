@@ -4,7 +4,7 @@ use tokio_postgres::Client;
 
 use minerva::change::Change;
 use minerva::relation::{
-    load_relation_from_file, materialize_relation, AddRelation, UpdateRelation,
+    load_relation_from_file, materialize_relation, AddRelation, UpdateRelationView,
 };
 
 use clap::{Parser, Subcommand};
@@ -55,15 +55,22 @@ impl RelationUpdate {
     async fn update(&self) -> CmdResult {
         let relation = load_relation_from_file(&self.definition)?;
 
-        println!("Loaded definition, updating relation");
+        if let Some(view_src) = relation.query {
+            println!("Loaded definition, updating relation");
 
-        let mut client = connect_db().await?;
+            let mut client = connect_db().await?;
 
-        let change = UpdateRelation { relation };
+            let change = UpdateRelationView {
+                relation_name: relation.name,
+                view_src
+            };
 
-        let message = change.apply(&mut client).await?;
+            let message = change.apply(&mut client).await?;
 
-        println!("{message}");
+            println!("{message}");
+        } else {
+            println!("Relation has no view definition, nothing to update");
+        }
 
         Ok(())
     }

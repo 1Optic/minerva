@@ -17,7 +17,7 @@ use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
 #[serde(tag = "type")]
 pub struct Relation {
     pub name: String,
-    pub query: String,
+    pub query: Option<String>,
 }
 
 impl fmt::Display for Relation {
@@ -69,13 +69,15 @@ pub async fn load_relation_from_db<T: GenericClient + Send + Sync>(
     name: &str,
 ) -> Result<Relation, String> {
     let query = concat!(
-        "select ",
-        "relname, ",
-        "pg_get_viewdef(ev_class) ",
-        "from pg_rewrite r ",
-        "join pg_class c on c.oid = ev_class ",
-        "join pg_namespace nsp on nsp.oid = c.relnamespace ",
-        "where nspname = 'relation_def' and relname = $1"
+        "select r.name, pg_get_viewdef(ev_class) ",
+        "from relation_directory.\"type\" r ",
+        "left join (",
+        "select c.relname as view_name, ev_class ",
+        "from pg_class c ",
+        "join pg_rewrite rw on c.oid = rw.ev_class ",
+        "join pg_namespace nsp on nsp.oid = c.relnamespace and nspname = 'relation_def'",
+        ") view_def on view_def.view_name = r.name ", 
+        "where r.name = $1",
     );
 
     let rows = conn.query(query, &[&name]).await.unwrap();
@@ -98,13 +100,14 @@ pub async fn load_relations_from_db<T: GenericClient + Send + Sync>(
     conn: &mut T,
 ) -> Result<Vec<Relation>, String> {
     let query = concat!(
-        "select ",
-        "relname, ",
-        "pg_get_viewdef(ev_class) ",
-        "from pg_rewrite r ",
-        "join pg_class c on c.oid = ev_class ",
-        "join pg_namespace nsp on nsp.oid = c.relnamespace ",
-        "where nspname = 'relation_def'"
+        "select r.name, pg_get_viewdef(ev_class) ",
+        "from relation_directory.\"type\" r ",
+        "left join (",
+        "select c.relname as view_name, ev_class ",
+        "from pg_class c ",
+        "join pg_rewrite rw on c.oid = rw.ev_class ",
+        "join pg_namespace nsp on nsp.oid = c.relnamespace and nspname = 'relation_def'",
+        ") view_def on view_def.view_name = r.name", 
     );
 
     let rows = conn.query(query, &[]).await.unwrap();
@@ -177,26 +180,27 @@ impl Changed for AddedRelation {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct UpdateRelation {
-    pub relation: Relation,
+pub struct UpdateRelationView {
+    pub relation_name: String,
+    pub view_src: String,
 }
 
-impl fmt::Display for UpdateRelation {
+impl fmt::Display for UpdateRelationView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateRelation({})", &self.relation)
+        write!(f, "UpdateRelationView({})", &self.relation_name)
     }
 }
 
 #[async_trait]
 #[typetag::serde]
-impl Change for UpdateRelation {
+impl Change for UpdateRelationView {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
         let tx = client.transaction().await?;
 
         let query = format!(
             "CREATE OR REPLACE VIEW relation_def.{} AS {}",
-            escape_identifier(&self.relation.name),
-            self.relation.query
+            escape_identifier(&self.relation_name),
+            self.view_src
         );
 
         tx.query(&query, &[])
@@ -206,14 +210,8 @@ impl Change for UpdateRelation {
         tx.commit().await?;
 
         Ok(Box::new(UpdatedRelation {
-            relation_name: self.relation.name.clone(),
+            relation_name: self.relation_name.clone(),
         }))
-    }
-}
-
-impl From<Relation> for UpdateRelation {
-    fn from(relation: Relation) -> Self {
-        UpdateRelation { relation }
     }
 }
 
@@ -301,15 +299,17 @@ pub async fn create_relation<T: GenericClient>(
         CreateRelationError::Database(format!("Error creating relation table: {e}"))
     })?;
 
-    let query = format!(
-        "CREATE VIEW relation_def.\"{}\" AS {}",
-        relation.name, relation.query
-    );
+    if let Some(view_src) = &relation.query {
+        let query = format!(
+            "CREATE VIEW relation_def.\"{}\" AS {}",
+            relation.name, view_src
+        );
 
-    client
-        .query(&query, &[])
-        .await
-        .map_err(|e| CreateRelationError::Database(format!("Error creating relation view: {e}")))?;
+        client
+            .query(&query, &[])
+            .await
+            .map_err(|e| CreateRelationError::Database(format!("Error creating relation view: {e}")))?;
+    }
 
     let query = format!(
         "CREATE UNIQUE INDEX ON relation.\"{}\"(source_id, target_id)",
