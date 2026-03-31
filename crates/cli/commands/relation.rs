@@ -62,7 +62,7 @@ impl RelationUpdate {
 
             let change = UpdateRelationView {
                 relation_name: relation.name,
-                view_src
+                view_src,
             };
 
             let message = change.apply(&mut client).await?;

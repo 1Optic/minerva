@@ -76,7 +76,7 @@ pub async fn load_relation_from_db<T: GenericClient + Send + Sync>(
         "from pg_class c ",
         "join pg_rewrite rw on c.oid = rw.ev_class ",
         "join pg_namespace nsp on nsp.oid = c.relnamespace and nspname = 'relation_def'",
-        ") view_def on view_def.view_name = r.name ", 
+        ") view_def on view_def.view_name = r.name ",
         "where r.name = $1",
     );
 
@@ -107,7 +107,7 @@ pub async fn load_relations_from_db<T: GenericClient + Send + Sync>(
         "from pg_class c ",
         "join pg_rewrite rw on c.oid = rw.ev_class ",
         "join pg_namespace nsp on nsp.oid = c.relnamespace and nspname = 'relation_def'",
-        ") view_def on view_def.view_name = r.name", 
+        ") view_def on view_def.view_name = r.name",
     );
 
     let rows = conn.query(query, &[]).await.unwrap();
@@ -305,10 +305,9 @@ pub async fn create_relation<T: GenericClient>(
             relation.name, view_src
         );
 
-        client
-            .query(&query, &[])
-            .await
-            .map_err(|e| CreateRelationError::Database(format!("Error creating relation view: {e}")))?;
+        client.query(&query, &[]).await.map_err(|e| {
+            CreateRelationError::Database(format!("Error creating relation view: {e}"))
+        })?;
     }
 
     let query = format!(
