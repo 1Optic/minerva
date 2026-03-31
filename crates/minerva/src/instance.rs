@@ -715,16 +715,18 @@ impl MinervaInstance {
                     // Ok, still there
                 }
                 None => {
-                    // No longer defined, so remove it
-                    for trend_store_part in &my_trend_store.parts {
-                        changes.push(Box::new(RemoveTrendStorePart {
-                            name: trend_store_part.name.clone(),
+                    if !options.ignore_deletions {
+                        // No longer defined, so remove it
+                        for trend_store_part in &my_trend_store.parts {
+                            changes.push(Box::new(RemoveTrendStorePart {
+                                name: trend_store_part.name.clone(),
+                            }));
+                        }
+
+                        changes.push(Box::new(RemoveTrendStore {
+                            trend_store: my_trend_store.into(),
                         }));
                     }
-
-                    changes.push(Box::new(RemoveTrendStore {
-                        trend_store: my_trend_store.into(),
-                    }));
                 }
             }
         }
@@ -787,12 +789,13 @@ impl MinervaInstance {
         }
 
         for my_trend_materialization in &self.trend_materializations {
-            if !other
-                .trend_materializations
-                .iter()
-                .any(|other_trend_materialization| {
-                    other_trend_materialization.name() == my_trend_materialization.name()
-                })
+            if !options.ignore_deletions
+                && !other
+                    .trend_materializations
+                    .iter()
+                    .any(|other_trend_materialization| {
+                        other_trend_materialization.name() == my_trend_materialization.name()
+                    })
             {
                 changes.push(Box::new(RemoveTrendMaterialization {
                     name: my_trend_materialization.name().to_string(),
@@ -820,10 +823,11 @@ impl MinervaInstance {
 
         // Check for virtual entities to remove
         for my_virtual_entity in &self.virtual_entities {
-            if !other
-                .virtual_entities
-                .iter()
-                .any(|other_virtual_entity| other_virtual_entity.name == my_virtual_entity.name)
+            if !options.ignore_deletions
+                && !other
+                    .virtual_entities
+                    .iter()
+                    .any(|other_virtual_entity| other_virtual_entity.name == my_virtual_entity.name)
             {
                 changes.push(Box::new(RemoveVirtualEntity {
                     name: my_virtual_entity.name.clone(),
@@ -849,10 +853,11 @@ impl MinervaInstance {
 
         // Check for relations to remove
         for my_relation in &self.relations {
-            if !other
-                .relations
-                .iter()
-                .any(|other_relation| other_relation.name == my_relation.name)
+            if !options.ignore_deletions
+                && !other
+                    .relations
+                    .iter()
+                    .any(|other_relation| other_relation.name == my_relation.name)
             {
                 changes.push(Box::new(RemoveRelation {
                     relation_name: my_relation.name.clone(),

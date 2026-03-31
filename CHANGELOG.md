@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.44.1] - 2026-03-31
+
+### Fixed
+
+- cli: Fix ignoring of all deletions when --ignore-deletions is set
+
 ## [9.44.0] - 2026-03-31
 
 ### Changed
@@ -627,4 +633,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.42.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.41.0...9.42.0
 [9.43.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.42.0...9.43.0
 [9.43.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.0...9.43.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.1...HEAD
+[9.44.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.1...9.44.0
+[9.44.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.0...9.44.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.1...HEAD
