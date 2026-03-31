@@ -77,7 +77,14 @@ async fn get_entity_set_members(conn: &mut Client, id: i32) -> Result<Vec<String
         .query_one(query, &[&id])
         .await
         .map_err(|e| format!("{e}"))?;
-    Ok(row.get(0))
+
+    // The function might return null, so handle that case and represent it as an empty list.
+    let members: Option<Vec<String>> = row.get(0);
+
+    match members {
+        Some(m) => Ok(m),
+        None => Ok(Vec::new()),
+    }
 }
 
 pub async fn load_entity_sets(conn: &mut Client) -> Result<Vec<EntitySet>, String> {

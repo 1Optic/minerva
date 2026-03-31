@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.43.1] - 2026-02-09
+
+### Fixed
+
+- lib: Fix entity set loading when there are no members
+
 ## [9.43.0] - 2026-02-09
 
 ### Added
@@ -613,4 +619,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.41.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.40.0...9.41.0
 [9.42.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.41.0...9.42.0
 [9.43.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.42.0...9.43.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.0...HEAD
+[9.43.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.0...9.43.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.1...HEAD
