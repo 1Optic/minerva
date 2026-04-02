@@ -16,7 +16,7 @@ pub struct VirtualEntityOpt {
 
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum VirtualEntityOptCommands {
-    #[command(about = "materialize a relation")]
+    #[command(about = "materialize a virtual entity type")]
     Materialize(VirtualEntityMaterialize),
 }
 
