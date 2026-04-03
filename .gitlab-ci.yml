@@ -77,7 +77,7 @@ publish-minerva-cli-deb:
 
 build-image:
   stage: build
-  image: quay.io/buildah/stable@sha256:691824e67ee90cea39496e460be962ae038007675ffeb0d78a93d34ff78f8418
+  image: quay.io/buildah/stable@sha256:fbf514f3e371fb7116e0d1a3e94defe8378408654b5bf9d2f3e2a28c9c0de7df
   before_script:
     - echo "$DOCKER_REGISTRY_PASSWORD" | buildah login -u "$DOCKER_REGISTRY_USER" --password-stdin $DOCKER_REGISTRY
   script:
@@ -90,7 +90,7 @@ build-image:
 
 build-instance-tester-image:
   stage: build
-  image: quay.io/buildah/stable@sha256:691824e67ee90cea39496e460be962ae038007675ffeb0d78a93d34ff78f8418
+  image: quay.io/buildah/stable@sha256:fbf514f3e371fb7116e0d1a3e94defe8378408654b5bf9d2f3e2a28c9c0de7df
   before_script:
     - echo "$DOCKER_REGISTRY_PASSWORD" | buildah login -u "$DOCKER_REGISTRY_USER" --password-stdin $DOCKER_REGISTRY
   script:
