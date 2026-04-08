@@ -87,6 +87,5 @@ When contributing:
 •	Keep changes focused and well scoped 
 •	Add or update tests where relevant 
 •	Make sure the full test suite passes before submitting changes 
-
 ## License
 
