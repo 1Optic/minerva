@@ -1,0 +1,3 @@
+name: node->entity_set
+source_entity_type: node
+target_entity_type: entity_set
