@@ -2,7 +2,7 @@
 
 High-performance ETL platform for standardized time series, attribute, and event type data.
 
-Minerva has been in use by Tier 1 CSP telecom operators for over more than 15 years. It offers real-time insight in your network data, no matter the scale or volume. Interested in the possibilities? Feel free to [book a demo at 1Optic.io](https://1optic.io)!
+Minerva has been in use by Tier 1 telecom Communication Service Providers (CSP) for over more than 15 years. It offers real-time insight in your network data, no matter the scale or volume. Interested in the possibilities? Feel free to [book a demo at 1Optic.io](https://1optic.io)!
 
 ## Features
 
