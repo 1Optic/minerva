@@ -1,4 +1,4 @@
-# Minerva ETL Platform
+# Minerva ETL
 
 High-performance ETL platform for standardized time series, attribute, and event type data.
 
