@@ -14,7 +14,7 @@ stages:
 lint-openapi:
   stage: lint
   image:
-    name: redocly/cli@sha256:e28a60abb3fa99af72f909536fae0d38cc48a65fa0d5579385f5e6f1b2928392
+    name: redocly/cli@sha256:35b02ccb2707d74affe56584cd899aea652929874ab3b8d9766809f98acab8fb
     entrypoint: [""]
   script:
     - redocly lint api-spec/openapi.yaml
