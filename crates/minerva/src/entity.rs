@@ -223,6 +223,7 @@ impl EntityMapping for DbEntityMapping {
             entities.insert(name, entity);
         }
 
+        // Return the entity data in the same order as the requested entity names
         let result = names
             .iter()
             .map(|name| -> Result<LargeEntity, EntityMappingError> {
@@ -232,6 +233,7 @@ impl EntityMapping for DbEntityMapping {
                     .ok_or(EntityMappingError::UnmappedEntityError)
             })
             .collect::<Result<Vec<LargeEntity>, EntityMappingError>>()?;
+
         Ok(result)
     }
 }
