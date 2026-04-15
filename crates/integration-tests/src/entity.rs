@@ -65,6 +65,31 @@ pub async fn db_entity_mapping(
         let first_name: &str = first_row.get(1);
 
         assert_eq!(first_name, "n0008");
+
+        // The following is the test for the bug in KPN1OPTIC2026-158
+
+        let db_ids = rows
+            .iter()
+            .map(|row| row.get::<_, i32>(0))
+            .collect::<Vec<_>>();
+
+        let names = vec![
+            "n0008".to_string(),
+            "n0004".to_string(),
+            "n0003".to_string(),
+            "n0001".to_string(),
+        ];
+
+        let entity_mapping = DbEntityMapping {};
+        let entities = entity_mapping
+            .names_to_entities(&client, &"node".to_string(), &names)
+            .await?;
+
+        let request_ids = entities
+            .iter()
+            .map(|entity| entity.id as i32)
+            .collect::<Vec<_>>();
+        assert_eq!(request_ids, db_ids);
     }
 
     Ok(())
