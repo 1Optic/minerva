@@ -74,7 +74,7 @@ pub async fn get_pending_migrations(client: &mut Client) -> Result<Vec<(u32, Str
         .collect::<Vec<_>>();
 
     // List of migrations is not sorted by default, so sort by version number
-    pending_migrations.sort_by(|a, b| a.0.cmp(&b.0));
+    pending_migrations.sort_by_key(|a| a.0);
 
     Ok(pending_migrations)
 }

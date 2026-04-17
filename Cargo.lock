@@ -104,7 +104,6 @@ version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92589714878ca59a7626ea19734f0e07a6a875197eec751bb5d3f99e64998c63"
 dependencies = [
- "actix-macros",
  "futures-core",
  "tokio",
 ]
@@ -493,29 +492,6 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
-
-[[package]]
-name = "bb8"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457d7ed3f888dfd2c7af56d4975cade43c622f74bdcddfed6d4352f57acc6310"
-dependencies = [
- "futures-util",
- "parking_lot",
- "portable-atomic",
- "tokio",
-]
-
-[[package]]
-name = "bb8-postgres"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e570e6557cd0f88d28d32afa76644873271a70dc22656df565b2021c4036aa9c"
-dependencies = [
- "bb8",
- "tokio",
- "tokio-postgres",
-]
 
 [[package]]
 name = "bindgen"
@@ -1088,23 +1064,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95d0d11eb38e7642efca359c3cf6eb7b2e528182d09110165de70192b0352775"
-dependencies = [
- "ctor-proc-macro",
- "dtor",
- "link-section",
-]
-
-[[package]]
-name = "ctor-proc-macro"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7ab264ea985f1bd27887d7b21ea2bb046728e05d11909ca138d700c494730db"
-
-[[package]]
 name = "ctutils"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1325,21 +1284,6 @@ name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
-
-[[package]]
-name = "dtor"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f72721db8027a4e96dd6fb50d2a1d32259c9d3da1b63dee612ccd981e14293"
-dependencies = [
- "dtor-proc-macro",
-]
-
-[[package]]
-name = "dtor-proc-macro"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c98b077c7463d01d22dde8a24378ddf1ca7263dc687cffbed38819ea6c21131"
 
 [[package]]
 name = "dunce"
@@ -2210,21 +2154,10 @@ dependencies = [
 name = "integration-tests"
 version = "9.44.2"
 dependencies = [
- "actix-cors",
- "actix-rt",
- "actix-web",
  "assert_cmd",
  "async-trait",
- "bb8",
- "bb8-postgres",
  "chrono",
- "ctor",
  "env_logger",
- "futures",
- "glob",
- "humantime",
- "humantime-serde",
- "lazy_static",
  "libtest-mimic",
  "log",
  "minerva",
@@ -2232,12 +2165,9 @@ dependencies = [
  "postgres-types",
  "predicates",
  "rand 0.10.1",
- "regex",
  "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
- "rustls",
- "rustls-native-certs",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2246,7 +2176,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-postgres",
- "tokio-postgres-rustls",
  "toxiproxy_rust",
  "url",
 ]
@@ -2461,12 +2390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "link-section"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "468808413fa8bdf0edbe61c2bbc182dfc59885b94f496cf3fb42c9c96b1e0149"
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2570,16 +2493,13 @@ dependencies = [
 name = "minerva"
 version = "9.44.2"
 dependencies = [
- "anyhow",
  "async-trait",
  "bollard",
- "bollard-stubs",
  "bytes",
  "chrono",
  "comfy-table",
  "console",
  "csv",
- "env_logger",
  "erased-serde",
  "futures-util",
  "glob",
@@ -2616,13 +2536,6 @@ dependencies = [
 name = "minerva-cli"
 version = "9.44.2"
 dependencies = [
- "actix-cors",
- "actix-rt",
- "actix-web",
- "assert_cmd",
- "async-trait",
- "bb8",
- "bb8-postgres",
  "chrono",
  "clap",
  "clap_complete",
@@ -2633,16 +2546,12 @@ dependencies = [
  "env_logger",
  "erased-serde",
  "futures",
- "glob",
  "humantime",
  "humantime-serde",
- "lazy_static",
  "log",
  "minerva",
  "petgraph 0.8.3",
  "postgres-protocol",
- "postgres-types",
- "predicates",
  "regex",
  "rustls",
  "rustls-native-certs",
@@ -2656,7 +2565,6 @@ dependencies = [
  "tokio-postgres",
  "tokio-postgres-rustls",
  "tokio-stream",
- "url",
 ]
 
 [[package]]
@@ -2665,11 +2573,9 @@ version = "9.44.2"
 dependencies = [
  "chrono",
  "deadpool-postgres",
- "derive_more",
  "env_logger",
  "humantime-serde",
  "log",
- "postgres",
  "reqwest 0.13.2",
  "rustls",
  "rustls-native-certs",
@@ -2678,7 +2584,6 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
- "utoipa",
 ]
 
 [[package]]
@@ -2687,31 +2592,20 @@ version = "9.44.2"
 dependencies = [
  "actix-cors",
  "actix-web",
- "async-trait",
  "chrono",
- "clap",
  "deadpool-postgres",
  "derive_more",
- "dialoguer",
  "env_logger",
- "glob",
- "humantime",
  "humantime-serde",
  "lazy_static",
  "log",
  "minerva",
- "postgres-types",
- "regex",
  "rustls",
  "rustls-native-certs",
  "serde",
  "serde_json",
- "serde_yaml",
- "term-table",
- "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
- "tokio-stream",
  "utoipa",
  "utoipa-swagger-ui",
 ]

@@ -10,25 +10,11 @@ description = "Minerva integration tests"
 minerva = { version = "*", path = "../minerva" }
 tokio = { version = "1.52.1", features = ["full"] }
 tokio-postgres = { version = "0.7.17", features = ["with-chrono-0_4", "with-serde_json-1"] }
-rustls = "0.23.38"
-rustls-native-certs = "0.8.3"
-tokio-postgres-rustls = "0.13"
 postgres-types = { version = "0.2.13", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 chrono = { version = "0.4.44", features = ["serde"] }
-humantime = "2.3.0"
-humantime-serde = "1.1.1"
 serde_json = "1.0.149"
-glob = "0.3.3"
-regex = "1.12.3"
-actix-rt = "2.11.0"
-actix-web = "4.13.0"
-actix-cors = "0.7.1"
-bb8 = "0.9.1"
-bb8-postgres = "0.9"
-env_logger = "0.11.10"
-lazy_static = "1.5.0"
 assert_cmd = "2.2.0"
 predicates = "3.1.4"
 rand = "0.10.1"
@@ -43,11 +29,16 @@ async-trait = "0.1.89"
 toxiproxy_rust = "0.1.6"
 thiserror = "2.0.18"
 postgres-protocol = "0.6.11"
-ctor = "0.10.0"
-libtest-mimic = "0.8.2"
-futures = "0.3.32"
 
 [[test]]
 name = "integration_tests"
 path = "tests/main.rs"
 harness = false
+
+[dev-dependencies]
+env_logger = "0.11.10"
+libtest-mimic = "0.8.2"
+
+[lib]
+test = false
+doctest = false
