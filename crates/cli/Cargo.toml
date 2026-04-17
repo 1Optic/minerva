@@ -13,6 +13,8 @@ name = "minerva"
 [lib]
 name = "materialize"
 path = "materialize/lib.rs"
+test = false
+doctest = false
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
@@ -23,7 +25,6 @@ tokio-postgres = { version = "0.7.17", features = ["with-chrono-0_4", "with-serd
 rustls = { version = "0.23.38", features = ["ring"] }
 rustls-native-certs = "0.8.3"
 tokio-postgres-rustls = "0.13"
-postgres-types = { version = "0.2.13", features = ["derive"] }
 postgres-protocol = "0.6.11"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
@@ -31,21 +32,12 @@ chrono = { version = "0.4.44", features = ["serde"] }
 humantime = "2.3.0"
 humantime-serde = "1.1.1"
 serde_json = "1.0.149"
-glob = "0.3.3"
 regex = "1.12.3"
 dialoguer = "0.12.0"
-async-trait = "0.1.89"
-actix-rt = "2.11.0"
-actix-web = "4.13.0"
-actix-cors = "0.7.1"
-bb8 = "0.9.1"
-bb8-postgres = "0.9"
 log = "0.4.29"
 env_logger = "0.11.10"
-lazy_static = "1.5.0"
 term-table = "1.4.0"
 comfy-table = "7.2.2"
-url = "2.5.8"
 testcontainers = { version = "0.27.3" }
 thiserror = "2.0.18"
 deadpool-postgres = "0.14.1"
@@ -54,10 +46,6 @@ futures = "0.3.32"
 erased-serde = "0.4.10"
 petgraph = "0.8.3"
 dotenvy = "0.15.7"
-
-[dev-dependencies]
-assert_cmd = "=2.2.0"
-predicates = "=3.1.4"
 
 [package.metadata.deb]
 section = "admin"

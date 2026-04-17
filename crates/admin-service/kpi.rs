@@ -320,9 +320,8 @@ impl KpiImplementedData {
         let mut formats: Vec<String> = vec![];
         let mut partmodifieds: Vec<String> = vec![];
         let mut joins: Vec<String> = vec![];
-        let mut i: i32 = 1;
 
-        for default_source_name in &self.source_trendstore_parts {
+        for (i, default_source_name) in (1_i32..).zip(self.source_trendstore_parts.iter()) {
             // Map the source name for the default granularity to the requested granularity
             let source_name = default_source_name
                 .replace(&DEFAULT_GRANULARITY.to_string(), &granularity.to_string());
@@ -364,8 +363,6 @@ impl KpiImplementedData {
                 "LEFT JOIN trend_directory.trend_store_part part{} ON part{}.name = '{}'\nJOIN trend_directory.modified modified{} ON modified{}.trend_store_part_id = part{}.id AND modified{}.timestamp = t.timestamp",
                 i, i, actual_source_name.clone(), i, i, i, i
             ));
-
-            i += 1;
         }
 
         let fingerprint_function = format!(
@@ -377,13 +374,11 @@ impl KpiImplementedData {
         );
 
         let mut sourcestrings: Vec<String> = vec![];
-        let mut counter = 1;
-        for source in &query_sources {
+        for (counter, source) in (1..).zip(query_sources.iter()) {
             match counter {
                 1 => sourcestrings.push(format!("trend.\"{source}\" t{counter}")),
                 _ => sourcestrings.push(format!("trend.\"{source}\" t{counter} ON t1.entity_id = t{counter}.entity_id and t1.timestamp = t{counter}.timestamp")),
             };
-            counter += 1;
         }
 
         let mut src_lines: Vec<String> = Vec::new();
