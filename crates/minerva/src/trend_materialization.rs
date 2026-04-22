@@ -1049,6 +1049,18 @@ fn optional_to_string<T: Display>(interval: Option<T>) -> String {
 }
 
 impl TrendFunctionMaterialization {
+    pub fn generalized_attributes(&self) -> TrendMaterializationAttributes {
+        TrendMaterializationAttributes {
+            enabled: self.attributes.enabled,
+            processing_delay: self.attributes.processing_delay,
+            stability_delay: self.attributes.stability_delay,
+            reprocessing_period: self.attributes.reprocessing_period,
+            old_data_threshold: self.attributes.old_data_threshold,
+            old_data_stability_delay: self.attributes.old_data_stability_delay,
+            description: Some(self.attributes.description.clone().unwrap_or(Value::String("{}".to_string()))),
+        }
+    }
+
     pub fn name(&self) -> String {
         self.target_trend_store_part.clone()
     }
@@ -1173,7 +1185,7 @@ impl TrendFunctionMaterialization {
             }));
         }
 
-        if self.attributes != other.attributes {
+        if self.generalized_attributes() != other.generalized_attributes() {
             changes.push(Box::new(UpdateTrendFunctionMaterializationAttributes {
                 source_attributes: self.attributes.clone(),
                 target_attributes: other.attributes.clone(),
