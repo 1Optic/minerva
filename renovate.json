@@ -23,6 +23,10 @@
       ],
       "automerge": true,
       "platformAutomerge": true
+    },
+    {
+      "matchPackageNames": ["quay.io/buildah/stable"],
+      "pinDigests": false
     }
   ]
 }
