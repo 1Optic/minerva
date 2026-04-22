@@ -1057,7 +1057,12 @@ impl TrendFunctionMaterialization {
             reprocessing_period: self.attributes.reprocessing_period,
             old_data_threshold: self.attributes.old_data_threshold,
             old_data_stability_delay: self.attributes.old_data_stability_delay,
-            description: Some(self.attributes.description.clone().unwrap_or(Value::String("{}".to_string()))),
+            description: Some(
+                self.attributes
+                    .description
+                    .clone()
+                    .unwrap_or(Value::String("{}".to_string())),
+            ),
         }
     }
 
