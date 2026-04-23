@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.44.4] - 2026-04-23
+
+### Fixed
+
+- db: Update schema to allow null value for trend materialization description
+
 ## [9.44.3] - 2026-04-23
 
 ### Fixed
