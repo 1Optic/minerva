@@ -16,7 +16,7 @@ utoipa = { version = "5.4.0", features = ["chrono"] }
 lazy_static = "1.5.0"
 minerva = { path = "../minerva" }
 tokio-postgres = { version = "0.7.17", features = ["with-chrono-0_4", "with-serde_json-1"] }
-rustls = { version = "0.23.38", features = ["ring"] }
+rustls = { version = "0.23.39", features = ["ring"] }
 rustls-native-certs = "0.8.3"
 tokio-postgres-rustls = "0.13"
 serde = { version = "1.0.228", features = ["derive"] }
