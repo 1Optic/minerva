@@ -1011,7 +1011,7 @@ impl TrendMaterializationAttributes {
             &format_duration(self.stability_delay).to_string(),
             &format_duration(self.reprocessing_period).to_string(),
             &self.enabled,
-            &self.description.as_ref().unwrap_or(&Value::Null),
+            &self.description,
             &self
                 .old_data_threshold
                 .map(|v| format_duration(v).to_string()),
