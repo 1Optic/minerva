@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.44.3] - 2026-04-23
+
+### Fixed
+
+- lib: Fix updating of materialization empty 'description' in database
+
 ## [9.44.2] - 2026-04-15
 
 ### Fixed
