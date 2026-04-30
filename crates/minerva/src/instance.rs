@@ -858,10 +858,11 @@ impl MinervaInstance {
                     .relations
                     .iter()
                     .any(|other_relation| other_relation.name == my_relation.name)
+                && !my_relation.name.ends_with("->entity_set") // Ignore relation deletions for entity sets, as they are created on the fly, not predefined
             {
                 changes.push(Box::new(RemoveRelation {
                     relation_name: my_relation.name.clone(),
-                }))
+                }));
             }
         }
 
