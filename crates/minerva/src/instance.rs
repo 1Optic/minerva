@@ -44,7 +44,7 @@ use super::trend_materialization::{
 use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
-use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
+use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, Trigger};
 use super::virtual_entity::{
     load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
     VirtualEntity,
@@ -862,6 +862,38 @@ impl MinervaInstance {
             {
                 changes.push(Box::new(RemoveRelation {
                     relation_name: my_relation.name.clone(),
+                }));
+            }
+        }
+
+        // Check for changes in triggers
+        for other_trigger in &other.triggers {
+            match self
+                .triggers
+                .iter()
+                .find(|my_trigger| {
+                    my_trigger.name == other_trigger.name
+                }) {
+                Some(my_trigger) => {
+                    changes.append(&mut my_trigger.diff(other_trigger));
+                }
+                None => changes.push(Box::new(AddTrigger {
+                    trigger: other_trigger.clone(),
+                    verify: false,
+                })),
+            }
+        }
+
+        // Check for triggers to remove
+        for my_trigger in &self.triggers {
+            if !options.ignore_deletions
+                && !other
+                    .triggers
+                    .iter()
+                    .any(|other_trigger| other_trigger.name == my_trigger.name)
+            {
+                changes.push(Box::new(DeleteTrigger {
+                    trigger_name: my_trigger.name.clone(),
                 }));
             }
         }
