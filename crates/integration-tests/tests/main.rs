@@ -183,5 +183,12 @@ fn setup_tests(connector: Option<MinervaClusterConnector>) -> Vec<Trial> {
                 integration_tests::entity::db_entity_mapping,
             ),
         ),
+        Trial::test(
+            "avoid_deadlock",
+            setup_test(
+                connector.clone(),
+                integration_tests::entity::avoid_deadlock,
+            ),
+        ),
     ]
 }
