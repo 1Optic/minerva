@@ -503,7 +503,7 @@ async fn create_entity<T: GenericClient>(
     name: &str,
 ) -> Result<i64, EntityMappingError> {
     let query = format!(
-        "INSERT INTO entity.{}(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id::bigint",
+        "INSERT INTO entity.{}(name) VALUES($1) ON CONFLICT(name) DO NOTHING RETURNING id::bigint",
         escape_identifier(entity_type_table)
     );
 
@@ -526,7 +526,7 @@ async fn create_entity_with_alias<T: GenericClient>(
     name: &str,
 ) -> Result<LargeEntity, EntityMappingError> {
     let query = format!(
-        "INSERT INTO entity.{}(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id::bigint, primary_alias",
+        "INSERT INTO entity.{}(name) VALUES($1) ON CONFLICT(name) DO NOTHING RETURNING id::bigint, primary_alias",
         escape_identifier(entity_type_table)
     );
 
