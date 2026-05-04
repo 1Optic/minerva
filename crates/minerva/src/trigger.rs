@@ -16,6 +16,7 @@ use async_trait::async_trait;
 
 use crate::change::Changed;
 use crate::interval::parse_interval;
+use crate::change::trigger::ChangeKpiData;
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
@@ -127,6 +128,65 @@ pub struct FileTrigger {
 impl fmt::Display for Trigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Trigger({})", &self.name,)
+    }
+}
+
+impl Trigger {
+    pub fn diff(&self, other: &Trigger) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+        for kpi_data in self.kpi_data.iter() {
+            
+        }
+
+
+
+        if self.kpi_data != other.kpi_data {
+            diffs.push("kpi_data".to_string());
+        }
+        if self.kpi_function != other.kpi_function {
+            diffs.push("kpi_function".to_string());
+        }
+        if self.thresholds != other.thresholds {
+            diffs.push("thresholds".to_string());
+        }
+        if self.condition != other.condition {
+            diffs.push("condition".to_string());
+        }
+        if self.weight != other.weight {
+            diffs.push("weight".to_string());
+        }
+        if self.notification != other.notification {
+            diffs.push("notification".to_string());
+        }
+        if self.tags != other.tags {
+            diffs.push("tags".to_string());
+        }
+        if self.fingerprint != other.fingerprint {
+            diffs.push("fingerprint".to_string());
+        }
+        if self.notification_store != other.notification_store {
+            diffs.push("notification_store".to_string());
+        }
+        if self.data != other.data {
+            diffs.push("data".to_string());
+        }
+        if self.trend_store_links != other.trend_store_links {
+            diffs.push("trend_store_links".to_string());
+        }
+        if self.mapping_functions != other.mapping_functions {
+            diffs.push("mapping_functions".to_string());
+        }
+        if self.description != other.description {
+            diffs.push("description".to_string());
+        }
+        if self.granularity != other.granularity {
+            diffs.push("granularity".to_string());
+        }
+        if self.enabled != other.enabled {
+            diffs.push("enabled".to_string());
+        }
+
+        diffs
     }
 }
 
