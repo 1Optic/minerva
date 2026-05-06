@@ -20,7 +20,7 @@ predicates = "3.1.4"
 rand = "0.10.1"
 tempfile = "3.27.0"
 reqwest = { version = "0.13.3", features = ["json"] }
-rust_decimal = "1.41.0"
+rust_decimal = "1.42.0"
 rust_decimal_macros = "1.40.0"
 testcontainers = "0.27.3"
 url = "2.5.8"
