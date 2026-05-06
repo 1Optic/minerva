@@ -1,3 +1,4 @@
+use assert_cmd::assert;
 use log::debug;
 
 use minerva::cluster::MinervaClusterConnector;
@@ -104,78 +105,166 @@ pub async fn avoid_deadlock(
     debug!("Created database '{}'", test_database.name);
 
     let mut client = test_database.connect().await?;
+    let mut client1 = test_database.connect().await?;
     let mut client2 = test_database.connect().await?;
     create_schema(&mut client).await?;
     
-    let tx = client.transaction().await?;
+    let txpre = client.transaction().await?;
 
     let entity_type_name = "node";
 
-    tx.query(
+    txpre.query(
         "SELECT directory.create_entity_type($1)",
         &[&entity_type_name],
     )
     .await
     .unwrap();
-    tx.commit().await?;
-
-    let tx = client.transaction().await?;
-
     let names = vec![
         "n0001".to_string(),
         "n0002".to_string(),
+        "n0003".to_string(),
+        "n0004".to_string(),
     ];
 
     let entity_mapping = DbEntityMapping {};
-    let entities1 = entity_mapping
-        .names_to_entity_ids(&tx, &"node".to_string(), &names)
+    let _ = entity_mapping
+        .names_to_entity_ids(&txpre, &"node".to_string(), &names)
         .await
-        .unwrap();
+        .unwrap()
+        .clone();
+    txpre.commit().await?;
 
-    let handle = tokio::spawn(async move {
+    let txwait = client.transaction().await?;
+
+    txwait.commit().await?;
+
+    let pid_query = "SELECT pg_backend_pid()";
+    let mypid = client.query_one(pid_query, &[]).await?.get::<_, i32>(0);
+    let (sender1, receiver1) = tokio::sync::oneshot::channel();
+    let (sender2, receiver2) = tokio::sync::oneshot::channel();
+
+    let mut client = test_database.connect().await?;
+
+    let txselect = client.transaction().await?;
+    let query = "SELECT * FROM entity.node";
+
+    txselect.query(query, &[]).await?;
+
+    let handle1 = tokio::spawn(async move {
+        let tx1 = client1.transaction().await.unwrap();
+        let mypid = tx1.query_one(pid_query, &[]).await.unwrap().get::<_, i32>(0);
+        sender1.send(mypid).unwrap();
+
+        let names = vec![
+            "n0001".to_string(),
+            "n0002".to_string(),
+            "n0005".to_string(),
+            "n0006".to_string(),
+        ];
+
+        let entity_mapping = DbEntityMapping {};
+        let entities = entity_mapping
+            .names_to_entity_ids(&tx1, &"node".to_string(), &names)
+            .await
+            .unwrap()
+            .clone();
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        tx1.commit().await.unwrap();
+
+        assert_eq!(entities.len(), 4, "Expected to retrieve 4 entities in transaction 1, but got {}", entities.len());
+        entities
+    });
+
+    let handle2 = tokio::spawn(async move {
         let tx2 = client2.transaction().await.unwrap();
+        let mypid = tx2.query_one(pid_query, &[]).await.unwrap().get::<_, i32>(0);
+        sender2.send(mypid).unwrap();
+       
 
         let names = vec![
             "n0001".to_string(),
             "n0003".to_string(),
+            "n0005".to_string(),
+            "n0007".to_string(),
         ];
 
-        let entity_mapping2 = DbEntityMapping {};
-        let entities = entity_mapping2
+        let entity_mapping = DbEntityMapping {};
+        let entities = entity_mapping
             .names_to_entity_ids(&tx2, &"node".to_string(), &names)
             .await
             .unwrap()
             .clone();
+
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         tx2.commit().await.unwrap();
+
+        assert_eq!(entities.len(), 4, "Expected to retrieve 4 entities in transaction 2, but got {}", entities.len());
         entities
     });
 
-    let entities2 = tokio::select! {
-        result = handle => {
+    let observer_client = test_database.connect().await?;
+
+    let pid1 = receiver1.await.unwrap();
+    let pid2 = receiver2.await.unwrap();
+    println!("My PID: {}, PID1: {}, PID2: {}", mypid, pid1, pid2);
+    let query = concat!(
+        "select l1.pid, l2.pid, l1.relation::regclass::text, l2.relation::regclass::text, l1.mode, l2.mode, a1.query as query1, a2.query as query2 ",
+        "from pg_locks l1 join pg_locks l2 on l1.relation = l2.relation ",
+        "join pg_stat_activity a1 on l1.pid = a1.pid join pg_stat_activity a2 on l2.pid = a2.pid ",
+        "where l1.pid = $1 OR l2.pid = $1 OR l1.pid = $2 OR l2.pid = $2 OR l1.pid = $3 OR l2.pid = $3;"
+    );
+    let rows = txselect.query(query, &[&mypid, &pid1, &pid2]).await?;
+    for row in rows {
+        println!("Pid 1: {}, Pid 2: {},Lock 1: {}, Lock 2: {}, Mode 1: {}, Mode 2: {}, Query 1: {}, Query 2: {}",
+            row.get::<_, i32>(0),
+            row.get::<_, i32>(1),
+            row.get::<_, String>(2),
+            row.get::<_, String>(3),
+            row.get::<_, String>(4),
+            row.get::<_, String>(5),
+            row.get::<_, String>(6),
+            row.get::<_, String>(7),
+        );
+    }
+
+    let entities1 = tokio::select! {
+        result = handle1 => {
             // The task completed successfully, which means there was no deadlock
             result?
         }
-        _ = tokio::time::sleep(std::time::Duration::from_secs(20)) => {
+        _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
             // The task is still running after 20 seconds, which likely indicates a deadlock
-            return Err("Deadlock occurs when two transactions try to insert entities with overlapping names concurrently".into());
+            return Err("Deadlock for handle1".into());
         }
     };
 
-    tx.commit().await?;
+    let entities2 = tokio::select! {
+        result = handle2 => {
+            // The task completed successfully, which means there was no deadlock
+            result?
+        }
+        _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+            // The task is still running after 20 seconds, which likely indicates a deadlock
+            return Err("Deadlock for handle2".into());
+        }
+    };
+    
+    txselect.commit().await?;
 
-    let tx3 = client.transaction().await?;
+    let mut client = test_database.connect().await?;
+    let tx = client.transaction().await?;
     let query = "SELECT id FROM entity.node";
-    let rows = tx3.query(query, &[]).await?;
+    let rows = tx.query(query, &[]).await?;
 
-    let entities = rows.iter().map(|row| row.get::<_, i64>(0)).collect::<Vec<_>>();
-    assert_eq!(entities.len(), 3, "Expected 3 entities to be inserted, but found {}", entities.len());
+    let entities = rows.iter().map(|row| row.get::<_, i32>(0)).collect::<Vec<_>>();
+    assert_eq!(entities.len(), 7, "Expected 7 entities to be inserted, but found {}", entities.len());
     for entity in entities1 {
-        assert!(entities.contains(&entity), "Entity ID {} from first transaction not found in database", entity);
+        assert!(entities.contains(&(entity as i32)), "Entity ID {} from first transaction not found in database", entity);
     }
     for entity in entities2 {
-        assert!(entities.contains(&entity), "Entity ID {} from second transaction not found in database", entity);
+        assert!(entities.contains(&(entity as i32)), "Entity ID {} from second transaction not found in database", entity);
     }   
-    tx3.commit().await?;
+    tx.commit().await?;
 
     Ok(())
 }
