@@ -208,6 +208,9 @@ impl Change for RemoveAttributes {
         let mut attributes: Vec<Attribute> = Vec::new();
         let tx = client.transaction().await?;
 
+        tx.execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[])
+            .await?;
+
         let query = concat!(
             "SELECT attribute_directory.drop_attribute(attribute_store, $1) ",
             "FROM attribute_directory.attribute_store ",
