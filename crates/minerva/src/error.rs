@@ -6,9 +6,9 @@ use crate::entity::EntityMappingError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum DatabaseError {
-    #[error("0")]
+    #[error("{0}")]
     Default(String),
-    #[error("0")]
+    #[error("{0}")]
     UniqueViolation(String),
 }
 
