@@ -44,7 +44,7 @@ use super::trend_materialization::{
 use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
-use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, Trigger};
+use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, UpdateTrigger, EnableTrigger, DisableTrigger, Trigger};
 use super::virtual_entity::{
     load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
     VirtualEntity,
@@ -875,7 +875,26 @@ impl MinervaInstance {
                     my_trigger.name == other_trigger.name
                 }) {
                 Some(my_trigger) => {
-                    changes.append(&mut my_trigger.diff(other_trigger));
+                    let differences = my_trigger.differences(other_trigger);
+                    if !differences.is_empty() {
+                        changes.push(Box::new(UpdateTrigger {
+                            trigger: other_trigger.clone(),
+                            verify: false,
+                            changes: Some(differences),
+                        }));
+                    } else {
+                        if my_trigger.enabled != other_trigger.enabled {
+                            if other_trigger.enabled {
+                                changes.push(Box::new(EnableTrigger {
+                                    trigger_name:my_trigger.name.clone(),
+                                }));
+                            } else {
+                                changes.push(Box::new(DisableTrigger {
+                                    trigger_name: my_trigger.name.clone(),
+                                }));
+                            }
+                        }
+                    }
                 }
                 None => changes.push(Box::new(AddTrigger {
                     trigger: other_trigger.clone(),

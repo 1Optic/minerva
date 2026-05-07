@@ -28,6 +28,7 @@ impl TriggerUpdate {
         let change = UpdateTrigger {
             trigger,
             verify: self.verify,
+            changes: None,
         };
 
         let message = change.apply(&mut client).await?;

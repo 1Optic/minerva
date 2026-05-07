@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use log::{debug, error, trace};
 
+use pg_query::{parse as parse_sql, parse_plpgsql, ParseResult};
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
 
@@ -15,8 +16,8 @@ use tokio_postgres::{Client, GenericClient, Row, Transaction};
 use async_trait::async_trait;
 
 use crate::change::Changed;
+use crate::changes::trend_store;
 use crate::interval::parse_interval;
-use crate::change::trigger::ChangeKpiData;
 
 use super::change::{Change, ChangeResult};
 use super::error::{ConfigurationError, DatabaseError, Error, RuntimeError};
@@ -131,62 +132,204 @@ impl fmt::Display for Trigger {
     }
 }
 
+fn equal_parse_result(first: &ParseResult, second: &ParseResult) -> bool {
+    for table in &first.tables {
+        if !second.tables.iter().any(|other_table| table == other_table) {
+            return false;
+        }
+    }
+    for table in &second.tables {
+        if !first.tables.iter().any(|other_table| table == other_table) {
+            return false;
+        }
+    }
+
+    for alias in &first.aliases {
+        if !second.aliases.iter().any(|other_alias| alias.0 == other_alias.0 && alias.1 == other_alias.1) {
+            return false;
+        }
+    }
+    for alias in &second.aliases {
+        if !first.aliases.iter().any(|other_alias| alias.0 == other_alias.0 && alias.1 == other_alias.1) {
+            return false;
+        }
+    }
+
+    for cte_name in &first.cte_names {
+        if !second.cte_names.iter().any(|other_cte_name| cte_name == other_cte_name) {
+            return false;
+        }
+    }
+    for cte_name in &second.cte_names {
+        if !first.cte_names.iter().any(|other_cte_name| cte_name == other_cte_name) {
+            return false;
+        }
+    }
+
+    for function in &first.functions {
+        if !second.functions.iter().any(|other_function| function == other_function) {
+            return false;
+        }
+    }
+    for function in &second.functions {
+        if !first.functions.iter().any(|other_function| function == other_function) {
+            return false;
+        }
+    }
+
+    for column in &first.filter_columns {
+        if !second.filter_columns.iter().any(|other_column| column == other_column) {
+            return false;
+        }
+    }
+    for column in &second.filter_columns {
+        if !first.filter_columns.iter().any(|other_column| column == other_column) {
+            return false;
+        }
+    }
+
+    true
+}
+
+
 impl Trigger {
-    pub fn diff(&self, other: &Trigger) -> Vec<Box<dyn Change + Send>> {
-        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
-        for kpi_data in self.kpi_data.iter() {
-            
+    fn kpi_function(&self) -> String {
+        format!(
+            "CREATE OR REPLACE FUNCTION trigger_rule.{}(timestamp with time zone) RETURNS SETOF trigger_rule.{} AS $function$\n{}\n$function$ LANGUAGE plpgsql STABLE",
+            escape_identifier(&format!("{}_kpi", &self.name)),
+            escape_identifier(&format!("{}_kpi", &self.name)),
+            &self.kpi_function,
+        )
+    }
+
+    pub fn differences(&self, other: &Trigger) -> Vec<String> {
+        let mut changes = Vec::new();
+        // We need to use the experimental plpgsql parsing because the fingerprinting does not
+        // yet work for plpgsql code.
+        let this_kpi_json = parse_plpgsql(&self.kpi_function()).unwrap();
+        let other_kpi_json = parse_plpgsql(&other.kpi_function()).unwrap();   
+        if !this_kpi_json.eq(&other_kpi_json) {
+            changes.push("change kpi_function".to_string());
+        }
+
+        for threshold in &self.thresholds {
+            match other.thresholds.iter().find(|other_threshold| {
+                threshold.name == other_threshold.name
+            }) {
+                Some(other_threshold) => {
+                    if threshold.data_type != other_threshold.data_type || threshold.value != other_threshold.value {
+                        changes.push(format!("change threshold {}", threshold.name));
+                    }
+                }
+                None => {
+                    changes.push(format!("remove threshold {}", threshold.name));
+                }
+            }
+        }
+
+        for threshold in &other.thresholds {
+            if !self.thresholds.iter().any(|self_threshold| {
+                threshold.name == self_threshold.name
+            }) {
+                changes.push(format!("add threshold {}", threshold.name));
+            }
+        }
+
+        let this_condition_json = parse_sql(&format!("SELECT ({})", &self.condition)).unwrap();
+        let other_condition_json = parse_sql(&format!("SELECT ({})",  &other.condition)).unwrap();
+        if !equal_parse_result(&this_condition_json, &other_condition_json) {
+            changes.push("change condition".to_string());
+        }
+
+        let this_weight_json = parse_sql(&format!("SELECT ({})",&self.weight)).unwrap();
+        let other_weight_json = parse_sql(&format!("SELECT ({})", &other.weight)).unwrap();
+        if !equal_parse_result(&this_weight_json, &other_weight_json) {
+            changes.push("change weight".to_string());
+        }
+    
+        let this_notification_json = parse_sql(&format!("SELECT ({})", &self.notification)).unwrap();
+        let other_notification_json = parse_sql(&format!("SELECT ({})", &other.notification)).unwrap();
+        if !equal_parse_result(&this_notification_json, &other_notification_json) {
+            changes.push("change notification".to_string());
+        }
+
+        for tag in &self.tags {
+            if !other.tags.iter().any(|other_tag| tag == other_tag) {
+                changes.push(format!("remove tag {}", tag));
+            }
+        }
+        for tag in &other.tags {
+            if !self.tags.iter().any(|self_tag| tag == self_tag) {
+                changes.push(format!("add tag {}", tag));
+            }
+        }
+
+        let this_fingerprint_json = parse_sql(&self.fingerprint).unwrap();
+        let other_fingerprint_json = parse_sql(&other.fingerprint).unwrap();
+        if !equal_parse_result(&this_fingerprint_json, &other_fingerprint_json) {
+            changes.push("change fingerprint".to_string());
         }
 
 
-
-        if self.kpi_data != other.kpi_data {
-            diffs.push("kpi_data".to_string());
-        }
-        if self.kpi_function != other.kpi_function {
-            diffs.push("kpi_function".to_string());
-        }
-        if self.thresholds != other.thresholds {
-            diffs.push("thresholds".to_string());
-        }
-        if self.condition != other.condition {
-            diffs.push("condition".to_string());
-        }
-        if self.weight != other.weight {
-            diffs.push("weight".to_string());
-        }
-        if self.notification != other.notification {
-            diffs.push("notification".to_string());
-        }
-        if self.tags != other.tags {
-            diffs.push("tags".to_string());
-        }
-        if self.fingerprint != other.fingerprint {
-            diffs.push("fingerprint".to_string());
-        }
         if self.notification_store != other.notification_store {
-            diffs.push("notification_store".to_string());
-        }
-        if self.data != other.data {
-            diffs.push("data".to_string());
-        }
-        if self.trend_store_links != other.trend_store_links {
-            diffs.push("trend_store_links".to_string());
-        }
-        if self.mapping_functions != other.mapping_functions {
-            diffs.push("mapping_functions".to_string());
-        }
-        if self.description != other.description {
-            diffs.push("description".to_string());
-        }
-        if self.granularity != other.granularity {
-            diffs.push("granularity".to_string());
-        }
-        if self.enabled != other.enabled {
-            diffs.push("enabled".to_string());
+            changes.push("change notification store".to_string());
         }
 
-        diffs
+        if self.data != other.data {
+            changes.push("change data".to_string());
+        }
+
+        for trend_store_link in &self.trend_store_links {
+            match other.trend_store_links.iter().find(|other_trend_store_link| {
+                trend_store_link.part_name == other_trend_store_link.part_name                
+            }) {
+                Some(other_trend_store_link) => {
+                    if trend_store_link.mapping_function != other_trend_store_link.mapping_function {
+                        changes.push(format!("change mapping function for part {}", trend_store_link.part_name));
+                    }
+                },
+                None => {
+                    changes.push(format!("remove trend store link {}", trend_store_link.part_name));
+                }
+            }
+        }
+        for trend_store_link in &other.trend_store_links {
+            if !self.trend_store_links.iter().any(|self_trend_store_link| {
+                trend_store_link.part_name == self_trend_store_link.part_name
+            }) {
+                changes.push(format!("add trend store link {}", trend_store_link.part_name));
+            }
+        }
+
+        for mapping_function in &self.mapping_functions {
+            match other.mapping_functions.iter().find(|other_mapping_function| {
+                mapping_function.name == other_mapping_function.name
+            }) {
+                Some(other_mapping_function) => {
+                    if mapping_function.source != other_mapping_function.source {
+                        changes.push(format!("change source for mapping function {}", mapping_function.name));
+                    }
+                    // no change
+                },
+                None => {
+                    changes.push(format!("remove mapping function {}", mapping_function.name));
+                }
+            }
+        }
+        for mapping_function in &other.mapping_functions {
+            if !self.mapping_functions.iter().any(|self_mapping_function| {
+                mapping_function.name == self_mapping_function.name
+                    && mapping_function.source == self_mapping_function.source
+            }) {
+                changes.push(format!("add mapping function {}", mapping_function.name));
+            }
+        }
+
+        if self.granularity != other.granularity {
+            changes.push("change granularity".to_string());
+        }
+
+        changes
     }
 }
 
@@ -1071,11 +1214,24 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
 pub struct UpdateTrigger {
     pub trigger: Trigger,
     pub verify: bool,
+    pub changes: Option<Vec<String>>,
 }
 
 impl fmt::Display for UpdateTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateTrigger({})", &self.trigger)
+        match &self.changes {
+            Some(changes) => {
+                write!(
+                    f,
+                    "UpdateTrigger({}): changes: {}",
+                    &self.trigger.name,
+                    changes.join(", ")
+                )
+            }
+            None => {
+                write!(f, "UpdateTrigger({})", &self.trigger)
+            }
+        }
     }
 }
 
