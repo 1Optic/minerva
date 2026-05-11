@@ -497,7 +497,7 @@ impl EntityMapping for CachingEntityMapping {
     }
 }
 
-async fn create_entity<T: GenericClient>(
+pub async fn create_entity<T: GenericClient>(
     client: &T,
     entity_type_table: &str,
     name: &str,
@@ -521,7 +521,7 @@ async fn create_entity<T: GenericClient>(
     }
 }
 
-async fn create_entity_with_alias<T: GenericClient>(
+pub async fn create_entity_with_alias<T: GenericClient>(
     client: &T,
     entity_type_table: &str,
     name: &str,

@@ -29,6 +29,7 @@ async-trait = "0.1.89"
 toxiproxy_rust = "0.1.6"
 thiserror = "2.0.18"
 postgres-protocol = "0.6.11"
+comfy-table = "7.2.2"
 
 [[test]]
 name = "integration_tests"

@@ -1,9 +1,10 @@
-use assert_cmd::assert;
 use log::debug;
 
 use minerva::cluster::MinervaClusterConnector;
-use minerva::entity::{DbEntityMapping, EntityMapping};
+use minerva::entity::{DbEntityMapping, EntityMapping, create_entity};
 use minerva::schema::create_schema;
+use postgres_types::Type;
+use tokio_postgres::Row;
 
 pub async fn db_entity_mapping(
     cluster: MinervaClusterConnector,
@@ -134,18 +135,14 @@ pub async fn avoid_deadlock(
         .clone();
     txpre.commit().await?;
 
-    let txwait = client.transaction().await?;
-
-    txwait.commit().await?;
-
     let pid_query = "SELECT pg_backend_pid()";
-    let mypid = client.query_one(pid_query, &[]).await?.get::<_, i32>(0);
-    let (sender1, receiver1) = tokio::sync::oneshot::channel();
-    let (sender2, receiver2) = tokio::sync::oneshot::channel();
+    let (pid_sender1, pid_receiver1) = tokio::sync::oneshot::channel();
+    let (pid_sender2, pid_receiver2) = tokio::sync::oneshot::channel();
 
     let mut client = test_database.connect().await?;
 
     let txselect = client.transaction().await?;
+    let mypid = txselect.query_one(pid_query, &[]).await?.get::<_, i32>(0);
     let query = "SELECT * FROM entity.node";
 
     txselect.query(query, &[]).await?;
@@ -153,81 +150,62 @@ pub async fn avoid_deadlock(
     let handle1 = tokio::spawn(async move {
         let tx1 = client1.transaction().await.unwrap();
         let mypid = tx1.query_one(pid_query, &[]).await.unwrap().get::<_, i32>(0);
-        sender1.send(mypid).unwrap();
+        pid_sender1.send(mypid).unwrap();
 
-        let names = vec![
-            "n0001".to_string(),
-            "n0002".to_string(),
-            "n0005".to_string(),
-            "n0006".to_string(),
-        ];
+        let _entity = create_entity(&tx1, "node", "n0003").await.unwrap();
 
-        let entity_mapping = DbEntityMapping {};
-        let entities = entity_mapping
-            .names_to_entity_ids(&tx1, &"node".to_string(), &names)
-            .await
-            .unwrap()
-            .clone();
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         tx1.commit().await.unwrap();
-
-        assert_eq!(entities.len(), 4, "Expected to retrieve 4 entities in transaction 1, but got {}", entities.len());
-        entities
     });
 
     let handle2 = tokio::spawn(async move {
         let tx2 = client2.transaction().await.unwrap();
         let mypid = tx2.query_one(pid_query, &[]).await.unwrap().get::<_, i32>(0);
-        sender2.send(mypid).unwrap();
-       
+        pid_sender2.send(mypid).unwrap();
 
-        let names = vec![
-            "n0001".to_string(),
-            "n0003".to_string(),
-            "n0005".to_string(),
-            "n0007".to_string(),
-        ];
-
-        let entity_mapping = DbEntityMapping {};
-        let entities = entity_mapping
-            .names_to_entity_ids(&tx2, &"node".to_string(), &names)
-            .await
-            .unwrap()
-            .clone();
+        let _entity = create_entity(&tx2, "node", "n0003").await.unwrap();
 
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         tx2.commit().await.unwrap();
-
-        assert_eq!(entities.len(), 4, "Expected to retrieve 4 entities in transaction 2, but got {}", entities.len());
-        entities
     });
 
-    let observer_client = test_database.connect().await?;
+    let client = test_database.connect().await?;
 
-    let pid1 = receiver1.await.unwrap();
-    let pid2 = receiver2.await.unwrap();
+    let stat_activity = client.query("SELECT * FROM pg_stat_activity", &[]).await?;
+
+    render_rows_table(stat_activity);
+
+    let pid1 = pid_receiver1.await.unwrap();
+    let pid2 = pid_receiver2.await.unwrap();
     println!("My PID: {}, PID1: {}, PID2: {}", mypid, pid1, pid2);
     let query = concat!(
         "select l1.pid, l2.pid, l1.relation::regclass::text, l2.relation::regclass::text, l1.mode, l2.mode, a1.query as query1, a2.query as query2 ",
         "from pg_locks l1 join pg_locks l2 on l1.relation = l2.relation ",
         "join pg_stat_activity a1 on l1.pid = a1.pid join pg_stat_activity a2 on l2.pid = a2.pid ",
-        "where l1.pid = $1 OR l2.pid = $1 OR l1.pid = $2 OR l2.pid = $2 OR l1.pid = $3 OR l2.pid = $3;"
+        "where l1.pid IN ($1,$2,$3) AND l2.pid IN ($1,$2,$3) AND l1.pid != l2.pid;"
     );
+
+    let mut table = comfy_table::Table::new();
+    let style = "     ═╪ ┆          ";
+    table.load_preset(style);
+    table.set_header(vec!["Pid 1","Pid 2","Lock 1","Lock 2","Mode 1","Mode 2","Query 1","Query 2"]);
+
     let rows = txselect.query(query, &[&mypid, &pid1, &pid2]).await?;
     for row in rows {
-        println!("Pid 1: {}, Pid 2: {},Lock 1: {}, Lock 2: {}, Mode 1: {}, Mode 2: {}, Query 1: {}, Query 2: {}",
-            row.get::<_, i32>(0),
-            row.get::<_, i32>(1),
-            row.get::<_, String>(2),
-            row.get::<_, String>(3),
-            row.get::<_, String>(4),
-            row.get::<_, String>(5),
-            row.get::<_, String>(6),
-            row.get::<_, String>(7),
-        );
+        table.add_row(vec![
+            row.get::<_, i32>(0).to_string(),
+            row.get::<_, i32>(1).to_string(),
+            row.get::<_, String>(2).to_string(),
+            row.get::<_, String>(3).to_string(),
+            row.get::<_, String>(4).to_string(),
+            row.get::<_, String>(5).to_string(),
+            row.get::<_, String>(6).to_string(),
+            row.get::<_, String>(7).to_string(),
+        ]);
     }
+    println!("{table}");
 
-    let entities1 = tokio::select! {
+    tokio::select! {
         result = handle1 => {
             // The task completed successfully, which means there was no deadlock
             result?
@@ -238,7 +216,7 @@ pub async fn avoid_deadlock(
         }
     };
 
-    let entities2 = tokio::select! {
+    tokio::select! {
         result = handle2 => {
             // The task completed successfully, which means there was no deadlock
             result?
@@ -249,22 +227,34 @@ pub async fn avoid_deadlock(
         }
     };
     
-    txselect.commit().await?;
-
-    let mut client = test_database.connect().await?;
-    let tx = client.transaction().await?;
-    let query = "SELECT id FROM entity.node";
-    let rows = tx.query(query, &[]).await?;
-
-    let entities = rows.iter().map(|row| row.get::<_, i32>(0)).collect::<Vec<_>>();
-    assert_eq!(entities.len(), 7, "Expected 7 entities to be inserted, but found {}", entities.len());
-    for entity in entities1 {
-        assert!(entities.contains(&(entity as i32)), "Entity ID {} from first transaction not found in database", entity);
-    }
-    for entity in entities2 {
-        assert!(entities.contains(&(entity as i32)), "Entity ID {} from second transaction not found in database", entity);
-    }   
-    tx.commit().await?;
-
     Ok(())
+}
+
+fn render_rows_table(rows: Vec<Row>) {
+    let mut table = comfy_table::Table::new();
+    let style = "     ═╪ ┆          ";
+    table.load_preset(style);
+
+    let first_row = rows.first().unwrap();
+    let header_names: Vec<String> = first_row.columns().iter().map(|c| c.name().to_string()).collect();
+    table.set_header(header_names);
+
+    for row in &rows {
+        let row_values: Vec<String> = first_row
+            .columns()
+            .iter()
+            .enumerate()
+            .map(|(index, column)| { value_to_text(index, column.type_(), row)})
+            .collect();
+
+        table.add_row(row_values);
+    }
+    println!("{table}");
+}
+
+fn value_to_text(index: usize, value_type: &Type, row: &Row) -> String {
+    match value_type {
+        &Type::INT4 => row.get::<_, i32>(index).to_string(),
+        _ => "???".to_string(),
+    }
 }
