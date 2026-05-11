@@ -25,7 +25,10 @@
       "platformAutomerge": true
     },
     {
-      "matchPackageNames": ["quay.io/buildah/stable"],
+      "matchPackageNames": [
+        "quay.io/buildah/stable",
+        "sonarsource/sonar-scanner-cli"
+      ],
       "pinDigests": false
     }
   ]
