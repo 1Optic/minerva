@@ -44,7 +44,7 @@ use super::trend_materialization::{
 use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
-use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, UpdateTrigger, EnableTrigger, DisableTrigger, Trigger};
+use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, UpdateTrigger, EnableTrigger, DisableTrigger, UpdateTriggerTags, Trigger};
 use super::virtual_entity::{
     load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
     VirtualEntity,
@@ -878,7 +878,7 @@ impl MinervaInstance {
                     let differences = my_trigger.differences(other_trigger);
                     if !differences.is_empty() {
                         changes.push(Box::new(UpdateTrigger {
-                            trigger: other_trigger.clone(),
+                            trigger: my_trigger.clone(),
                             verify: false,
                             changes: Some(differences),
                         }));
@@ -894,6 +894,13 @@ impl MinervaInstance {
                                 }));
                             }
                         }
+                    }
+                    if my_trigger.tags.len() != other_trigger.tags.len() || !my_trigger.tags.iter().all(|tag| other_trigger.tags.contains(tag)) {
+                        changes.push(Box::new(UpdateTriggerTags {
+                            trigger_name: other_trigger.name.clone(),
+                            old_tags: my_trigger.tags.clone(),
+                            new_tags: other_trigger.tags.clone(),
+                        }));
                     }
                 }
                 None => changes.push(Box::new(AddTrigger {

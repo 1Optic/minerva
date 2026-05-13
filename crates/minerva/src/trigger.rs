@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
+use regex::Regex;
 use log::{debug, error, trace};
 
 use pg_query::{parse as parse_sql, parse_plpgsql, ParseResult};
@@ -16,7 +17,6 @@ use tokio_postgres::{Client, GenericClient, Row, Transaction};
 use async_trait::async_trait;
 
 use crate::change::Changed;
-use crate::changes::trend_store;
 use crate::interval::parse_interval;
 
 use super::change::{Change, ChangeResult};
@@ -133,64 +133,16 @@ impl fmt::Display for Trigger {
 }
 
 fn equal_parse_result(first: &ParseResult, second: &ParseResult) -> bool {
-    for table in &first.tables {
-        if !second.tables.iter().any(|other_table| table == other_table) {
-            return false;
-        }
-    }
-    for table in &second.tables {
-        if !first.tables.iter().any(|other_table| table == other_table) {
-            return false;
-        }
-    }
-
-    for alias in &first.aliases {
-        if !second.aliases.iter().any(|other_alias| alias.0 == other_alias.0 && alias.1 == other_alias.1) {
-            return false;
-        }
-    }
-    for alias in &second.aliases {
-        if !first.aliases.iter().any(|other_alias| alias.0 == other_alias.0 && alias.1 == other_alias.1) {
-            return false;
-        }
-    }
-
-    for cte_name in &first.cte_names {
-        if !second.cte_names.iter().any(|other_cte_name| cte_name == other_cte_name) {
-            return false;
-        }
-    }
-    for cte_name in &second.cte_names {
-        if !first.cte_names.iter().any(|other_cte_name| cte_name == other_cte_name) {
-            return false;
-        }
-    }
-
-    for function in &first.functions {
-        if !second.functions.iter().any(|other_function| function == other_function) {
-            return false;
-        }
-    }
-    for function in &second.functions {
-        if !first.functions.iter().any(|other_function| function == other_function) {
-            return false;
-        }
-    }
-
-    for column in &first.filter_columns {
-        if !second.filter_columns.iter().any(|other_column| column == other_column) {
-            return false;
-        }
-    }
-    for column in &second.filter_columns {
-        if !first.filter_columns.iter().any(|other_column| column == other_column) {
-            return false;
-        }
-    }
-
-    true
+    first.protobuf.eq(&second.protobuf)
 }
 
+fn function_name(mapping_function: String) -> String {
+    let regex = Regex::new(r"\.(?P<function_name>.+)\(").unwrap();
+    match regex.captures(&mapping_function) {
+        Some(capture) => capture.name("function_name").unwrap().as_str().to_string(),
+        None => mapping_function
+    }
+}
 
 impl Trigger {
     fn kpi_function(&self) -> String {
@@ -239,13 +191,18 @@ impl Trigger {
         let other_condition_json = parse_sql(&format!("SELECT ({})",  &other.condition)).unwrap();
         if !equal_parse_result(&this_condition_json, &other_condition_json) {
             changes.push("change condition".to_string());
+        } else {
+            changes.push(format!("keep condition as '{:?}'", this_condition_json));
         }
+    
 
         let this_weight_json = parse_sql(&format!("SELECT ({})",&self.weight)).unwrap();
         let other_weight_json = parse_sql(&format!("SELECT ({})", &other.weight)).unwrap();
         if !equal_parse_result(&this_weight_json, &other_weight_json) {
             changes.push("change weight".to_string());
-        }
+        }// else {
+        //    changes.push(format!("keep weight as '{:?}'", this_weight_json));
+        //}
     
         let this_notification_json = parse_sql(&format!("SELECT ({})", &self.notification)).unwrap();
         let other_notification_json = parse_sql(&format!("SELECT ({})", &other.notification)).unwrap();
@@ -253,30 +210,31 @@ impl Trigger {
             changes.push("change notification".to_string());
         }
 
-        for tag in &self.tags {
-            if !other.tags.iter().any(|other_tag| tag == other_tag) {
-                changes.push(format!("remove tag {}", tag));
-            }
-        }
-        for tag in &other.tags {
-            if !self.tags.iter().any(|self_tag| tag == self_tag) {
-                changes.push(format!("add tag {}", tag));
-            }
-        }
-
-        let this_fingerprint_json = parse_sql(&self.fingerprint).unwrap();
-        let other_fingerprint_json = parse_sql(&other.fingerprint).unwrap();
-        if !equal_parse_result(&this_fingerprint_json, &other_fingerprint_json) {
-            changes.push("change fingerprint".to_string());
-        }
+        // Not comparing fingerprints for now, as those are not in use
+        // let this_fingerprint_json = parse_sql(&self.fingerprint).unwrap();
+        // let other_fingerprint_json = parse_sql(&other.fingerprint).unwrap();
+        // if !equal_parse_result(&this_fingerprint_json, &other_fingerprint_json) {
+        //     changes.push("change fingerprint".to_string());
+        // }
 
 
         if self.notification_store != other.notification_store {
             changes.push("change notification store".to_string());
         }
 
-        if self.data != other.data {
-            changes.push("change data".to_string());
+        
+        // If JSON is created from the database, it is a full function definition,
+        // but if it is created from a file, it is just the part within a SELECT ... INTO
+        let re = Regex::new(r"(?s)SELECT\s*\((?P<datastring>.*)\)\s*INTO").unwrap();
+        let datastring = match re.captures(&self.data) {
+            Some(capture) => {
+                capture.name("datastring").unwrap().as_str().to_string()
+            },
+            None => self.data.clone()
+        };
+
+        if datastring != other.data {
+            changes.push(format!("change data"));
         }
 
         for trend_store_link in &self.trend_store_links {
@@ -284,8 +242,8 @@ impl Trigger {
                 trend_store_link.part_name == other_trend_store_link.part_name                
             }) {
                 Some(other_trend_store_link) => {
-                    if trend_store_link.mapping_function != other_trend_store_link.mapping_function {
-                        changes.push(format!("change mapping function for part {}", trend_store_link.part_name));
+                    if function_name(trend_store_link.mapping_function.clone()) != function_name(other_trend_store_link.mapping_function.clone()) {
+                        changes.push(format!("change mapping function"));
                     }
                 },
                 None => {
@@ -306,10 +264,9 @@ impl Trigger {
                 mapping_function.name == other_mapping_function.name
             }) {
                 Some(other_mapping_function) => {
-                    if mapping_function.source != other_mapping_function.source {
-                        changes.push(format!("change source for mapping function {}", mapping_function.name));
+                    if function_name(mapping_function.source.clone()) != function_name(other_mapping_function.source.clone()) {
+                        changes.push(format!("change source for mapping function {}", mapping_function.name))
                     }
-                    // no change
                 },
                 None => {
                     changes.push(format!("remove mapping function {}", mapping_function.name));
@@ -319,7 +276,7 @@ impl Trigger {
         for mapping_function in &other.mapping_functions {
             if !self.mapping_functions.iter().any(|self_mapping_function| {
                 mapping_function.name == self_mapping_function.name
-                    && mapping_function.source == self_mapping_function.source
+                    && function_name(mapping_function.source.clone()) == function_name(self_mapping_function.source.clone())
             }) {
                 changes.push(format!("add mapping function {}", mapping_function.name));
             }
@@ -453,6 +410,12 @@ impl AddTrigger {
 
         set_weight(&self.trigger, transaction).await?;
         trace!("Weight set");
+
+        set_tags(&self.trigger.name, &self.trigger.tags, transaction).await?;
+        trace!("Tags set");
+
+        set_fingerprint_function(&self.trigger, transaction).await?;
+        trace!("Fingerprint function set");
 
         Ok(())
     }
@@ -766,6 +729,28 @@ async fn set_weight<T: GenericClient + Sync + Send>(
         .map_err(|e| DatabaseError::from_msg(format!("Error setting weight: {e}")))?;
 
     Ok(format!("Set weight for trigger '{}'", &trigger.name))
+}
+
+async fn set_tags<T: GenericClient + Sync + Send>(
+    trigger_name: &String,
+    tags: &Vec<String>,
+    client: &mut T,
+) -> Result<String, Error> {
+    let query = "SELECT trigger.set_tags(id, $2::text[], 'prepared') FROM trigger.rule WHERE name = $1";
+    client
+        .execute(query, &[&trigger_name, &tags])
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error setting tags: {e}")))?;
+
+    Ok(format!("Set tags for trigger '{}'", &trigger_name))
+}
+
+async fn set_fingerprint_function<T: GenericClient + Sync + Send>(
+    trigger: &Trigger,
+    _client: &mut T,
+) -> Result<String, Error> {
+    // Because fingerprint functions are currently not in use, this has not been implemented yet.
+    Ok(format!("Setting fingerprint function for trigger '{}' skipped", &trigger.name))
 }
 
 pub async fn set_thresholds<T: GenericClient + Sync + Send>(
@@ -1267,6 +1252,8 @@ impl Change for UpdateTrigger {
 
         set_weight(&self.trigger, &mut transaction).await?;
 
+        set_fingerprint_function(&self.trigger, &mut transaction).await?;
+
         set_thresholds(&self.trigger, &mut transaction).await?;
 
         set_condition(&self.trigger, &mut transaction).await?;
@@ -1322,6 +1309,74 @@ impl Display for UpdatedTrigger {
 impl Changed for UpdatedTrigger {
     fn revert(&self) -> Option<Box<dyn Change>> {
         None
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdateTriggerTags {
+    pub trigger_name: String,
+    pub old_tags: Vec<String>,
+    pub new_tags: Vec<String>,
+}
+
+impl fmt::Display for UpdateTriggerTags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UpdateTriggerTags({})", &self.trigger_name)
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for UpdateTriggerTags {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut transaction = client.transaction().await?;
+
+        if !trigger_exists(&self.trigger_name, &mut transaction).await? {
+            return Err(Error::Runtime(RuntimeError::from_msg(format!(
+                "No trigger with name '{}'",
+                &self.trigger_name
+            ))));
+        }
+
+        set_tags(&self.trigger_name, &self.new_tags, &mut transaction).await?;
+
+        transaction.commit().await?;
+
+        Ok(Box::new(UpdatedTriggerTags {
+            trigger_name: self.trigger_name.clone(),
+            old_tags: self.old_tags.clone(),
+            new_tags: self.new_tags.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTriggerTags {
+    pub trigger_name: String,
+    pub old_tags: Vec<String>,
+    pub new_tags: Vec<String>,
+}
+
+impl Display for UpdatedTriggerTags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated trigger tags for trigger '{}'",
+            &self.trigger_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTriggerTags {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateTriggerTags {
+            trigger_name: self.trigger_name.clone(),
+            old_tags: self.new_tags.clone(),
+            new_tags: self.old_tags.clone(),
+        }))
     }
 }
 
@@ -1384,6 +1439,8 @@ impl Change for RenameTrigger {
         setup_rule(&self.trigger, &mut transaction).await?;
 
         set_weight(&self.trigger, &mut transaction).await?;
+
+        set_tags(&self.trigger.name, &self.trigger.tags, &mut transaction).await?;
 
         set_thresholds(&self.trigger, &mut transaction).await?;
 
@@ -1605,7 +1662,7 @@ impl Changed for DisabledTrigger {
 }
 
 fn extract_rule_from_src(src: &str) -> Result<String, TriggerError> {
-    let condition_regex = regex::Regex::from_str(r".*\(\$1\) WHERE ((?s).*);[ ]*$").unwrap();
+    let condition_regex = Regex::from_str(r".*\(\$1\) WHERE ((?s).*);[ ]*$").unwrap();
 
     let captures = condition_regex.captures(src);
 

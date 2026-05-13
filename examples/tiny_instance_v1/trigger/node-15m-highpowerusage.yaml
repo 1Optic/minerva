@@ -19,13 +19,13 @@ thresholds:
     data_type: numeric
     value: 0.05
 condition: |-
-  power_kwh > max_power
+  power_kwh < max_power
 weight: |-
   SELECT
       CASE
           WHEN $1.power_kwh > 1 THEN 500
           WHEN $1.power_kwh > 2 THEN 800
-          ELSE 300
+          ELSE 100
       END
 notification: |-
   SELECT array_to_string(
@@ -41,11 +41,7 @@ data: |-
   )
 tags: ['online']
 fingerprint: |-
-  SELECT trigger.modified_to_fingerprint(
-      ARRAY[
-          trend.modified(trend.to_trendstore('hub_node_main_15m'), $1)
-      ]::timestamptz[]
-  )
+  SELECT now()::text
 notification_store: trigger-notification
 trend_store_links:
   - part_name: hub_node_main_15m
