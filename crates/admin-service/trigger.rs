@@ -57,7 +57,6 @@ pub struct ParameterData {
     pub name: String,
     pub value: String,
     pub data_type: Option<String>,
-    pub default_value: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -143,7 +142,6 @@ impl From<ExtendedParameterValue> for ParameterData {
             name: parm.name,
             value: parm.value,
             data_type: parm.data_type,
-            default_value: parm.default_value,
         }
     }
 }
@@ -160,7 +158,6 @@ impl From<ParameterData> for ExtendedParameterValue {
             name: parm.name,
             value: parm.value,
             data_type: parm.data_type,
-            default_value: parm.default_value,
         }
     }
 }
@@ -817,6 +814,7 @@ async fn create_trigger_fn(
 }
 
 // curl -H "Content-Type: application/json" -X POST -d '{"name": "high_downtime", "description": "downtime higher than maximum", "thresholds": [{"name": "max_downtime", "data_type": "numeric", "value": "50"}], "entity_type": "v-cell", "granularity": "15m", "weight": 100, "enabled": true, "template_instance": {"template_id": 1, "parameters": [{"parameter": "counter", "value": "L.Cell.Unavail.Dur.Sys"}, {"parameter": "comparison", "value": ">"}, {"parameter": "value", "value": "max_downtime"}]}}' localhost:8000/triggers
+// curl -H "Content-Type: application/json" -X POST -d '{"name": "high_temperature", "description": "temperature higher than maximum", "entity_type": "node", "granularity": "15m", "weight": 100, "enabled": true, "template_instance": {"template_id": 1, "parameters": [{"name": "trend_1", "value": "inside_temp"}, {"name": "comparison_1", "value": ">"}, {"name": "value_1", "value": "50"}]}}' localhost:8000/triggers
 #[utoipa::path(
     post,
     path="/triggers",
