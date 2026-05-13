@@ -189,9 +189,7 @@ impl From<TemplatedTrigger> for FullTemplatedTrigger {
                                 .data_type
                                 .clone()
                                 .unwrap_or(DEFAULT_THRESHOLD_DATA_TYPE.to_string()),
-                            value: p
-                                .value
-                                .clone()
+                            value: p.value.clone(),
                         })
                     } else {
                         None
