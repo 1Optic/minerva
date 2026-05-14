@@ -133,7 +133,9 @@ impl fmt::Display for Trigger {
 }
 
 fn equal_parse_result(first: &ParseResult, second: &ParseResult) -> bool {
-    first.protobuf.eq(&second.protobuf)
+    first.protobuf.nodes().iter().zip(second.protobuf.nodes()).all(|(first_node, second_node)| {
+        first_node.0.deparse() == second_node.0.deparse()
+    })
 }
 
 fn function_name(mapping_function: String) -> String {
@@ -187,25 +189,45 @@ impl Trigger {
             }
         }
 
-        let this_condition_json = parse_sql(&format!("SELECT ({})", &self.condition)).unwrap();
-        let other_condition_json = parse_sql(&format!("SELECT ({})",  &other.condition)).unwrap();
+        let regex = Regex::new(r"(?s)SELECT\s*\(.*\)").unwrap();
+        let this_condition = match regex.captures(&self.condition) {
+            Some(_capture) => self.condition.clone().trim().to_string(),
+            None => format!("SELECT ({})", &self.condition.trim().to_string())
+        };
+        let other_condition = match regex.captures(&other.condition) {
+            Some(_capture) => other.condition.clone().trim().to_string(),
+            None => format!("SELECT ({})", &other.condition.trim().to_string())
+        };
+        let this_condition_json = parse_sql(&this_condition).unwrap();
+        let other_condition_json = parse_sql(&other_condition).unwrap();
         if !equal_parse_result(&this_condition_json, &other_condition_json) {
             changes.push("change condition".to_string());
-        } else {
-            changes.push(format!("keep condition as '{:?}'", this_condition_json));
         }
-    
 
-        let this_weight_json = parse_sql(&format!("SELECT ({})",&self.weight)).unwrap();
-        let other_weight_json = parse_sql(&format!("SELECT ({})", &other.weight)).unwrap();
+        let this_weight = match regex.captures(&self.weight) {
+            Some(_capture) => self.weight.clone().trim().to_string(),
+            None => format!("SELECT ({})", &self.weight.trim().to_string())
+        };
+        let other_weight = match regex.captures(&other.weight) {
+            Some(_capture) => other.weight.clone().trim().to_string(),
+            None => format!("SELECT ({})", &other.weight.trim().to_string())
+        };
+        let this_weight_json = parse_sql(&this_weight).unwrap();
+        let other_weight_json = parse_sql(&other_weight).unwrap();
         if !equal_parse_result(&this_weight_json, &other_weight_json) {
             changes.push("change weight".to_string());
-        }// else {
-        //    changes.push(format!("keep weight as '{:?}'", this_weight_json));
-        //}
+        }
     
-        let this_notification_json = parse_sql(&format!("SELECT ({})", &self.notification)).unwrap();
-        let other_notification_json = parse_sql(&format!("SELECT ({})", &other.notification)).unwrap();
+        let this_notification = match regex.captures(&self.notification) {
+            Some(_capture) => self.notification.clone().trim().to_string(),
+            None => format!("SELECT ({})::text", &self.notification)
+        };
+        let other_notification = match regex.captures(&other.notification) {
+            Some(_capture) => other.notification.clone().trim().to_string(),
+            None => format!("SELECT ({})::text", &other.notification.trim().to_string())
+        };
+        let this_notification_json = parse_sql(&this_notification).unwrap();
+        let other_notification_json = parse_sql(&other_notification).unwrap();
         if !equal_parse_result(&this_notification_json, &other_notification_json) {
             changes.push("change notification".to_string());
         }
