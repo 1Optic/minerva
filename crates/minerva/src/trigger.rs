@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-use regex::Regex;
 use log::{debug, error, trace};
+use regex::Regex;
 
 use pg_query::{parse as parse_sql, parse_plpgsql, ParseResult};
 use postgres_types::ToSql;
@@ -133,16 +133,19 @@ impl fmt::Display for Trigger {
 }
 
 fn equal_parse_result(first: &ParseResult, second: &ParseResult) -> bool {
-    first.protobuf.nodes().iter().zip(second.protobuf.nodes()).all(|(first_node, second_node)| {
-        first_node.0.deparse() == second_node.0.deparse()
-    })
+    first
+        .protobuf
+        .nodes()
+        .iter()
+        .zip(second.protobuf.nodes())
+        .all(|(first_node, second_node)| first_node.0.deparse() == second_node.0.deparse())
 }
 
 fn function_name(mapping_function: String) -> String {
     let regex = Regex::new(r"\.(?P<function_name>.+)\(").unwrap();
     match regex.captures(&mapping_function) {
         Some(capture) => capture.name("function_name").unwrap().as_str().to_string(),
-        None => mapping_function
+        None => mapping_function,
     }
 }
 
@@ -161,17 +164,21 @@ impl Trigger {
         // We need to use the experimental plpgsql parsing because the fingerprinting does not
         // yet work for plpgsql code.
         let this_kpi_json = parse_plpgsql(&self.kpi_function()).unwrap();
-        let other_kpi_json = parse_plpgsql(&other.kpi_function()).unwrap();   
+        let other_kpi_json = parse_plpgsql(&other.kpi_function()).unwrap();
         if !this_kpi_json.eq(&other_kpi_json) {
             changes.push("change kpi_function".to_string());
         }
 
         for threshold in &self.thresholds {
-            match other.thresholds.iter().find(|other_threshold| {
-                threshold.name == other_threshold.name
-            }) {
+            match other
+                .thresholds
+                .iter()
+                .find(|other_threshold| threshold.name == other_threshold.name)
+            {
                 Some(other_threshold) => {
-                    if threshold.data_type != other_threshold.data_type || threshold.value != other_threshold.value {
+                    if threshold.data_type != other_threshold.data_type
+                        || threshold.value != other_threshold.value
+                    {
                         changes.push(format!("change threshold {}", threshold.name));
                     }
                 }
@@ -182,9 +189,11 @@ impl Trigger {
         }
 
         for threshold in &other.thresholds {
-            if !self.thresholds.iter().any(|self_threshold| {
-                threshold.name == self_threshold.name
-            }) {
+            if !self
+                .thresholds
+                .iter()
+                .any(|self_threshold| threshold.name == self_threshold.name)
+            {
                 changes.push(format!("add threshold {}", threshold.name));
             }
         }
@@ -192,11 +201,11 @@ impl Trigger {
         let regex = Regex::new(r"(?s)SELECT\s*\(.*\)").unwrap();
         let this_condition = match regex.captures(&self.condition) {
             Some(_capture) => self.condition.clone().trim().to_string(),
-            None => format!("SELECT ({})", &self.condition.trim().to_string())
+            None => format!("SELECT ({})", &self.condition.trim().to_string()),
         };
         let other_condition = match regex.captures(&other.condition) {
             Some(_capture) => other.condition.clone().trim().to_string(),
-            None => format!("SELECT ({})", &other.condition.trim().to_string())
+            None => format!("SELECT ({})", &other.condition.trim().to_string()),
         };
         let this_condition_json = parse_sql(&this_condition).unwrap();
         let other_condition_json = parse_sql(&other_condition).unwrap();
@@ -206,25 +215,25 @@ impl Trigger {
 
         let this_weight = match regex.captures(&self.weight) {
             Some(_capture) => self.weight.clone().trim().to_string(),
-            None => format!("SELECT ({})", &self.weight.trim().to_string())
+            None => format!("SELECT ({})", &self.weight.trim().to_string()),
         };
         let other_weight = match regex.captures(&other.weight) {
             Some(_capture) => other.weight.clone().trim().to_string(),
-            None => format!("SELECT ({})", &other.weight.trim().to_string())
+            None => format!("SELECT ({})", &other.weight.trim().to_string()),
         };
         let this_weight_json = parse_sql(&this_weight).unwrap();
         let other_weight_json = parse_sql(&other_weight).unwrap();
         if !equal_parse_result(&this_weight_json, &other_weight_json) {
             changes.push("change weight".to_string());
         }
-    
+
         let this_notification = match regex.captures(&self.notification) {
             Some(_capture) => self.notification.clone().trim().to_string(),
-            None => format!("SELECT ({})::text", &self.notification)
+            None => format!("SELECT ({})::text", &self.notification),
         };
         let other_notification = match regex.captures(&other.notification) {
             Some(_capture) => other.notification.clone().trim().to_string(),
-            None => format!("SELECT ({})::text", &other.notification.trim().to_string())
+            None => format!("SELECT ({})::text", &other.notification.trim().to_string()),
         };
         let this_notification_json = parse_sql(&this_notification).unwrap();
         let other_notification_json = parse_sql(&other_notification).unwrap();
@@ -239,37 +248,44 @@ impl Trigger {
         //     changes.push("change fingerprint".to_string());
         // }
 
-
         if self.notification_store != other.notification_store {
             changes.push("change notification store".to_string());
         }
 
-        
         // If JSON is created from the database, it is a full function definition,
         // but if it is created from a file, it is just the part within a SELECT ... INTO
         let re = Regex::new(r"(?s)SELECT\s*\((?P<datastring>.*)\)\s*INTO").unwrap();
         let datastring = match re.captures(&self.data) {
-            Some(capture) => {
-                capture.name("datastring").unwrap().as_str().to_string()
-            },
-            None => self.data.clone()
+            Some(capture) => capture.name("datastring").unwrap().as_str().to_string(),
+            None => self.data.clone(),
         };
 
         if datastring != other.data {
-            changes.push(format!("change data"));
+            changes.push("change data".to_string());
         }
 
         for trend_store_link in &self.trend_store_links {
-            match other.trend_store_links.iter().find(|other_trend_store_link| {
-                trend_store_link.part_name == other_trend_store_link.part_name                
-            }) {
+            match other
+                .trend_store_links
+                .iter()
+                .find(|other_trend_store_link| {
+                    trend_store_link.part_name == other_trend_store_link.part_name
+                }) {
                 Some(other_trend_store_link) => {
-                    if function_name(trend_store_link.mapping_function.clone()) != function_name(other_trend_store_link.mapping_function.clone()) {
-                        changes.push(format!("change mapping function"));
+                    if function_name(trend_store_link.mapping_function.clone())
+                        != function_name(other_trend_store_link.mapping_function.clone())
+                    {
+                        changes.push(format!(
+                            "change mapping function for trend store link {}",
+                            trend_store_link.part_name
+                        ));
                     }
-                },
+                }
                 None => {
-                    changes.push(format!("remove trend store link {}", trend_store_link.part_name));
+                    changes.push(format!(
+                        "remove trend store link {}",
+                        trend_store_link.part_name
+                    ));
                 }
             }
         }
@@ -277,19 +293,29 @@ impl Trigger {
             if !self.trend_store_links.iter().any(|self_trend_store_link| {
                 trend_store_link.part_name == self_trend_store_link.part_name
             }) {
-                changes.push(format!("add trend store link {}", trend_store_link.part_name));
+                changes.push(format!(
+                    "add trend store link {}",
+                    trend_store_link.part_name
+                ));
             }
         }
 
         for mapping_function in &self.mapping_functions {
-            match other.mapping_functions.iter().find(|other_mapping_function| {
-                mapping_function.name == other_mapping_function.name
-            }) {
+            match other
+                .mapping_functions
+                .iter()
+                .find(|other_mapping_function| mapping_function.name == other_mapping_function.name)
+            {
                 Some(other_mapping_function) => {
-                    if function_name(mapping_function.source.clone()) != function_name(other_mapping_function.source.clone()) {
-                        changes.push(format!("change source for mapping function {}", mapping_function.name))
+                    if function_name(mapping_function.source.clone())
+                        != function_name(other_mapping_function.source.clone())
+                    {
+                        changes.push(format!(
+                            "change source for mapping function {}",
+                            mapping_function.name
+                        ))
                     }
-                },
+                }
                 None => {
                     changes.push(format!("remove mapping function {}", mapping_function.name));
                 }
@@ -298,7 +324,8 @@ impl Trigger {
         for mapping_function in &other.mapping_functions {
             if !self.mapping_functions.iter().any(|self_mapping_function| {
                 mapping_function.name == self_mapping_function.name
-                    && function_name(mapping_function.source.clone()) == function_name(self_mapping_function.source.clone())
+                    && function_name(mapping_function.source.clone())
+                        == function_name(self_mapping_function.source.clone())
             }) {
                 changes.push(format!("add mapping function {}", mapping_function.name));
             }
@@ -758,7 +785,8 @@ async fn set_tags<T: GenericClient + Sync + Send>(
     tags: &Vec<String>,
     client: &mut T,
 ) -> Result<String, Error> {
-    let query = "SELECT trigger.set_tags(id, $2::text[], 'prepared') FROM trigger.rule WHERE name = $1";
+    let query =
+        "SELECT trigger.set_tags(id, $2::text[], 'prepared') FROM trigger.rule WHERE name = $1";
     client
         .execute(query, &[&trigger_name, &tags])
         .await
@@ -772,7 +800,10 @@ async fn set_fingerprint_function<T: GenericClient + Sync + Send>(
     _client: &mut T,
 ) -> Result<String, Error> {
     // Because fingerprint functions are currently not in use, this has not been implemented yet.
-    Ok(format!("Setting fingerprint function for trigger '{}' skipped", &trigger.name))
+    Ok(format!(
+        "Setting fingerprint function for trigger '{}' skipped",
+        &trigger.name
+    ))
 }
 
 pub async fn set_thresholds<T: GenericClient + Sync + Send>(
