@@ -282,3 +282,50 @@ async fn update(
 
     Ok(())
 }
+
+pub async fn update_variation(
+    client: &mut Client,
+    log_dir: &Path,
+    changes: Vec<Box<dyn Change>>,
+    interactive: bool,
+) -> CmdResult {
+    println!("Applying changes:");
+
+    let num_changes = changes.len();
+
+    for (index, change) in changes.iter().enumerate() {
+        println!("\n\n* [{}/{num_changes}] {change}", index + 1);
+
+        if !interactive || interact(client, change.as_ref()).await? {
+            match change.apply(client).await {
+                Ok(changed) => {
+                    let now = chrono::offset::Local::now();
+
+                    let mut file_path: PathBuf = log_dir.into();
+
+                    file_path.push(format!("{}.json", now.to_rfc3339()));
+
+                    let file = File::create(file_path.clone()).map_err(|e| {
+                        format!(
+                            "Could not write entity materialization to '{}': {e}",
+                            file_path.to_string_lossy()
+                        )
+                    })?;
+
+                    let writer = BufWriter::new(file);
+
+                    let json = &mut serde_json::Serializer::new(writer);
+                    let mut serializer = Box::new(<dyn Serializer>::erase(json));
+                    let _ = changed.erased_serialize(&mut serializer);
+
+                    println!("> {}", &changed);
+                }
+                Err(err) => {
+                    println!("! Error applying change: {}", &err);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
