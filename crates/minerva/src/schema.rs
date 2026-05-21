@@ -43,7 +43,7 @@ pub async fn create_schema(client: &mut Client) -> Result<(), SchemaCreationErro
 }
 
 /// Get version number of last applied migration in the database.
-pub async fn get_current_version(client: &mut Client) -> Result<Option<u32>, String> {
+pub async fn get_current_version(client: &mut Client) -> Result<Option<i32>, String> {
     let migration = migrations::runner()
         .set_migration_table_name(SCHEMA_HISTORY_TABLE)
         .get_last_applied_migration_async(client)
@@ -55,7 +55,7 @@ pub async fn get_current_version(client: &mut Client) -> Result<Option<u32>, Str
 
 /// Get list of migrations that have a greater version number than the last applied migration
 /// in the database.
-pub async fn get_pending_migrations(client: &mut Client) -> Result<Vec<(u32, String)>, String> {
+pub async fn get_pending_migrations(client: &mut Client) -> Result<Vec<(i32, String)>, String> {
     let mut runner = migrations::runner();
     runner.set_migration_table_name(SCHEMA_HISTORY_TABLE);
 
