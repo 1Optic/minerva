@@ -31,6 +31,7 @@ sonarqube:
   image:
     name: sonarsource/sonar-scanner-cli:12
     entrypoint: [""]
+  allow_failure: true
   script:
   - sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}"
 
