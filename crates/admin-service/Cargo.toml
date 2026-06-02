@@ -27,7 +27,7 @@ deadpool-postgres = "0.14.1"
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 env_logger = "0.11.10"
 derive_more = { version = "2.1.1", features = ["full"] }
-log = "0.4.30"
+log = "0.4.31"
 
 [package.metadata.deb]
 section = "admin"
