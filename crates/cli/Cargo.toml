@@ -25,7 +25,7 @@ tokio-postgres = { version = "0.7.17", features = ["with-chrono-0_4", "with-serd
 rustls = { version = "0.23.40", features = ["ring"] }
 rustls-native-certs = "0.8.4"
 tokio-postgres-rustls = "0.14.0"
-postgres-protocol = "0.6.11"
+postgres-protocol = "0.6.12"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 chrono = { version = "0.4.45", features = ["serde"] }
