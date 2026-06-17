@@ -1,3 +1,14 @@
+# https://docs.gitlab.com/ee/ci/jobs/job_control.html
+.default_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never # When in a MR, prefer that pipeline, do not run pipelines for branches too
+
 variables:
   POSTGRES_HOST_AUTH_METHOD: trust
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
@@ -6,34 +17,40 @@ variables:
 image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.95.0.0@sha256:794278e69ec7190dbf95c6f4fbaec8527d5e030a498abbac2f5bca2ab70d9d55"
 
 stages:
-  - analyse
+  - analyze
   - test
   - build
   - docs
 
 lint-openapi:
-  stage: analyse
+  stage: analyze
   image:
     name: redocly/cli@sha256:02cb36053814fba87645ddfd1b0c3c40e8ee742b4b12c73d35d690116e60bd6d
     entrypoint: [""]
   script:
     - redocly lint api-spec/openapi.yaml
+  rules:
+    - !reference [.default_rules, rules]
 
 lint:
-  stage: analyse
+  stage: analyze
   script:
     - cargo fmt --check
     - RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
     - cargo shear
+  rules:
+    - !reference [.default_rules, rules]
 
 sonarqube:
-  stage: analyse
+  stage: analyze
   image:
     name: sonarsource/sonar-scanner-cli:12
     entrypoint: [""]
   allow_failure: true
   script:
   - sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}"
+  rules:
+    - !reference [.default_rules, rules]
 
 # Use cargo to test the project
 unit-test:cargo:
@@ -47,6 +64,8 @@ unit-test:cargo:
     when: always
     reports:
       junit: results.xml
+  rules:
+    - !reference [.default_rules, rules]
 
 integration-test:cargo:
   stage: test
@@ -63,6 +82,8 @@ integration-test:cargo:
     when: always
     reports:
       junit: results.xml
+  rules:
+    - !reference [.default_rules, rules]
 
 build-minerva-cli-deb:
   stage: test # Test musl build
@@ -71,6 +92,8 @@ build-minerva-cli-deb:
       - "target/**/*.deb"
   script:
     - cargo deb -p minerva-cli --target=x86_64-unknown-linux-musl
+  rules:
+    - !reference [.default_rules, rules]
 
 publish-minerva-cli-deb:
   stage: build
