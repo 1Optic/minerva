@@ -79,11 +79,7 @@ data: |-
   )
 tags: []
 fingerprint: |-
-  SELECT trigger.modified_to_fingerprint(
-    ARRAY[
-    trend.modified(trend.to_trendstore('trend.hub_node_main_15m'), $1)
-    ]::timestamptz[]
-  )
+  SELECT now()::text
 notification_store: trigger-notification
 trend_store_links:
   - part_name: hub_node_main_15m

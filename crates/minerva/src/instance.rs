@@ -44,7 +44,10 @@ use super::trend_materialization::{
 use super::trend_store::{
     load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
 };
-use super::trigger::{load_trigger_from_file, load_triggers, AddTrigger, Trigger};
+use super::trigger::{
+    load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, DisableTrigger,
+    EnableTrigger, Trigger, UpdateTrigger, UpdateTriggerTags,
+};
 use super::virtual_entity::{
     load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
     VirtualEntity,
@@ -858,10 +861,72 @@ impl MinervaInstance {
                     .relations
                     .iter()
                     .any(|other_relation| other_relation.name == my_relation.name)
+                && !my_relation.name.ends_with("->entity_set")
+            // Ignore relation deletions for entity sets, as they are created on the fly, not predefined
             {
                 changes.push(Box::new(RemoveRelation {
                     relation_name: my_relation.name.clone(),
-                }))
+                }));
+            }
+        }
+
+        // Check for changes in triggers
+        for other_trigger in &other.triggers {
+            match self
+                .triggers
+                .iter()
+                .find(|my_trigger| my_trigger.name == other_trigger.name)
+            {
+                Some(my_trigger) => {
+                    let differences = my_trigger.differences(other_trigger);
+                    if !differences.is_empty() {
+                        changes.push(Box::new(UpdateTrigger {
+                            trigger: my_trigger.clone(),
+                            verify: false,
+                            changes: Some(differences),
+                        }));
+                    } else if my_trigger.enabled != other_trigger.enabled {
+                        if other_trigger.enabled {
+                            changes.push(Box::new(EnableTrigger {
+                                trigger_name: my_trigger.name.clone(),
+                            }));
+                        } else {
+                            changes.push(Box::new(DisableTrigger {
+                                trigger_name: my_trigger.name.clone(),
+                            }));
+                        }
+                    }
+                    if my_trigger.tags.len() != other_trigger.tags.len()
+                        || !my_trigger
+                            .tags
+                            .iter()
+                            .all(|tag| other_trigger.tags.contains(tag))
+                    {
+                        changes.push(Box::new(UpdateTriggerTags {
+                            trigger_name: other_trigger.name.clone(),
+                            old_tags: my_trigger.tags.clone(),
+                            new_tags: other_trigger.tags.clone(),
+                        }));
+                    }
+                }
+                None => changes.push(Box::new(AddTrigger {
+                    trigger: other_trigger.clone(),
+                    verify: false,
+                })),
+            }
+        }
+
+        // Check for triggers to remove
+        for my_trigger in &self.triggers {
+            if !options.ignore_deletions
+                && !other
+                    .triggers
+                    .iter()
+                    .any(|other_trigger| other_trigger.name == my_trigger.name)
+            {
+                changes.push(Box::new(DeleteTrigger {
+                    trigger_name: my_trigger.name.clone(),
+                }));
             }
         }
 

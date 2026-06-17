@@ -4,7 +4,9 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use log::{debug, error, trace};
+use regex::Regex;
 
+use pg_query::{parse as parse_sql, parse_plpgsql, ParseResult};
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
 
@@ -130,6 +132,213 @@ impl fmt::Display for Trigger {
     }
 }
 
+fn equal_parse_result(first: &ParseResult, second: &ParseResult) -> bool {
+    first
+        .protobuf
+        .nodes()
+        .iter()
+        .zip(second.protobuf.nodes())
+        .all(|(first_node, second_node)| first_node.0.deparse() == second_node.0.deparse())
+}
+
+fn function_name(mapping_function: String) -> String {
+    let regex = Regex::new(r"\.(?P<function_name>.+)\(").unwrap();
+    match regex.captures(&mapping_function) {
+        Some(capture) => capture.name("function_name").unwrap().as_str().to_string(),
+        None => mapping_function,
+    }
+}
+
+impl Trigger {
+    fn kpi_function(&self) -> String {
+        format!(
+            "CREATE OR REPLACE FUNCTION trigger_rule.{}(timestamp with time zone) RETURNS SETOF trigger_rule.{} AS $function$\n{}\n$function$ LANGUAGE plpgsql STABLE",
+            escape_identifier(&format!("{}_kpi", &self.name)),
+            escape_identifier(&format!("{}_kpi", &self.name)),
+            &self.kpi_function,
+        )
+    }
+
+    pub fn differences(&self, other: &Trigger) -> Vec<String> {
+        let mut changes = Vec::new();
+        // We need to use the experimental plpgsql parsing because the fingerprinting does not
+        // yet work for plpgsql code.
+        let this_kpi_json = parse_plpgsql(&self.kpi_function()).unwrap();
+        let other_kpi_json = parse_plpgsql(&other.kpi_function()).unwrap();
+        if !this_kpi_json.eq(&other_kpi_json) {
+            changes.push("change kpi_function".to_string());
+        }
+
+        for threshold in &self.thresholds {
+            match other
+                .thresholds
+                .iter()
+                .find(|other_threshold| threshold.name == other_threshold.name)
+            {
+                Some(other_threshold) => {
+                    if threshold.data_type != other_threshold.data_type
+                        || threshold.value != other_threshold.value
+                    {
+                        changes.push(format!("change threshold {}", threshold.name));
+                    }
+                }
+                None => {
+                    changes.push(format!("remove threshold {}", threshold.name));
+                }
+            }
+        }
+
+        for threshold in &other.thresholds {
+            if !self
+                .thresholds
+                .iter()
+                .any(|self_threshold| threshold.name == self_threshold.name)
+            {
+                changes.push(format!("add threshold {}", threshold.name));
+            }
+        }
+
+        let regex = Regex::new(r"(?s)SELECT\s*\(.*\)").unwrap();
+        let this_condition = match regex.captures(&self.condition) {
+            Some(_capture) => self.condition.clone().trim().to_string(),
+            None => format!("SELECT ({})", &self.condition.trim().to_string()),
+        };
+        let other_condition = match regex.captures(&other.condition) {
+            Some(_capture) => other.condition.clone().trim().to_string(),
+            None => format!("SELECT ({})", &other.condition.trim().to_string()),
+        };
+        let this_condition_json = parse_sql(&this_condition).unwrap();
+        let other_condition_json = parse_sql(&other_condition).unwrap();
+        if !equal_parse_result(&this_condition_json, &other_condition_json) {
+            changes.push("change condition".to_string());
+        }
+
+        let this_weight = match regex.captures(&self.weight) {
+            Some(_capture) => self.weight.clone().trim().to_string(),
+            None => format!("SELECT ({})", &self.weight.trim().to_string()),
+        };
+        let other_weight = match regex.captures(&other.weight) {
+            Some(_capture) => other.weight.clone().trim().to_string(),
+            None => format!("SELECT ({})", &other.weight.trim().to_string()),
+        };
+        let this_weight_json = parse_sql(&this_weight).unwrap();
+        let other_weight_json = parse_sql(&other_weight).unwrap();
+        if !equal_parse_result(&this_weight_json, &other_weight_json) {
+            changes.push("change weight".to_string());
+        }
+
+        let this_notification = match regex.captures(&self.notification) {
+            Some(_capture) => self.notification.clone().trim().to_string(),
+            None => format!("SELECT ({})::text", &self.notification),
+        };
+        let other_notification = match regex.captures(&other.notification) {
+            Some(_capture) => other.notification.clone().trim().to_string(),
+            None => format!("SELECT ({})::text", &other.notification.trim().to_string()),
+        };
+        let this_notification_json = parse_sql(&this_notification).unwrap();
+        let other_notification_json = parse_sql(&other_notification).unwrap();
+        if !equal_parse_result(&this_notification_json, &other_notification_json) {
+            changes.push("change notification".to_string());
+        }
+
+        // Not comparing fingerprints for now, as those are not in use
+        // let this_fingerprint_json = parse_sql(&self.fingerprint).unwrap();
+        // let other_fingerprint_json = parse_sql(&other.fingerprint).unwrap();
+        // if !equal_parse_result(&this_fingerprint_json, &other_fingerprint_json) {
+        //     changes.push("change fingerprint".to_string());
+        // }
+
+        if self.notification_store != other.notification_store {
+            changes.push("change notification store".to_string());
+        }
+
+        // If JSON is created from the database, it is a full function definition,
+        // but if it is created from a file, it is just the part within a SELECT ... INTO
+        let re = Regex::new(r"(?s)SELECT\s*\((?P<datastring>.*)\)\s*INTO").unwrap();
+        let datastring = match re.captures(&self.data) {
+            Some(capture) => capture.name("datastring").unwrap().as_str().to_string(),
+            None => self.data.clone(),
+        };
+
+        if datastring != other.data {
+            changes.push("change data".to_string());
+        }
+
+        for trend_store_link in &self.trend_store_links {
+            match other
+                .trend_store_links
+                .iter()
+                .find(|other_trend_store_link| {
+                    trend_store_link.part_name == other_trend_store_link.part_name
+                }) {
+                Some(other_trend_store_link) => {
+                    if function_name(trend_store_link.mapping_function.clone())
+                        != function_name(other_trend_store_link.mapping_function.clone())
+                    {
+                        changes.push(format!(
+                            "change mapping function for trend store link {}",
+                            trend_store_link.part_name
+                        ));
+                    }
+                }
+                None => {
+                    changes.push(format!(
+                        "remove trend store link {}",
+                        trend_store_link.part_name
+                    ));
+                }
+            }
+        }
+        for trend_store_link in &other.trend_store_links {
+            if !self.trend_store_links.iter().any(|self_trend_store_link| {
+                trend_store_link.part_name == self_trend_store_link.part_name
+            }) {
+                changes.push(format!(
+                    "add trend store link {}",
+                    trend_store_link.part_name
+                ));
+            }
+        }
+
+        for mapping_function in &self.mapping_functions {
+            match other
+                .mapping_functions
+                .iter()
+                .find(|other_mapping_function| mapping_function.name == other_mapping_function.name)
+            {
+                Some(other_mapping_function) => {
+                    if function_name(mapping_function.source.clone())
+                        != function_name(other_mapping_function.source.clone())
+                    {
+                        changes.push(format!(
+                            "change source for mapping function {}",
+                            mapping_function.name
+                        ))
+                    }
+                }
+                None => {
+                    changes.push(format!("remove mapping function {}", mapping_function.name));
+                }
+            }
+        }
+        for mapping_function in &other.mapping_functions {
+            if !self.mapping_functions.iter().any(|self_mapping_function| {
+                mapping_function.name == self_mapping_function.name
+                    && function_name(mapping_function.source.clone())
+                        == function_name(self_mapping_function.source.clone())
+            }) {
+                changes.push(format!("add mapping function {}", mapping_function.name));
+            }
+        }
+
+        if self.granularity != other.granularity {
+            changes.push("change granularity".to_string());
+        }
+
+        changes
+    }
+}
+
 impl FileTrigger {
     fn full_trigger(&self) -> Trigger {
         Trigger {
@@ -250,6 +459,12 @@ impl AddTrigger {
 
         set_weight(&self.trigger, transaction).await?;
         trace!("Weight set");
+
+        set_tags(&self.trigger.name, &self.trigger.tags, transaction).await?;
+        trace!("Tags set");
+
+        set_fingerprint_function(&self.trigger, transaction).await?;
+        trace!("Fingerprint function set");
 
         Ok(())
     }
@@ -563,6 +778,32 @@ async fn set_weight<T: GenericClient + Sync + Send>(
         .map_err(|e| DatabaseError::from_msg(format!("Error setting weight: {e}")))?;
 
     Ok(format!("Set weight for trigger '{}'", &trigger.name))
+}
+
+async fn set_tags<T: GenericClient + Sync + Send>(
+    trigger_name: &String,
+    tags: &Vec<String>,
+    client: &mut T,
+) -> Result<String, Error> {
+    let query =
+        "SELECT trigger.set_tags(id, $2::text[], 'prepared') FROM trigger.rule WHERE name = $1";
+    client
+        .execute(query, &[&trigger_name, &tags])
+        .await
+        .map_err(|e| DatabaseError::from_msg(format!("Error setting tags: {e}")))?;
+
+    Ok(format!("Set tags for trigger '{}'", &trigger_name))
+}
+
+async fn set_fingerprint_function<T: GenericClient + Sync + Send>(
+    trigger: &Trigger,
+    _client: &mut T,
+) -> Result<String, Error> {
+    // Because fingerprint functions are currently not in use, this has not been implemented yet.
+    Ok(format!(
+        "Setting fingerprint function for trigger '{}' skipped",
+        &trigger.name
+    ))
 }
 
 pub async fn set_thresholds<T: GenericClient + Sync + Send>(
@@ -1011,11 +1252,25 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
 pub struct UpdateTrigger {
     pub trigger: Trigger,
     pub verify: bool,
+    pub changes: Option<Vec<String>>,
 }
 
 impl fmt::Display for UpdateTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateTrigger({})", &self.trigger)
+        match &self.changes {
+            Some(changes) => {
+                writeln!(f, "UpdateTrigger({}):", &self.trigger.name,)?;
+
+                for change in changes {
+                    writeln!(f, " - {}", change)?;
+                }
+
+                Ok(())
+            }
+            None => {
+                write!(f, "UpdateTrigger({})", &self.trigger)
+            }
+        }
     }
 }
 
@@ -1050,6 +1305,8 @@ impl Change for UpdateTrigger {
         setup_rule(&self.trigger, &mut transaction).await?;
 
         set_weight(&self.trigger, &mut transaction).await?;
+
+        set_fingerprint_function(&self.trigger, &mut transaction).await?;
 
         set_thresholds(&self.trigger, &mut transaction).await?;
 
@@ -1106,6 +1363,74 @@ impl Display for UpdatedTrigger {
 impl Changed for UpdatedTrigger {
     fn revert(&self) -> Option<Box<dyn Change>> {
         None
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdateTriggerTags {
+    pub trigger_name: String,
+    pub old_tags: Vec<String>,
+    pub new_tags: Vec<String>,
+}
+
+impl fmt::Display for UpdateTriggerTags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UpdateTriggerTags({})", &self.trigger_name)
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for UpdateTriggerTags {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut transaction = client.transaction().await?;
+
+        if !trigger_exists(&self.trigger_name, &mut transaction).await? {
+            return Err(Error::Runtime(RuntimeError::from_msg(format!(
+                "No trigger with name '{}'",
+                &self.trigger_name
+            ))));
+        }
+
+        set_tags(&self.trigger_name, &self.new_tags, &mut transaction).await?;
+
+        transaction.commit().await?;
+
+        Ok(Box::new(UpdatedTriggerTags {
+            trigger_name: self.trigger_name.clone(),
+            old_tags: self.old_tags.clone(),
+            new_tags: self.new_tags.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct UpdatedTriggerTags {
+    pub trigger_name: String,
+    pub old_tags: Vec<String>,
+    pub new_tags: Vec<String>,
+}
+
+impl Display for UpdatedTriggerTags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Updated trigger tags for trigger '{}'",
+            &self.trigger_name
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for UpdatedTriggerTags {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(UpdateTriggerTags {
+            trigger_name: self.trigger_name.clone(),
+            old_tags: self.new_tags.clone(),
+            new_tags: self.old_tags.clone(),
+        }))
     }
 }
 
@@ -1168,6 +1493,8 @@ impl Change for RenameTrigger {
         setup_rule(&self.trigger, &mut transaction).await?;
 
         set_weight(&self.trigger, &mut transaction).await?;
+
+        set_tags(&self.trigger.name, &self.trigger.tags, &mut transaction).await?;
 
         set_thresholds(&self.trigger, &mut transaction).await?;
 
@@ -1389,7 +1716,7 @@ impl Changed for DisabledTrigger {
 }
 
 fn extract_rule_from_src(src: &str) -> Result<String, TriggerError> {
-    let condition_regex = regex::Regex::from_str(r".*\(\$1\) WHERE ((?s).*);[ ]*$").unwrap();
+    let condition_regex = Regex::from_str(r".*\(\$1\) WHERE ((?s).*);[ ]*$").unwrap();
 
     let captures = condition_regex.captures(src);
 
