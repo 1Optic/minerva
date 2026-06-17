@@ -1259,11 +1259,7 @@ impl fmt::Display for UpdateTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.changes {
             Some(changes) => {
-                writeln!(
-                    f,
-                    "UpdateTrigger({}):",
-                    &self.trigger.name,
-                )?;
+                writeln!(f, "UpdateTrigger({}):", &self.trigger.name,)?;
 
                 for change in changes {
                     writeln!(f, " - {}", change)?;
