@@ -264,6 +264,7 @@ impl FullTemplatedTrigger {
         {
             Some(template_parameter) => match template_parameter.parameter_type {
                 ParameterType::Counter => "\"".to_owned() + &parameter.value + "\"",
+                ParameterType::ThresholdVariable => "\"".to_owned() + &parameter.name + "\"",
                 _ => parameter.value.clone(),
             },
             None => parameter.value.clone(),
@@ -285,7 +286,8 @@ impl FullTemplatedTrigger {
             Some(template_parameter) => match template_parameter.parameter_type {
                 ParameterType::Counter => {
                     "\"".to_owned() + &parameter.value + "_" + extension + "\""
-                }
+                },
+                ParameterType::ThresholdVariable => "\"".to_owned() + &parameter.name + "_" + extension + "\"",
                 _ => parameter.value.clone() + "_" + extension,
             },
             None => parameter.value.clone() + "_" + extension,

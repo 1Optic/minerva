@@ -98,7 +98,7 @@ pub async fn create_trigger(
         "description": "inside temperature low",
         "thresholds": [
             {
-                "name": "min_temperature",
+                "name": "value",
                 "data_type": "numeric",
                 "value": "10"
             }
@@ -120,7 +120,7 @@ pub async fn create_trigger(
                 },
                 {
                     "name": "value",
-                    "value": "min_temperature"
+                    "value": "5"
                 }
             ]
         }
@@ -148,7 +148,7 @@ pub async fn create_trigger(
             "description": "inside temperature low",
             "thresholds": [
                 {
-                    "name": "min_temperature",
+                    "name": "value",
                     "data_type": "numeric",
                     "value": "10"
                 }
@@ -168,7 +168,7 @@ pub async fn create_trigger(
 
     assert_eq!(
         src.trim(),
-        "SELECT * FROM trigger_rule.low_temperature_with_threshold($1) WHERE \"inside_temp\" < min_temperature;"
+        "SELECT * FROM trigger_rule.low_temperature_with_threshold($1) WHERE \"inside_temp\" < \"value\";"
     );
 
     Ok(())
