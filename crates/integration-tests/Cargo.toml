@@ -36,7 +36,7 @@ path = "tests/main.rs"
 harness = false
 
 [dev-dependencies]
-env_logger = "0.11.10"
+env_logger = "0.11.11"
 libtest-mimic = "0.8.2"
 
 [lib]
