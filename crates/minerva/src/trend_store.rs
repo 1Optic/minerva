@@ -2172,8 +2172,9 @@ pub async fn get_trends_to_delete(conn: &mut Client) -> Result<Vec<(String, Stri
 
     for (trend_store_part_name, trend_name) in trends_marked_for_deletion {
         let query_specified = format!(
-            "SELECT 42 FROM trend.\"{}\" WHERE \"{}\" IS NOT NULL LIMIT 1",
-            trend_store_part_name, trend_name
+            "SELECT 42 FROM trend.{} WHERE {} IS NOT NULL LIMIT 1",
+            escape_identifier(&trend_store_part_name),
+            escape_identifier(&trend_name)
         );
         let rows = conn.query(&query_specified, &[]).await.map_err(|e| {
             DatabaseError::from_msg(format!(
