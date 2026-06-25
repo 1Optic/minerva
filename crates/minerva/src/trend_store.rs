@@ -2147,6 +2147,49 @@ async fn create_partition_for_trend_store_part(
     Ok(partition_name)
 }
 
+pub async fn get_trends_to_delete(conn: &mut Client) -> Result<Vec<(String, String)>, Error> {
+    let query = concat!(
+        "SELECT tsp.name, tt.name ",
+        "FROM trend_directory.table_trend tt ",
+        "JOIN trend_directory.trend_store_part tsp ON tsp.id = tt.trend_store_part_id ",
+        "WHERE tt.deleted IS NULL AND tt.deletion_staging_column IS NOT NULL"
+    );
+
+    let query_result = conn.query(query, &[]).await.map_err(|e| {
+        DatabaseError::from_msg(format!("Error loading trends marked for deletion: {e}"))
+    })?;
+
+    let trends_marked_for_deletion = query_result
+        .into_iter()
+        .map(|row| {
+            let trend_store_part_name: String = row.get(0);
+            let trend_name: String = row.get(1);
+            (trend_store_part_name, trend_name)
+        })
+        .collect::<Vec<(String, String)>>();
+
+    let mut result: Vec<(String, String)> = Vec::new();
+
+    for (trend_store_part_name, trend_name) in trends_marked_for_deletion {
+        let query_specified = format!(
+            "SELECT 42 FROM trend.{} WHERE {} IS NOT NULL LIMIT 1",
+            escape_identifier(&trend_store_part_name),
+            escape_identifier(&trend_name)
+        );
+        let rows = conn.query(&query_specified, &[]).await.map_err(|e| {
+            DatabaseError::from_msg(format!(
+                "Error checking if trend '{}' in part '{}' is empty: {e}",
+                trend_name, trend_store_part_name
+            ))
+        })?;
+
+        if rows.is_empty() {
+            result.push((trend_store_part_name, trend_name));
+        }
+    }
+    Ok(result)
+}
+
 pub struct TrendStat {
     pub name: String,
     pub max_value: Option<String>,

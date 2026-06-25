@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 pub mod check;
+pub mod clean;
 pub mod create;
 pub mod delete;
 pub mod deletetimestamp;
@@ -15,6 +16,7 @@ pub mod update;
 
 use crate::commands::common::{Cmd, CmdResult};
 use check::TrendStoreCheck;
+use clean::TrendStoreClean;
 use create::TrendStoreCreate;
 use delete::TrendStoreDelete;
 use deletetimestamp::TrendStoreDeleteTimestamp;
@@ -59,6 +61,8 @@ pub enum TrendStoreOptCommands {
     Dump(TrendStoreDump),
     #[command(about = "recalculate all trend statistics")]
     Statistics(TrendStoreStatistics),
+    #[command(about = "remove extraneous trends")]
+    Clean(TrendStoreClean),
 }
 
 impl TrendStoreOpt {
@@ -85,6 +89,7 @@ impl TrendStoreOpt {
             TrendStoreOptCommands::DeleteTimestamp(delete_timestamp) => delete_timestamp.run(),
             TrendStoreOptCommands::Dump(dump) => dump.run(),
             TrendStoreOptCommands::Statistics(stats) => stats.run(),
+            TrendStoreOptCommands::Clean(clean) => clean.run(),
         }
     }
 }
