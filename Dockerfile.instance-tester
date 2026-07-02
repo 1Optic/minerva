@@ -9,7 +9,7 @@ WORKDIR /src
 
 RUN cargo build --package minerva-cli --release --target=x86_64-unknown-linux-musl
 
-FROM docker.io/citusdata/citus:13.2.0@sha256:2b67bc2190ffbde221c19696bbffde45a2ee22e2c371f8a435d67eb674bdeb46
+FROM docker.io/citusdata/citus:14.1.0@sha256:100bb457c798d7b50de1ece819fad7109744c0ed812dc63fb76a90e99767602f
 
 COPY --from=build /src/target/x86_64-unknown-linux-musl/release/minerva /usr/bin/
 
