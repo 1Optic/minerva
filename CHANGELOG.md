@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.45.0] - 2026-07-06
+
+### Added
+
+- cli: Add minerva trend-store clean subcommand
+- cli: Add trigger diff subcommand
+- lib: Handle copying of name (default alias) data with materializations
+- lib: Use ensure_name_column function to repair missing primary aliases
+
+### Changed
+
+- lib: Change attribute_history ids to bigint
+
 ## [9.44.4] - 2026-04-23
 
 ### Fixed
@@ -654,4 +667,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.44.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.43.1...9.44.0
 [9.44.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.0...9.44.1
 [9.44.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.1...9.44.2
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.2...HEAD
+[9.45.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.2...9.45.0
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...HEAD
