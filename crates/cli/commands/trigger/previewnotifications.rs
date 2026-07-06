@@ -6,7 +6,7 @@ use comfy_table::Table;
 use minerva::error::DatabaseError;
 use minerva::trigger::get_notifications;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TriggerPreviewNotifications {

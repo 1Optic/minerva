@@ -2,7 +2,7 @@ use clap::Parser;
 
 use minerva::{error::RuntimeError, trend_materialization::load_materializations};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationDump {

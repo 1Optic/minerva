@@ -3,7 +3,7 @@ use clap::Parser;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_materialization::populate_source_fingerprint;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationPopulateSourceFingerprint {

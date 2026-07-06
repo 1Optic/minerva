@@ -8,14 +8,14 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
 use std::path::{Path, PathBuf};
 
 use bollard::query_parameters::BuildImageOptions;
-use bollard::{body_stream, Docker};
+use bollard::{Docker, body_stream};
 use log::{debug, error, info};
 
 use futures_util::StreamExt;
 use rand::distr::{Alphanumeric, SampleString};
 
 use tokio::io::AsyncBufReadExt;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tokio_postgres::config::Config;
 use tokio_postgres::{Client, NoTls};
 

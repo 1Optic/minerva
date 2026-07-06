@@ -1,6 +1,6 @@
 use std::env;
-use std::fs::create_dir_all;
 use std::fs::File;
+use std::fs::create_dir_all;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
@@ -11,21 +11,21 @@ use clap::Parser;
 use erased_serde::Serializer;
 use minerva::change::Change;
 use minerva::error::RuntimeError;
+use minerva::graph::GraphNode;
 use minerva::graph::dependee_graph;
 use minerva::graph::node_index_by_name;
 use minerva::graph::render_graph_with_changes;
-use minerva::graph::GraphNode;
-use minerva::instance::load_instance_config;
 use minerva::instance::DiffOptions;
+use minerva::instance::load_instance_config;
+use petgraph::Graph;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::Dfs;
-use petgraph::Graph;
 use tokio_postgres::Client;
 
 use minerva::error::{ConfigurationError, Error};
 use minerva::instance::MinervaInstance;
 
-use super::common::{connect_db, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT};
+use super::common::{Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT, connect_db};
 use crate::interact::interact;
 
 #[derive(Debug, Parser, PartialEq)]
@@ -89,7 +89,12 @@ impl UpdateOpt {
                         // Next to passing on the Minerva instance root directory, we need to set the
                         // environment variable for any child processes that might be started during
                         // initialization.
-                        std::env::set_var(ENV_MINERVA_INSTANCE_ROOT, root);
+                        // SAFETY: This CLI updates process environment before spawning any child
+                        // process that depends on this variable, and this assignment is scoped to
+                        // command execution.
+                        unsafe {
+                            std::env::set_var(ENV_MINERVA_INSTANCE_ROOT, root);
+                        }
 
                         root.clone()
                     }

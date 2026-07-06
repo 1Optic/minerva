@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
-use actix_web::{delete, get, post, put, web::Data, web::Json, web::Path, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, delete, get, post, put, web::Data, web::Json, web::Path};
 use chrono::{DateTime, Utc};
 
 use minerva::entity_set::{
-    load_entity_set, load_entity_sets, EntitySet, EntitySetError, NewEntitySet,
+    EntitySet, EntitySetError, NewEntitySet, load_entity_set, load_entity_sets,
 };
 
 use super::serviceerror::{ExtendedServiceError, ServiceError, ServiceErrorKind};

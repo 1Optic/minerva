@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 
 use minerva::schema::{get_current_version, get_pending_migrations, migrate};
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct SchemaMigrate {

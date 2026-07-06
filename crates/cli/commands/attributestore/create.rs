@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use minerva::attribute_store::{load_attribute_store_from_file, AddAttributeStore, AttributeStore};
+use minerva::attribute_store::{AddAttributeStore, AttributeStore, load_attribute_store_from_file};
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreCreate {

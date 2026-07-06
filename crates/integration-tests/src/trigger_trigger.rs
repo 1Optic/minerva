@@ -1,7 +1,7 @@
 use log::info;
-use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
+use minerva::trend_store::{TrendStore, create_partitions_for_timestamp};
 use minerva::trigger::{AddTrigger, CreateNotifications, Trigger};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;

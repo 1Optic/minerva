@@ -4,12 +4,12 @@ use tokio_postgres::Client;
 
 use minerva::change::Change;
 use minerva::relation::{
-    load_relation_from_file, materialize_relation, AddRelation, UpdateRelationView,
+    AddRelation, UpdateRelationView, load_relation_from_file, materialize_relation,
 };
 
 use clap::{Parser, Subcommand};
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct RelationCreate {

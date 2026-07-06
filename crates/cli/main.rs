@@ -1,5 +1,5 @@
 use clap::{Command, CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Generator, Shell};
+use clap_complete::{Generator, Shell, generate};
 use dotenvy::dotenv;
 
 use std::io;
@@ -79,8 +79,8 @@ enum Commands {
     BaselineDump(BaselineDumpOpt),
 }
 
-fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+fn print_completions<G: Generator>(r#gen: G, cmd: &mut Command) {
+    generate(r#gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 fn main() -> ExitCode {

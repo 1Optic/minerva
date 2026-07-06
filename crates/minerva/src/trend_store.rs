@@ -4,7 +4,7 @@ use log::debug;
 use postgres_protocol::escape::escape_identifier;
 use postgres_types::Type;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::convert::From;
 use std::fmt;
@@ -13,11 +13,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio_postgres::error::SqlState;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{binary_copy::BinaryCopyInWriter, Client, GenericClient, Row, Transaction};
+use tokio_postgres::{Client, GenericClient, Row, Transaction, binary_copy::BinaryCopyInWriter};
 
 use chrono::{DateTime, Utc};
-use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 
 use async_trait::async_trait;
 
@@ -26,10 +26,10 @@ use crate::changes::trend_store::{
     ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
     StageTrendsForDeletion,
 };
-use crate::entity::{default_entity_id_type, EntityIdType, EntityMapping};
+use crate::entity::{EntityIdType, EntityMapping, default_entity_id_type};
 use crate::instance::DeploymentIgnore;
 use crate::meas_value::{
-    DataType, MeasValue, INT8_NONE_VALUE, INTEGER_NONE_VALUE, NUMERIC_NONE_VALUE, TEXT_NONE_VALUE,
+    DataType, INT8_NONE_VALUE, INTEGER_NONE_VALUE, MeasValue, NUMERIC_NONE_VALUE, TEXT_NONE_VALUE,
 };
 
 use super::change::Change;
@@ -1034,13 +1034,13 @@ impl TrendStorePart {
                 .iter()
                 .find(|t| t.name.eq(trend_name));
 
-            if let Some(trend) = loaded_trend_result {
-                if trend.data_type != own_trend_result.data_type {
-                    mismatches.push(format!(
-                        "{}({}<>{})",
-                        trend_name, own_trend_result.data_type, trend.data_type
-                    ));
-                }
+            if let Some(trend) = loaded_trend_result
+                && trend.data_type != own_trend_result.data_type
+            {
+                mismatches.push(format!(
+                    "{}({}<>{})",
+                    trend_name, own_trend_result.data_type, trend.data_type
+                ));
             }
         }
 
@@ -1773,8 +1773,7 @@ async fn load_trend_store_parts<T: GenericClient>(
     conn: &T,
     trend_store_id: i32,
 ) -> Vec<TrendStorePart> {
-    let trend_store_part_query =
-        "SELECT id, name, primary_alias FROM trend_directory.trend_store_part WHERE trend_store_id = $1";
+    let trend_store_part_query = "SELECT id, name, primary_alias FROM trend_directory.trend_store_part WHERE trend_store_id = $1";
 
     let trend_store_part_result = conn
         .query(trend_store_part_query, &[&trend_store_id])

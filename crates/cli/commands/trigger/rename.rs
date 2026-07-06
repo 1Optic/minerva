@@ -4,9 +4,9 @@ use clap::Parser;
 
 use minerva::change::Change;
 use minerva::error::{Error, RuntimeError};
-use minerva::trigger::{load_trigger_from_file, RenameTrigger};
+use minerva::trigger::{RenameTrigger, load_trigger_from_file};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TriggerRename {

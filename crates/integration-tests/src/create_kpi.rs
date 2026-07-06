@@ -8,8 +8,8 @@ use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
 use minerva::trend_store::TrendStore;
 
-use crate::common::{create_schema_with_retry, create_webservice_role, get_available_port};
 use crate::common::{MinervaService, MinervaServiceConfig};
+use crate::common::{create_schema_with_retry, create_webservice_role, get_available_port};
 
 const TREND_STORE_DEFINITION_15M: &str = r"
 title: Raw node data

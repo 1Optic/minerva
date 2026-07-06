@@ -12,7 +12,7 @@ use tokio::process::Command;
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
+use minerva::trend_store::{TrendStore, create_partitions_for_timestamp};
 
 use crate::common::create_schema_with_retry;
 

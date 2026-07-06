@@ -382,11 +382,15 @@ async fn create_fingerprint_function<T: GenericClient + Send + Sync>(
     materialization_name: &str,
     function_body: &str,
 ) -> Result<(), Error> {
-    let query = format!(concat!(
-        "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS trend_directory.fingerprint AS $$\n",
-        "{}\n",
-        "$$ LANGUAGE sql STABLE\n"
-    ), escape_identifier(&fingerprint_function_name(materialization_name)), function_body);
+    let query = format!(
+        concat!(
+            "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS trend_directory.fingerprint AS $$\n",
+            "{}\n",
+            "$$ LANGUAGE sql STABLE\n"
+        ),
+        escape_identifier(&fingerprint_function_name(materialization_name)),
+        function_body
+    );
 
     match client.query(query.as_str(), &[]).await {
         Ok(_) => Ok(()),
@@ -2633,10 +2637,10 @@ pub async fn check_trend_materialization<T: GenericClient + Send + Sync>(
     trend_materialization: &TrendMaterialization,
 ) -> Result<Vec<String>, String> {
     match trend_materialization {
-        TrendMaterialization::View(ref view_materialization) => {
+        TrendMaterialization::View(view_materialization) => {
             check_view_materialization(client, view_materialization).await
         }
-        TrendMaterialization::Function(ref function_materialization) => {
+        TrendMaterialization::Function(function_materialization) => {
             check_function_materialization(client, function_materialization).await
         }
     }
@@ -2872,7 +2876,7 @@ function:
   src: |-
       SELECT
         timestamp,
-        r.target_id AS entity_id, 
+        r.target_id AS entity_id,
         sum(power_kwh) * 1000 as power_mwh
       FROM trend."hub_node_main_15m"
       JOIN relation."node->v-network" r ON r.source_id = t.entity_id

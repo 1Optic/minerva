@@ -3,7 +3,7 @@ use log::{debug, trace};
 use std::time::Duration;
 
 use actix_web::{
-    delete, get, post, put, web::Data, web::Path, HttpResponse, Responder, ResponseError,
+    HttpResponse, Responder, ResponseError, delete, get, post, put, web::Data, web::Path,
 };
 
 use serde::{Deserialize, Serialize};
@@ -12,12 +12,13 @@ use utoipa::ToSchema;
 
 use minerva::change::Change;
 use minerva::trigger::{
-    list_triggers, load_thresholds_with_client, load_trigger, set_enabled, set_thresholds,
-    AddTrigger, DeleteTrigger, Threshold, TriggerError,
+    AddTrigger, DeleteTrigger, Threshold, TriggerError, list_triggers, load_thresholds_with_client,
+    load_trigger, set_enabled, set_thresholds,
 };
 use minerva::trigger_template::{
-    get_bare_template, get_template_from_id, list_templates, BareTemplate, ExtendedParameterValue,
-    FullTemplatedTrigger, ParameterValue, Template, TemplatedTrigger, TriggerTemplateError,
+    BareTemplate, ExtendedParameterValue, FullTemplatedTrigger, ParameterValue, Template,
+    TemplatedTrigger, TriggerTemplateError, get_bare_template, get_template_from_id,
+    list_templates,
 };
 
 use super::serviceerror::{ExtendedServiceError, ServiceErrorKind};

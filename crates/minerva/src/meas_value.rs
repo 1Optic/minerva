@@ -3,7 +3,7 @@ use std::fmt::{self};
 use rust_decimal::prelude::*;
 
 use lazy_static::lazy_static;
-use postgres_types::{to_sql_checked, Type};
+use postgres_types::{Type, to_sql_checked};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::ToSql;
 

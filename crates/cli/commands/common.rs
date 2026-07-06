@@ -2,8 +2,8 @@ use std::env;
 
 use rustls::ClientConfig as RustlsClientConfig;
 use tokio;
-use tokio_postgres::{config::SslMode, Config};
 use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Config, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 use minerva::error::{ConfigurationError, Error, RuntimeError};
@@ -67,7 +67,7 @@ pub fn get_db_config() -> Result<Config, Error> {
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
                     msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                }))
+                }));
             }
         };
 

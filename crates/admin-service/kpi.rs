@@ -7,10 +7,10 @@ use utoipa::ToSchema;
 
 use deadpool_postgres::Pool;
 
-use actix_web::{delete, get, post, put, web::Data, web::Path, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, put, web::Data, web::Path};
 
 use serde_json::json;
-use tokio_postgres::{types::Type, GenericClient, Transaction};
+use tokio_postgres::{GenericClient, Transaction, types::Type};
 
 use minerva::interval::parse_interval;
 use minerva::trend_materialization::map_sql_to_plpgsql;

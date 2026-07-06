@@ -1,5 +1,5 @@
 use actix_web::error::ResponseError;
-use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::{HttpResponse, http::StatusCode};
 use core::fmt::Display;
 use derive_more::From;
 use log::error;

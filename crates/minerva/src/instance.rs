@@ -15,42 +15,42 @@ use tokio_postgres::Client;
 
 use crate::attribute_materialization::AddAttributeMaterialization;
 use crate::changes::trend_store::{RemoveTrendStore, RemoveTrendStorePart};
-use crate::entity_type::{load_entity_types, load_entity_types_from, AddEntityType, EntityType};
+use crate::entity_type::{AddEntityType, EntityType, load_entity_types, load_entity_types_from};
 use crate::error::RuntimeError;
 use crate::graph::GraphNode;
 use crate::meas_value::DataType;
-use crate::relation::{load_relations_from_db, RemoveRelation};
+use crate::relation::{RemoveRelation, load_relations_from_db};
 use crate::trend_materialization::{RemoveTrendMaterialization, TrendMaterializationSource};
-use crate::virtual_entity::{load_virtual_entities_from_db, RemoveVirtualEntity};
+use crate::virtual_entity::{RemoveVirtualEntity, load_virtual_entities_from_db};
 
 use super::attribute_materialization::{
-    load_attribute_materializations, load_attribute_materializations_from, AttributeMaterialization,
+    AttributeMaterialization, load_attribute_materializations, load_attribute_materializations_from,
 };
 use super::attribute_store::{
-    load_attribute_stores, AddAttributeStore, AttributeStore, AttributeStoreDiffOptions,
+    AddAttributeStore, AttributeStore, AttributeStoreDiffOptions, load_attribute_stores,
 };
 use super::change::Change;
 use super::changes::trend_store::AddTrendStore;
-use super::entity_set::{load_entity_sets, EntitySet};
+use super::entity_set::{EntitySet, load_entity_sets};
 use super::error::Error;
 use super::notification_store::{
-    load_notification_stores, AddNotificationStore, NotificationStore,
+    AddNotificationStore, NotificationStore, load_notification_stores,
 };
-use super::relation::{load_relation_from_file, AddRelation, Relation};
+use super::relation::{AddRelation, Relation, load_relation_from_file};
 use super::trend_materialization::{
-    load_materializations, load_materializations_from, AddTrendMaterialization,
-    TrendMaterialization,
+    AddTrendMaterialization, TrendMaterialization, load_materializations,
+    load_materializations_from,
 };
 use super::trend_store::{
-    load_trend_store_from_file, load_trend_stores, TrendStore, TrendStoreDiffOptions,
+    TrendStore, TrendStoreDiffOptions, load_trend_store_from_file, load_trend_stores,
 };
 use super::trigger::{
-    load_trigger_from_file, load_triggers, AddTrigger, DeleteTrigger, DisableTrigger,
-    EnableTrigger, Trigger, UpdateTrigger, UpdateTriggerTags,
+    AddTrigger, DeleteTrigger, DisableTrigger, EnableTrigger, Trigger, UpdateTrigger,
+    UpdateTriggerTags, load_trigger_from_file, load_triggers,
 };
 use super::virtual_entity::{
-    load_virtual_entity_from_file, load_virtual_entity_from_yaml_file, AddVirtualEntity,
-    VirtualEntity,
+    AddVirtualEntity, VirtualEntity, load_virtual_entity_from_file,
+    load_virtual_entity_from_yaml_file,
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
@@ -1344,7 +1344,7 @@ async fn load_sql(client: &mut Client, path: &PathBuf) -> Result<(), String> {
                 "Could not open sql file '{}': {}",
                 &path.to_string_lossy(),
                 e
-            ))
+            ));
         }
     };
 

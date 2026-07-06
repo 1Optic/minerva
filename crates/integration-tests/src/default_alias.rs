@@ -3,9 +3,9 @@ use log::debug;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rust_decimal::prelude::FromPrimitive;
+use tokio_postgres::GenericClient;
 use tokio_postgres::binary_copy::BinaryCopyInWriter;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::GenericClient;
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
@@ -14,7 +14,7 @@ use minerva::entity_type::{AddEntityType, EntityType};
 use minerva::meas_value::{DataType, MeasValue};
 use minerva::trend_store::MeasurementStore;
 use minerva::trend_store::{
-    create_partitions_for_timestamp, DataPackage, DataPackageWriteError, TrendStore,
+    DataPackage, DataPackageWriteError, TrendStore, create_partitions_for_timestamp,
 };
 
 use crate::common::create_schema_with_retry;

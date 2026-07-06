@@ -6,7 +6,7 @@ use tokio_postgres::GenericClient;
 use clap::{Parser, Subcommand};
 use thiserror::Error;
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct VirtualEntityOpt {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use petgraph::{graph::NodeIndex, visit::DfsEvent, Graph};
+use petgraph::{Graph, graph::NodeIndex, visit::DfsEvent};
 
 use crate::change::Change;
 

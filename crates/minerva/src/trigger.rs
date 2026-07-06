@@ -6,7 +6,7 @@ use std::time::Duration;
 use log::{debug, error, trace};
 use regex::Regex;
 
-use pg_query::{parse as parse_sql, parse_plpgsql, ParseResult};
+use pg_query::{ParseResult, parse as parse_sql, parse_plpgsql};
 use postgres_types::ToSql;
 use serde::{Deserialize, Serialize};
 
@@ -731,7 +731,18 @@ async fn setup_rule<T: GenericClient + Sync + Send>(
 ) -> Result<String, Error> {
     let query = format!(
         "SELECT trigger.setup_rule(rule, array[{}]::trigger.threshold_def[]) FROM trigger.rule WHERE name = $1",
-        trigger.thresholds.iter().map(|threshold| { format!("({}, {})", escape_literal(&threshold.name), escape_literal(&threshold.data_type)) }).collect::<Vec<String>>().join(",")
+        trigger
+            .thresholds
+            .iter()
+            .map(|threshold| {
+                format!(
+                    "({}, {})",
+                    escape_literal(&threshold.name),
+                    escape_literal(&threshold.data_type)
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(",")
     );
 
     client
@@ -1725,7 +1736,7 @@ fn extract_rule_from_src(src: &str) -> Result<String, TriggerError> {
         None => {
             return Err(TriggerError::DatabaseError(DatabaseError::Default(
                 format!("Could not extract condition from SQL: '{src}'"),
-            )))
+            )));
         }
     };
 
@@ -1861,7 +1872,9 @@ where
     T: GenericClient + Send + Sync,
     Ts: ToSql + Send + Sync,
 {
-    let query = format!("SELECT entity_id, timestamp::text, weight, details, data::text FROM trigger_rule.\"{name}_create_notification\"($1::timestamptz)");
+    let query = format!(
+        "SELECT entity_id, timestamp::text, weight, details, data::text FROM trigger_rule.\"{name}_create_notification\"($1::timestamptz)"
+    );
 
     let query_args = [&timestamp as &(dyn ToSql + Sync)];
 

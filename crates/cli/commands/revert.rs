@@ -13,7 +13,7 @@ use minerva::error::Error;
 
 use crate::interact::interact;
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 #[allow(clippy::struct_excessive_bools)]

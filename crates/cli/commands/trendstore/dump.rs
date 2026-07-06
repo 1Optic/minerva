@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use clap::Parser;
 
-use minerva::trend_store::{load_trend_store, TrendStoreRef};
+use minerva::trend_store::{TrendStoreRef, load_trend_store};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStoreDump {

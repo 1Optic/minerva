@@ -7,7 +7,7 @@ use minerva::trend_materialization::{
     check_trend_materialization, trend_materialization_from_config,
 };
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationUpdate {

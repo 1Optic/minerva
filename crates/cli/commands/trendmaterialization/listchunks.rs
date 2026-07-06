@@ -1,7 +1,7 @@
 use clap::Parser;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
-use materialize::materialize::{load_materialization_chunks, MaterializeConfig};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
+use materialize::materialize::{MaterializeConfig, load_materialization_chunks};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationChunkList {

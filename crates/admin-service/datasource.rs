@@ -1,6 +1,6 @@
 use deadpool_postgres::Pool;
 
-use actix_web::{get, web::Data, web::Path, HttpResponse};
+use actix_web::{HttpResponse, get, web::Data, web::Path};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

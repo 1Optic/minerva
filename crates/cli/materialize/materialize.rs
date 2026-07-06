@@ -5,13 +5,13 @@ use std::fmt::Display;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use deadpool_postgres::tokio_postgres;
 use deadpool_postgres::Pool;
+use deadpool_postgres::tokio_postgres;
 use futures::StreamExt;
 use log::warn;
 use thiserror::Error;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::Interval;
 use tokio_postgres::GenericClient;
 use tokio_postgres::NoTls;

@@ -4,13 +4,13 @@ use futures_util::pin_mut;
 use log::debug;
 use postgres_protocol::escape::escape_identifier;
 use thiserror::Error;
+use tokio_postgres::Transaction;
 use tokio_postgres::binary_copy::BinaryCopyInWriter;
 use tokio_postgres::types::{IsNull, ToSql, Type};
-use tokio_postgres::Transaction;
 
 use crate::attribute_store::{Attribute, AttributeStore};
 use crate::entity::{EntityMapping, EntityMappingError};
-use crate::meas_value::{parse_meas_value, DataType, MeasValue};
+use crate::meas_value::{DataType, MeasValue, parse_meas_value};
 
 #[derive(Error, Debug)]
 pub enum AttributeStorageError {

@@ -5,7 +5,7 @@ use std::path::Path;
 use chrono::DateTime;
 use log::debug;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio_postgres::Client;
 
 use crate::entity::CachingEntityMapping;
@@ -13,10 +13,10 @@ use crate::error::{Error, RuntimeError};
 use crate::interval::parse_interval;
 use crate::job::{end_job, start_job};
 use crate::trend_store::{
-    create_partitions_for_trend_store_and_timestamp, load_trend_store, RawMeasurementStore,
-    TrendStore,
+    RawMeasurementStore, TrendStore, create_partitions_for_trend_store_and_timestamp,
+    load_trend_store,
 };
-use crate::trend_store::{get_trend_store_id, TrendStoreRef};
+use crate::trend_store::{TrendStoreRef, get_trend_store_id};
 
 #[derive(Serialize, Deserialize)]
 pub struct TrendsFromHeader {
@@ -79,7 +79,7 @@ pub async fn load_data<P: AsRef<Path>>(
         None => {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "No column matching entity column '{entity_column}'"
-            ))))
+            ))));
         }
     };
 
@@ -88,7 +88,7 @@ pub async fn load_data<P: AsRef<Path>>(
         None => {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "No column matching timestamp column '{timestamp_column}'"
-            ))))
+            ))));
         }
     };
 

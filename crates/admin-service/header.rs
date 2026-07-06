@@ -1,4 +1,4 @@
-use actix_web::{get, web::Path, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, web::Path};
 
 use super::serviceerror::{ServiceError, ServiceErrorKind};
 use crate::error::Error;

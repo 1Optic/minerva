@@ -2,11 +2,11 @@ use std::env;
 use std::time::Duration;
 
 use log::debug;
-use postgres_secrets::{pgpass::CredentialQuery, PgPass};
+use postgres_secrets::{PgPass, pgpass::CredentialQuery};
 use rustls::ClientConfig as RustlsClientConfig;
 
-use tokio_postgres::{config::SslMode, Config};
 use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Config, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ pub fn get_db_config() -> Result<Config, Error> {
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
                     msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                }))
+                }));
             }
         };
 

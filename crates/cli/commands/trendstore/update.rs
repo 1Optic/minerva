@@ -5,7 +5,7 @@ use clap::Parser;
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_store::{load_trend_store, load_trend_store_from_file};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 use crate::interact::interact;
 
 #[derive(Debug, Parser, PartialEq)]

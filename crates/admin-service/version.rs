@@ -1,5 +1,5 @@
 use super::serviceerror::ServiceError;
-use actix_web::{get, HttpResponse};
+use actix_web::{HttpResponse, get};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

@@ -4,15 +4,15 @@ use log::info;
 use postgres_types::WrongType;
 use rust_decimal::prelude::FromPrimitive;
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{binary_copy::BinaryCopyInWriter, GenericClient};
+use tokio_postgres::{GenericClient, binary_copy::BinaryCopyInWriter};
 
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
 use minerva::meas_value::{DataType, MeasValue};
 use minerva::trend_store::{
-    create_partitions_for_timestamp, DataPackage, DataPackageWriteError, MeasurementStore,
-    StorePackageError, TrendStore,
+    DataPackage, DataPackageWriteError, MeasurementStore, StorePackageError, TrendStore,
+    create_partitions_for_timestamp,
 };
 
 use crate::common::create_schema_with_retry;

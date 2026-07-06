@@ -1,8 +1,8 @@
 use clap::Parser;
 
-use minerva::trigger::{dump_trigger, load_trigger, TriggerError};
+use minerva::trigger::{TriggerError, dump_trigger, load_trigger};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TriggerDump {

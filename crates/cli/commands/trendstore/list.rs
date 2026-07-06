@@ -4,7 +4,7 @@ use comfy_table;
 
 use minerva::trend_store::list_trend_stores;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStoreList {}
