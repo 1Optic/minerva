@@ -5,10 +5,10 @@ use clap::Parser;
 
 use erased_serde::{Serialize, Serializer};
 use minerva::error::{ConfigurationError, Error};
-use minerva::instance::{load_instance_config, DiffOptions, MinervaInstance};
+use minerva::instance::{DiffOptions, MinervaInstance, load_instance_config};
 
 use super::common::{
-    connect_to_db, get_db_config, show_db_config, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT,
+    Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT, connect_to_db, get_db_config, show_db_config,
 };
 
 #[derive(Debug, Parser, PartialEq)]

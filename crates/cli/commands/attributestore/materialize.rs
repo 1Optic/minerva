@@ -2,11 +2,11 @@ use clap::Parser;
 use tokio_postgres::Client;
 
 use minerva::attribute_materialization::{
-    load_attribute_materialization_by_id, load_attribute_materialization_by_name,
-    load_attribute_materializations, AttributeMaterializeError,
+    AttributeMaterializeError, load_attribute_materialization_by_id,
+    load_attribute_materialization_by_name, load_attribute_materializations,
 };
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreMaterialize {

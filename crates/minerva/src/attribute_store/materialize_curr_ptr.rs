@@ -209,7 +209,9 @@ pub async fn update_curr_table<T: GenericClient + Send + Sync>(
         .collect::<Vec<String>>()
         .join(",");
 
-    let query = format!("INSERT INTO attribute.\"{attribute_store_name}\"({dest_cols_part}) SELECT {src_cols_part} FROM attribute_history.\"{attribute_store_name}\" history JOIN attribute_history.\"{attribute_store_name}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id");
+    let query = format!(
+        "INSERT INTO attribute.\"{attribute_store_name}\"({dest_cols_part}) SELECT {src_cols_part} FROM attribute_history.\"{attribute_store_name}\" history JOIN attribute_history.\"{attribute_store_name}_curr_ptr\" curr_ptr ON history.id = curr_ptr.id"
+    );
 
     let record_count = client.execute(&query, &[]).await.map_err(|e| {
         MaterializeCurrPtrError::Unexpected(format!(

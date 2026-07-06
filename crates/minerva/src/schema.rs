@@ -28,10 +28,10 @@ pub async fn create_schema(client: &mut Client) -> Result<(), SchemaCreationErro
         .await
         .map_err(|e| match e.kind() {
             refinery::error::Kind::Connection(_conn_err_msg, conn_err) => {
-                if let Some(source) = conn_err.source() {
-                    if source.to_string().contains("tuple concurrently updated") {
-                        return SchemaCreationError::TupleConcurrentlyUpdated;
-                    }
+                if let Some(source) = conn_err.source()
+                    && source.to_string().contains("tuple concurrently updated")
+                {
+                    return SchemaCreationError::TupleConcurrentlyUpdated;
                 }
 
                 SchemaCreationError::from(e)

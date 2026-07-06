@@ -191,7 +191,12 @@ impl Change for AddNotificationStore {
 
         let query = format!(
             "SELECT notification_directory.create_notification_store($1::text, ARRAY[{}]::notification_directory.attr_def[])",
-            self.notification_store.attributes.iter().map(|att| format!("('{}', '{}', '')", &att.name, &att.data_type)).collect::<Vec<String>>().join(",")
+            self.notification_store
+                .attributes
+                .iter()
+                .map(|att| format!("('{}', '{}', '')", &att.name, &att.data_type))
+                .collect::<Vec<String>>()
+                .join(",")
         );
 
         tx.query_one(&query, &[&self.notification_store.data_source])

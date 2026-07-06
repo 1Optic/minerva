@@ -1,6 +1,6 @@
 use log::info;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
+use minerva::trend_store::{TrendStore, create_partitions_for_timestamp};
 
 use minerva::change::Change;
 use minerva::change::InformationOption;

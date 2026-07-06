@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use log::debug;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use tokio::time::Duration;
 
@@ -11,8 +11,8 @@ use minerva::cluster::MinervaClusterConnector;
 use minerva::trend_store::TrendStore;
 
 use crate::common::{
-    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
-    MinervaServiceConfig,
+    MinervaService, MinervaServiceConfig, create_schema_with_retry, create_webservice_role,
+    get_available_port,
 };
 
 /// Test the listing and creation of new entity sets

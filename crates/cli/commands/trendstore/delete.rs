@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 use minerva::error::{Error, RuntimeError};
 use minerva::trend_store::delete_trend_store;

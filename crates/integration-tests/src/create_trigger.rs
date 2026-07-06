@@ -11,8 +11,8 @@ use minerva::trend_store::TrendStore;
 use serde_json::json;
 
 use crate::common::{
-    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
-    MinervaServiceConfig,
+    MinervaService, MinervaServiceConfig, create_schema_with_retry, create_webservice_role,
+    get_available_port,
 };
 
 const TREND_STORE_DEFINITION: &str = r"

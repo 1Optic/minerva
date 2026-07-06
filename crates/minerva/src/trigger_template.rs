@@ -7,7 +7,7 @@ use tokio_postgres::{Client, Row, Transaction};
 
 use super::error::DatabaseError;
 use crate::trigger::{
-    trigger_exists, KPIDataColumn, Threshold, TrendStoreLink, Trigger, TriggerError,
+    KPIDataColumn, Threshold, TrendStoreLink, Trigger, TriggerError, trigger_exists,
 };
 
 const DEFAULT_THRESHOLD_DATA_TYPE: &str = "numeric";
@@ -466,15 +466,13 @@ impl FullTemplatedTrigger {
                 .clone()
                 .into_iter()
                 .find(|p| p.name == lookback_param)
-            {
-                if let Some(lookback_param) = self
+                && let Some(lookback_param) = self
                     .thresholds
                     .clone()
                     .into_iter()
                     .find(|t| t.name == lookback_param_name.value)
-                {
-                    lookback = lookback_param.value.clone();
-                }
+            {
+                lookback = lookback_param.value.clone();
             }
 
             if first {

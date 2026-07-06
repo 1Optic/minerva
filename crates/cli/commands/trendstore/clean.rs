@@ -10,7 +10,7 @@ use minerva::changes::trend_store::RemoveTrends;
 use minerva::error::RuntimeError;
 use minerva::trend_store::get_trends_to_delete;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 use crate::commands::update::update_variation;
 
 #[derive(Debug, Parser, PartialEq)]

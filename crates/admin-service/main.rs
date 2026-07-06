@@ -3,11 +3,11 @@ use std::{env, process::exit};
 use log::{error, info};
 
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{App, HttpServer, middleware::Logger, web};
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use rustls::ClientConfig as RustlsClientConfig;
-use tokio_postgres::{config::SslMode, Config, NoTls};
+use tokio_postgres::{Config, NoTls, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 use utoipa::OpenApi;
@@ -16,45 +16,45 @@ use utoipa_swagger_ui::SwaggerUi;
 use minerva::error::{ConfigurationError, DatabaseError, Error};
 
 mod version;
-use version::{get_version, Version};
+use version::{Version, get_version};
 
 mod trendmaterialization;
 use trendmaterialization::{
+    TrendFunctionMaterializationData, TrendFunctionMaterializationFull, TrendMaterializationDef,
+    TrendMaterializationSourceData, TrendViewMaterializationData, TrendViewMaterializationFull,
     delete_trend_function_materialization, delete_trend_view_materialization,
     get_trend_function_materialization, get_trend_function_materializations,
     get_trend_materializations, get_trend_view_materialization, get_trend_view_materializations,
     post_trend_function_materialization, post_trend_view_materialization,
     update_trend_function_materialization, update_trend_view_materialization,
-    TrendFunctionMaterializationData, TrendFunctionMaterializationFull, TrendMaterializationDef,
-    TrendMaterializationSourceData, TrendViewMaterializationData, TrendViewMaterializationFull,
 };
 
 mod trendstore;
 use trendstore::{
-    find_trend_store_part, get_trend_store, get_trend_store_part, get_trend_store_parts,
-    get_trend_stores, get_trends, get_trends_by_entity_type, post_trend_store_part,
-    GeneratedTrendFull, TrendFull, TrendStoreFull, TrendStorePartFull,
+    GeneratedTrendFull, TrendFull, TrendStoreFull, TrendStorePartFull, find_trend_store_part,
+    get_trend_store, get_trend_store_part, get_trend_store_parts, get_trend_stores, get_trends,
+    get_trends_by_entity_type, post_trend_store_part,
 };
 
 mod datasource;
-use datasource::{get_data_source, get_data_sources, DataSource};
+use datasource::{DataSource, get_data_source, get_data_sources};
 
 mod entitytype;
-use entitytype::{get_entity_type, get_entity_types, EntityType};
+use entitytype::{EntityType, get_entity_type, get_entity_types};
 
 mod kpi;
-use kpi::{delete_kpi, get_kpi, get_kpis, post_kpi, update_kpi, KpiImplementedData, KpiRawData};
+use kpi::{KpiImplementedData, KpiRawData, delete_kpi, get_kpi, get_kpis, post_kpi, update_kpi};
 
 mod trigger;
 use trigger::{
-    change_thresholds, change_thresholds_by_id, create_trigger, delete_trigger_by_id, get_template,
-    get_templates, get_triggers, ShortTemplateData, TemplateData, TemplatedTriggerDefinition,
-    TriggerData,
+    ShortTemplateData, TemplateData, TemplatedTriggerDefinition, TriggerData, change_thresholds,
+    change_thresholds_by_id, create_trigger, delete_trigger_by_id, get_template, get_templates,
+    get_triggers,
 };
 
 mod entityset;
 use entityset::{
-    change_entity_set, create_entity_set, delete_entity_set, get_entity_sets, EntitySetData,
+    EntitySetData, change_entity_set, create_entity_set, delete_entity_set, get_entity_sets,
 };
 
 mod header;
@@ -236,7 +236,7 @@ fn get_db_config() -> Result<Config, Error> {
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
                     msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
-                }))
+                }));
             }
         };
 

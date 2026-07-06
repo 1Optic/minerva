@@ -1,6 +1,6 @@
 use tokio_postgres::GenericClient;
 
-use crate::trend_store::{format_duration, TrendStoreRef};
+use crate::trend_store::{TrendStoreRef, format_duration};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RemoveTrendStoreError {

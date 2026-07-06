@@ -5,11 +5,11 @@ use log::debug;
 use minerva::change::Change;
 use minerva::changes::trend_store::AddTrendStore;
 use minerva::cluster::MinervaClusterConnector;
-use minerva::trend_store::{create_partitions_for_timestamp, TrendStore};
+use minerva::trend_store::{TrendStore, create_partitions_for_timestamp};
 
 use crate::common::{
-    create_schema_with_retry, create_webservice_role, get_available_port, MinervaService,
-    MinervaServiceConfig,
+    MinervaService, MinervaServiceConfig, create_schema_with_retry, create_webservice_role,
+    get_available_port,
 };
 
 const TREND_STORE_DEFINITION: &str = r"
@@ -91,7 +91,10 @@ pub async fn get_entity_types(
         let response = reqwest::get(url).await?;
         let body = response.text().await?;
 
-        assert_eq!(body, "[{\"id\":1,\"name\":\"entity_set\",\"description\":\"\"},{\"id\":2,\"name\":\"node\",\"description\":\"\"}]");
+        assert_eq!(
+            body,
+            "[{\"id\":1,\"name\":\"entity_set\",\"description\":\"\"},{\"id\":2,\"name\":\"node\",\"description\":\"\"}]"
+        );
     }
 
     Ok(())

@@ -1,7 +1,7 @@
 use clap::Parser;
 use tokio_postgres::{Client, Row};
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreList {}

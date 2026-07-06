@@ -1,7 +1,7 @@
 use log::{debug, error, info};
 use reqwest::{
-    header::{ACCEPT, CONTENT_TYPE},
     Client, Method,
+    header::{ACCEPT, CONTENT_TYPE},
 };
 use std::env;
 use std::fmt;
@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use rustls::ClientConfig as RustlsClientConfig;
-use tokio_postgres::{config::SslMode, Config as TokioConfig, Row};
+use tokio_postgres::{Config as TokioConfig, Row, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
 static ENV_DB_CONN: &str = "MINERVA_DB_CONN";

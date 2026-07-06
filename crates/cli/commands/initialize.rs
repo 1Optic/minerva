@@ -4,14 +4,14 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use minerva::database::{create_database, ClusterConfig};
+use minerva::database::{ClusterConfig, create_database};
 use minerva::error::{ConfigurationError, Error};
 use minerva::instance::initialize_from;
 use minerva::schema::create_schema;
 use minerva::trend_store::create_partitions;
 
 use super::common::{
-    connect_db, connect_to_db, get_db_config, Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT,
+    Cmd, CmdResult, ENV_MINERVA_INSTANCE_ROOT, connect_db, connect_to_db, get_db_config,
 };
 
 #[derive(Debug, Parser, PartialEq)]
@@ -44,8 +44,6 @@ impl InitializeOpt {
             let mut config = get_db_config()?;
             config.dbname(database_name);
             client = connect_to_db(&config).await?;
-
-            std::env::set_var("PGDATABASE", database_name);
         }
 
         if self.create_schema {

@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 use minerva::{
     error::RuntimeError,
     trend_materialization::{check_trend_materialization, load_materializations},

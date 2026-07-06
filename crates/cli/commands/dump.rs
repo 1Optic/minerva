@@ -2,7 +2,7 @@ use clap::Parser;
 
 use minerva::instance::dump;
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct DumpOpt {}

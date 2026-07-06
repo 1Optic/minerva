@@ -9,7 +9,7 @@ use minerva::aggregation_generation::{granularity_to_partition_size, save_trend_
 use minerva::attribute_store::{Attribute, AttributeStore};
 use minerva::entity::default_entity_id_type;
 use minerva::error::RuntimeError;
-use minerva::instance::{load_instance_config, load_trend_stores_from, InstanceConfig};
+use minerva::instance::{InstanceConfig, load_instance_config, load_trend_stores_from};
 use minerva::meas_value::DataType;
 use minerva::trend_store::{Trend, TrendStore, TrendStorePart};
 use serde::{Deserialize, Serialize};
@@ -507,10 +507,10 @@ mod tests {
     };
 
     use crate::commands::define::{
-        default_entity_id_type, define_attribute_stores, AttributeDefinition, TrendDefinition,
+        AttributeDefinition, TrendDefinition, default_entity_id_type, define_attribute_stores,
     };
 
-    use super::{define_trend_stores, TrendStorePartParameters};
+    use super::{TrendStorePartParameters, define_trend_stores};
 
     #[test]
     fn test_define_trend_stores() {

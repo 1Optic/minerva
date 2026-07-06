@@ -3,7 +3,7 @@ use minerva::attribute_store::materialize_curr_ptr::{
     materialize_curr_ptr, materialize_curr_ptr_by_name,
 };
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreMaterializeCurrPtr {

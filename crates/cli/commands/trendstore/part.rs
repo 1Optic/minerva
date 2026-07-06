@@ -3,14 +3,14 @@ use clap::Parser;
 use clap::Subcommand;
 
 use term_table::{
+    Table, TableStyle,
     row::Row,
     table_cell::{Alignment, TableCell},
-    Table, TableStyle,
 };
 
 use minerva::trend_store::analyze_trend_store_part;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendStorePartAnalyze {

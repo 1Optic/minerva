@@ -3,15 +3,15 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use clap::Parser;
-use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
-use tokio::time::{interval, Duration};
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::time::{Duration, interval};
 
 use crate::commands::common::{Cmd, CmdResult};
 
 use materialize::materialize::{
-    DBConfig, MaterializationChunk, MaterializationExecutor, MaterializationFetcher,
-    MaterializeConfig, CONNECTION_CHECK_INTERVAL, MAX_CONNECTION_AGE,
+    CONNECTION_CHECK_INTERVAL, DBConfig, MAX_CONNECTION_AGE, MaterializationChunk,
+    MaterializationExecutor, MaterializationFetcher, MaterializeConfig,
 };
 
 #[derive(Debug, Parser, PartialEq)]

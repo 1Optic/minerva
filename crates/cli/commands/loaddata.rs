@@ -2,9 +2,9 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use minerva::error::ConfigurationError;
-use minerva::loading::{load_data, ParserConfig, TrendsFrom, TrendsFromHeader};
+use minerva::loading::{ParserConfig, TrendsFrom, TrendsFromHeader, load_data};
 
-use super::common::{connect_db, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_db};
 
 static NULL_VALUE: &str = "";
 

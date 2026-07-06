@@ -3,7 +3,7 @@ use clap::Parser;
 use minerva::change::Change;
 use minerva::trigger::VerifyTrigger;
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TriggerVerify {

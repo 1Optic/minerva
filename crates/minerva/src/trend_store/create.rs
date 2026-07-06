@@ -1,7 +1,7 @@
 use postgres_protocol::escape::escape_identifier;
 use tokio_postgres::GenericClient;
 
-use crate::trend_store::{format_duration, TrendStore, TrendStorePart};
+use crate::trend_store::{TrendStore, TrendStorePart, format_duration};
 
 use super::{GeneratedTrend, Trend};
 
@@ -117,8 +117,7 @@ pub async fn create_entity_type<T: GenericClient>(
 
     let id: i32 = rows.first().unwrap().get(0);
 
-    let create_entity_table_query =
-        "SELECT entity.create_entity_table(entity_type, NULL) FROM directory.entity_type WHERE name = $1";
+    let create_entity_table_query = "SELECT entity.create_entity_table(entity_type, NULL) FROM directory.entity_type WHERE name = $1";
     client.execute(create_entity_table_query, &[&name]).await?;
 
     let create_get_entity_function_query = "SELECT entity.create_get_entity_function(entity_type) FROM directory.entity_type WHERE name = $1";

@@ -9,8 +9,8 @@ use minerva::error::{Error, RuntimeError};
 
 use log::{debug, error, info};
 use postgres_protocol::escape::{escape_identifier, escape_literal};
-use rand::distr::{Alphanumeric, SampleString};
 use rand::RngExt;
+use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use testcontainers::core::{ContainerPort, ContainerRequest};
 use testcontainers::runners::AsyncRunner;
@@ -22,7 +22,7 @@ use toxiproxy_rust::proxy::ProxyPack;
 use minerva::cluster::{
     MinervaCluster, MinervaClusterConfig, MinervaClusterConnector, TestDatabase,
 };
-use minerva::schema::{create_schema, SchemaCreationError};
+use minerva::schema::{SchemaCreationError, create_schema};
 
 const TOXIPROXY_API_PORT: u16 = 8474;
 const DB_PROXIED_PORT: u16 = 5432;

@@ -23,8 +23,8 @@ use crate::trend_store::create::{
 };
 use crate::trend_store::remove::remove_trend_store;
 use crate::trend_store::{
-    get_trend_store_id, load_trend_store, load_trend_store_part, load_trend_store_ref_for_part,
-    Trend, TrendStore, TrendStorePart, TrendStoreRef,
+    Trend, TrendStore, TrendStorePart, TrendStoreRef, get_trend_store_id, load_trend_store,
+    load_trend_store_part, load_trend_store_ref_for_part,
 };
 
 #[derive(Serialize, Deserialize)]

@@ -3,10 +3,10 @@ use minerva::attribute_store::materialize_curr_ptr::materialize_curr_ptr;
 use tokio_postgres::Client;
 
 use minerva::attribute_store::compact::{
-    compact_attribute_store_by_id, compact_attribute_store_by_name, CompactError,
+    CompactError, compact_attribute_store_by_id, compact_attribute_store_by_name,
 };
 
-use crate::commands::common::{connect_db, Cmd, CmdResult};
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct AttributeStoreCompact {

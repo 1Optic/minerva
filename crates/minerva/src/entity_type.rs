@@ -88,7 +88,10 @@ impl Change for AddPrimaryAlias {
             )
             .await?;
 
-        let query = format!("ALTER TABLE entity.\"{}\" ADD COLUMN primary_alias text GENERATED ALWAYS AS ({}) STORED", &self.entity_type, &self.primary_alias);
+        let query = format!(
+            "ALTER TABLE entity.\"{}\" ADD COLUMN primary_alias text GENERATED ALWAYS AS ({}) STORED",
+            &self.entity_type, &self.primary_alias
+        );
 
         transaction.execute(&query, &[]).await?;
 

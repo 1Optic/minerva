@@ -12,7 +12,7 @@ use super::change::{Change, ChangeResult};
 use super::error::{Error, RuntimeError};
 use crate::attribute_store::load_attribute_names;
 use crate::attribute_store::materialize_curr_ptr::{
-    materialize_curr_ptr_by_name, MaterializeCurrPtrError, MaterializeCurrPtrResult,
+    MaterializeCurrPtrError, MaterializeCurrPtrResult, materialize_curr_ptr_by_name,
 };
 use crate::change::Changed;
 

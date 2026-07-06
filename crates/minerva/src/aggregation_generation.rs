@@ -43,18 +43,18 @@ pub fn generate_all_standard_aggregations(
         MinervaInstance::load_from(instance_root).map_err(AggregationGenerationError::Runtime)?;
 
     for trend_store in instance.trend_stores.clone() {
-        if let Some(title) = &trend_store.title {
-            if title.to_lowercase().contains("raw") {
-                // For now, we determine the raw data trend stores based on the title, but this
-                // should be done based on the fact that there is no materialization as source.
-                generate_standard_aggregations(
-                    instance_root,
-                    &mut instance,
-                    &config,
-                    trend_store,
-                    config.entity_aggregation_hints.as_deref(),
-                )?;
-            }
+        if let Some(title) = &trend_store.title
+            && title.to_lowercase().contains("raw")
+        {
+            // For now, we determine the raw data trend stores based on the title, but this
+            // should be done based on the fact that there is no materialization as source.
+            generate_standard_aggregations(
+                instance_root,
+                &mut instance,
+                &config,
+                trend_store,
+                config.entity_aggregation_hints.as_deref(),
+            )?;
         }
     }
 
@@ -78,12 +78,12 @@ fn generate_standard_aggregations(
 
             let source_type = split.next().unwrap();
 
-            if let Some(target_type) = split.next() {
-                if source_type == trend_store.entity_type {
-                    // Only generate an aggregation when the source type matches the entity type of
-                    // the trend store.
-                    return Some((r.clone(), target_type.to_string()));
-                }
+            if let Some(target_type) = split.next()
+                && source_type == trend_store.entity_type
+            {
+                // Only generate an aggregation when the source type matches the entity type of
+                // the trend store.
+                return Some((r.clone(), target_type.to_string()));
             }
 
             None
@@ -1140,7 +1140,7 @@ fn translate_source_part_name(
         None => {
             return Err(format!(
                 "Could not extract part specific string from '{name}'"
-            ))
+            ));
         }
     };
 

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use deadpool_postgres::Pool;
 
-use actix_web::{delete, get, post, put, web::Data, web::Path, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, delete, get, post, put, web::Data, web::Path};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

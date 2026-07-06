@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use super::common::{connect_to_db, get_db_config, Cmd, CmdResult};
+use super::common::{Cmd, CmdResult, connect_to_db, get_db_config};
 use minerva::{
     error::RuntimeError,
     graph::{dependee_graph, dependency_graph, node_index_by_name, render_graph},
