@@ -217,7 +217,18 @@ impl EntityMapping for DbEntityMapping {
                         alias,
                     }
                 }
-                None => create_entity_with_alias(client, entity_type, &name).await?,
+                None => {
+                    if has_primary_alias {
+                        create_entity_with_alias(client, entity_type, &name).await?
+                    } else {
+                        let entity_id = create_entity(client, entity_type, &name).await?;
+                        LargeEntity {
+                            id: entity_id,
+                            name: name.clone(),
+                            alias: None,
+                        }
+                    }
+                }
             };
 
             entities.insert(name, entity);
