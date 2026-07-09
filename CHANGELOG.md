@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.45.1] - 2026-07-09
+
 ### Changed
 
 - Upgrade to Rust 2024
+
+### Fixed
+
+- lib: Don't look for primary alias when creating an entity without primary alias
 
 ## [9.45.0] - 2026-07-06
 
@@ -673,5 +679,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.44.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.1...9.44.2
 [9.44.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.2...9.44.3
 [9.44.4]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.3...9.44.4
-[9.45.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.2...9.45.0
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...HEAD
+[9.45.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.4...9.45.0
+[9.45.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...9.45.1
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.1...HEAD
