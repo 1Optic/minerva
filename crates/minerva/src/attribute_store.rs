@@ -302,11 +302,11 @@ impl InformationOption for AttributeRemoveValueInformation {
         let expressions: Vec<String> = self
             .attribute_names
             .iter()
-            .map(|attribute_name| format!("{}::text", escape_identifier(attribute_name)))
+            .map(|attribute_name| format!("max({})::text", escape_identifier(attribute_name)))
             .collect();
         let expressions_part: String = expressions.join(", ");
         let query = format!(
-            "SELECT {} FROM attribute.{} LIMIT 1",
+            "SELECT {} FROM attribute.{}",
             expressions_part,
             escape_identifier(&attribute_store_name)
         );
@@ -333,11 +333,13 @@ impl InformationOption for AttributeRemoveValueInformation {
                 .set_header(vec!["attribute", "value"]);
 
             for (index, attribute_name) in self.attribute_names.iter().enumerate() {
-                let value = values.get(index);
+                let value = values.get(index).unwrap();
+
+                let value_text = value.clone().unwrap_or("-".to_string());
 
                 table.add_row(vec![
                     Cell::new(attribute_name.clone()),
-                    Cell::new(format!("{value:?}")),
+                    Cell::new(value_text),
                 ]);
             }
 
