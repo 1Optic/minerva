@@ -42,7 +42,7 @@ testcontainers = { version = "0.27.3" }
 thiserror = "2.0.18"
 deadpool-postgres = "0.14.1"
 tokio-stream = "0.1.18"
-futures = "0.3.32"
+futures = "0.3.33"
 erased-serde = "0.4.10"
 petgraph = "0.8.3"
 dotenvy = "0.15.7"
