@@ -10,7 +10,7 @@ name = "minerva-event-service"
 path = "main.rs"
 
 [dependencies]
-serde = "1.0.228"
+serde = "1.0.229"
 serde_json = "1.0.150"
 chrono = "0.4.45"
 humantime-serde = "1.1.1"
