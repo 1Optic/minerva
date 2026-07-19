@@ -41,7 +41,7 @@ pg_query = "6.1.1"
 comfy-table = "7.2.2"
 similar = "3.1.1"
 console = "0.16.4"
-typetag = "0.2.22"
+typetag = "0.2.23"
 postgres_secrets = "1.0.0"
 
 [lib]
