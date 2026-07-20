@@ -159,7 +159,7 @@ impl Trigger {
         )
     }
 
-    fn compare_data_types(&self, data_type: &String, other_data_type: &String) -> bool {
+    fn compare_data_types(&self, data_type: &str, other_data_type: &str) -> bool {
         let data_type = data_type.to_lowercase();
         let other_data_type = other_data_type.to_lowercase();
 
@@ -168,20 +168,35 @@ impl Trigger {
         }
 
         // Handle cases where the data types are equivalent but have different representations
-        match (data_type.as_str(), other_data_type.as_str()) {
-            ("int2", "smallint") | ("smallint", "int2") => true,
-            ("int4", "integer") | ("integer", "int4") | ("int4", "int") | ("int", "int4") | ("int", "integer") | ("integer", "int") => true,
-            ("int8", "bigint") | ("bigint", "int8") => true,
-            ("float4", "float") | ("float", "float4") => true,
-            ("float8", "double precision") | ("double precision", "float8") => true,
-            ("numeric", "decimal") | ("decimal", "numeric") => true,
-            ("bool", "boolean") | ("boolean", "bool") => true,
-            ("varchar", "character varying") | ("character varying", "varchar") => true,
-            ("char", "character") | ("character", "char") => true,
-            ("text", "string") | ("string", "text") => true,
-            ("timestamptz", "timestamp with timezone") | ("timestamp with timezone", "timestamptz") => true,
-            _ => false,
-        }
+        matches!(
+            (data_type.as_str(), other_data_type.as_str()),
+            ("int2", "smallint")
+                | ("smallint", "int2")
+                | ("int4", "integer")
+                | ("integer", "int4")
+                | ("int4", "int")
+                | ("int", "int4")
+                | ("int", "integer")
+                | ("integer", "int")
+                | ("int8", "bigint")
+                | ("bigint", "int8")
+                | ("float4", "float")
+                | ("float", "float4")
+                | ("float8", "double precision")
+                | ("double precision", "float8")
+                | ("numeric", "decimal")
+                | ("decimal", "numeric")
+                | ("bool", "boolean")
+                | ("boolean", "bool")
+                | ("varchar", "character varying")
+                | ("character varying", "varchar")
+                | ("char", "character")
+                | ("character", "char")
+                | ("text", "string")
+                | ("string", "text")
+                | ("timestamptz", "timestamp with timezone")
+                | ("timestamp with timezone", "timestamptz")
+        )
     }
 
     pub fn differences(&self, other: &Trigger) -> Vec<String> {
