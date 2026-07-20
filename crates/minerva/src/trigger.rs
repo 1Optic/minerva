@@ -159,6 +159,46 @@ impl Trigger {
         )
     }
 
+    fn compare_data_types(&self, data_type: &str, other_data_type: &str) -> bool {
+        let data_type = data_type.to_lowercase();
+        let other_data_type = other_data_type.to_lowercase();
+
+        if data_type == other_data_type {
+            return true;
+        }
+
+        // Handle cases where the data types are equivalent but have different representations
+        matches!(
+            (data_type.as_str(), other_data_type.as_str()),
+            ("int2", "smallint")
+                | ("smallint", "int2")
+                | ("int4", "integer")
+                | ("integer", "int4")
+                | ("int4", "int")
+                | ("int", "int4")
+                | ("int", "integer")
+                | ("integer", "int")
+                | ("int8", "bigint")
+                | ("bigint", "int8")
+                | ("float4", "float")
+                | ("float", "float4")
+                | ("float8", "double precision")
+                | ("double precision", "float8")
+                | ("numeric", "decimal")
+                | ("decimal", "numeric")
+                | ("bool", "boolean")
+                | ("boolean", "bool")
+                | ("varchar", "character varying")
+                | ("character varying", "varchar")
+                | ("char", "character")
+                | ("character", "char")
+                | ("text", "string")
+                | ("string", "text")
+                | ("timestamptz", "timestamp with timezone")
+                | ("timestamp with timezone", "timestamptz")
+        )
+    }
+
     pub fn differences(&self, other: &Trigger) -> Vec<String> {
         let mut changes = Vec::new();
         // We need to use the experimental plpgsql parsing because the fingerprinting does not
@@ -176,7 +216,7 @@ impl Trigger {
                 .find(|other_threshold| threshold.name == other_threshold.name)
             {
                 Some(other_threshold) => {
-                    if threshold.data_type != other_threshold.data_type
+                    if !self.compare_data_types(&threshold.data_type, &other_threshold.data_type)
                         || threshold.value != other_threshold.value
                     {
                         changes.push(format!("change threshold {}", threshold.name));

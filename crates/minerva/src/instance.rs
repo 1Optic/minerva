@@ -881,7 +881,7 @@ impl MinervaInstance {
                     let differences = my_trigger.differences(other_trigger);
                     if !differences.is_empty() {
                         changes.push(Box::new(UpdateTrigger {
-                            trigger: my_trigger.clone(),
+                            trigger: other_trigger.clone(),
                             verify: false,
                             changes: Some(differences),
                         }));
