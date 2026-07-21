@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.45.2] - 2026-07-21
+
+### Changed
+
+- lib: Improve attribute value information when removing
+
+### Fixed
+
+- lib: Handle types in trigger diffs better
+- lib: Handle citus distributed view when removing attributes
+- cli: Fix virtual entity command help text
+
 ## [9.45.1] - 2026-07-09
 
 ### Changed
@@ -681,4 +693,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.44.4]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.3...9.44.4
 [9.45.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.4...9.45.0
 [9.45.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...9.45.1
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.1...HEAD
+[9.45.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.1...9.45.2
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.2...HEAD
