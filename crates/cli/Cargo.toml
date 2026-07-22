@@ -17,7 +17,7 @@ test = false
 doctest = false
 
 [dependencies]
-clap = { version = "4.6.3", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
 clap_complete = "4.6.7"
 minerva = { version = "*", path = "../minerva" }
 tokio = { version = "1.53.1", features = ["full"] }
