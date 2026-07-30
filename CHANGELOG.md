@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.45.3] - 2026-07-30
+
+### Changed
+
+- admin-api: Specify only the default value for trigger thresholds
+
 ## [9.45.2] - 2026-07-21
 
 ### Changed
@@ -694,4 +700,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.45.0]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.44.4...9.45.0
 [9.45.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...9.45.1
 [9.45.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.1...9.45.2
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.2...HEAD
+[9.45.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.2...9.45.3
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.3...HEAD
