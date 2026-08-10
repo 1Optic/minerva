@@ -26,7 +26,7 @@ fn default_empty_string() -> String {
     String::new()
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddNotificationStoreAttributes {
     pub notification_store: NotificationStoreRef,
@@ -106,7 +106,7 @@ impl Changed for AddedAttributes {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NotificationStoreRef {
     pub data_source: String,
 }
@@ -171,7 +171,7 @@ impl fmt::Display for NotificationStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddNotificationStore {
     pub notification_store: NotificationStore,
