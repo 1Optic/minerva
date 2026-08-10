@@ -1,6 +1,6 @@
 use std::boxed::Box;
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -469,12 +469,11 @@ pub struct AttributeStoreDiffOptions {
     pub ignore_deletions: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AttributeStoreRef {
     pub data_source: String,
     pub entity_type: String,
 }
-
 impl fmt::Display for AttributeStoreRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -580,7 +579,7 @@ impl fmt::Display for AttributeStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddAttributeStore {
     pub attribute_store: AttributeStore,
@@ -658,7 +657,7 @@ impl Changed for AddedAttributeStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveAttributeStore {
     pub attribute_store: AttributeStoreRef,
