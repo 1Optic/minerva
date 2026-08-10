@@ -82,7 +82,7 @@ pub enum TrendMaterializationSource {
     Attribute(TrendMaterializationAttributeSource),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TrendViewMaterializationRef {
     pub target_trend_store_part: String,
 }
@@ -456,7 +456,7 @@ impl DiffItem for TrendMaterializationAttributes {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateTrendViewMaterializationAttributes {
     pub source_attributes: TrendMaterializationAttributes,
@@ -588,7 +588,7 @@ impl DiffItem for FunctionMaterializationAttributesDiffItem {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateTrendFunctionMaterializationAttributes {
     pub source_attributes: TrendMaterializationAttributes,
@@ -667,7 +667,7 @@ impl fmt::Display for UpdateTrendFunctionMaterializationAttributes {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateView {
     pub original_definition: String,
@@ -771,7 +771,7 @@ impl Display for ViewDiff {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateFunction {
     pub original_definition: TrendMaterializationFunction,
@@ -900,7 +900,7 @@ impl TrendMaterializationFunction {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TrendFunctionMaterializationRef {
     pub target_trend_store_part: String,
 }
@@ -2170,7 +2170,7 @@ pub async fn get_function_return_type<T: GenericClient + Send + Sync>(
     Some(format!("TABLE (\n{columns_part}\n)\n"))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddTrendMaterialization {
     pub trend_materialization: TrendMaterialization,
@@ -2241,7 +2241,7 @@ impl Changed for AddedTrendMaterialization {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveTrendMaterialization {
     pub name: String,
@@ -2311,7 +2311,7 @@ impl Changed for RemovedTrendMaterialization {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateTrendMaterialization {
     pub trend_materialization: TrendMaterialization,
