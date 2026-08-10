@@ -285,6 +285,13 @@ async fn update(
         }
     }
 
+    client
+        .execute(
+            "SELECT directory.change_ownership_for_all_schemas($1)",
+            &[&"postgres"],
+        )
+        .await?;
+
     Ok(())
 }
 
