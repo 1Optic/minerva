@@ -347,7 +347,7 @@ pub async fn load_attribute_materializations<T: GenericClient + Send + Sync>(
     Ok(attribute_materializations)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AddAttributeMaterialization {
     pub attribute_materialization: AttributeMaterialization,
 }
@@ -423,7 +423,7 @@ impl Display for AddedAttributeMaterialization {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct RemoveAttributeMaterialization {
     attribute_materialization: AttributeMaterializationRef,
 }

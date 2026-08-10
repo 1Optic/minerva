@@ -56,7 +56,7 @@ impl EntityType {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddPrimaryAlias {
     pub entity_type: String,
@@ -128,7 +128,7 @@ impl Changed for AddedPrimaryAlias {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemovePrimaryAlias {
     pub entity_type: String,
@@ -207,7 +207,7 @@ impl Changed for RemovedPrimaryAlias {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct ChangePrimaryAlias {
     pub entity_type: String,
@@ -317,7 +317,7 @@ pub fn load_entity_type_from_file(path: &PathBuf) -> Result<EntityType, Error> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddEntityType {
     pub entity_type: EntityType,

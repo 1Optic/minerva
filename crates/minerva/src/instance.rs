@@ -65,12 +65,14 @@ pub enum AggregationType {
     Suppress,
 }
 
+#[derive(Clone)]
 pub struct DiffOptions {
     pub ignore_trend_extra_data: bool,
     pub ignore_trend_data_type: bool,
     pub ignore_deletions: bool,
     pub instance_ignores: Vec<DeploymentIgnore>,
     pub stage_deletions: bool,
+    pub include_sse: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -878,14 +880,14 @@ impl MinervaInstance {
                 .find(|my_trigger| my_trigger.name == other_trigger.name)
             {
                 Some(my_trigger) => {
-                    let differences = my_trigger.differences(other_trigger);
+                    let differences = my_trigger.differences(other_trigger, options.include_sse);
                     if !differences.is_empty() {
                         changes.push(Box::new(UpdateTrigger {
                             trigger: other_trigger.clone(),
                             verify: false,
                             changes: Some(differences),
                         }));
-                    } else if my_trigger.enabled != other_trigger.enabled {
+                    } else if my_trigger.enabled != other_trigger.enabled && options.include_sse {
                         if other_trigger.enabled {
                             changes.push(Box::new(EnableTrigger {
                                 trigger_name: my_trigger.name.clone(),
@@ -917,16 +919,18 @@ impl MinervaInstance {
         }
 
         // Check for triggers to remove
-        for my_trigger in &self.triggers {
-            if !options.ignore_deletions
-                && !other
-                    .triggers
-                    .iter()
-                    .any(|other_trigger| other_trigger.name == my_trigger.name)
-            {
-                changes.push(Box::new(DeleteTrigger {
-                    trigger_name: my_trigger.name.clone(),
-                }));
+        if options.include_sse {
+            for my_trigger in &self.triggers {
+                if !options.ignore_deletions
+                    && !other
+                        .triggers
+                        .iter()
+                        .any(|other_trigger| other_trigger.name == my_trigger.name)
+                {
+                    changes.push(Box::new(DeleteTrigger {
+                        trigger_name: my_trigger.name.clone(),
+                    }));
+                }
             }
         }
 
