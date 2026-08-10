@@ -121,7 +121,7 @@ pub async fn load_virtual_entities_from_db<T: GenericClient + Send + Sync>(
     Ok(virtual_entities)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddVirtualEntity {
     pub virtual_entity: VirtualEntity,
@@ -187,7 +187,7 @@ impl Changed for AddedVirtualEntity {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveVirtualEntity {
     pub name: String,

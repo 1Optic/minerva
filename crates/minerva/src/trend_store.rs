@@ -1420,7 +1420,7 @@ impl TrendStoreDiffOptions {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TrendStoreRef {
     pub data_source: String,
     pub entity_type: String,

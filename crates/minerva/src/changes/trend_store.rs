@@ -163,7 +163,7 @@ impl Change for StageTrendsForDeletion {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 struct TrendsStagedForDeletion {
     pub trend_store_part_name: String,
@@ -191,7 +191,7 @@ impl Changed for TrendsStagedForDeletion {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct RestoreTrendsStagedForDeletion {
     pub trend_store_part_name: String,
     pub trends: Vec<String>,
@@ -604,7 +604,7 @@ async fn initialize_table_trends<T: GenericClient>(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddAliasColumn {
     pub trend_store_part_name: String,
@@ -690,7 +690,7 @@ impl Changed for AddedAliasColumn {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveAliasColumn {
     pub trend_store_part_name: String,
@@ -765,7 +765,7 @@ impl Changed for RemovedAliasColumn {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct ModifyTrendDataType {
     pub trend_name: String,
@@ -1160,7 +1160,7 @@ impl Display for TrendRemoveValueInformation {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct ModifyTrendExtraData {
     pub trend_name: String,
@@ -1255,7 +1255,7 @@ impl Changed for ModifiedTrendExtraData {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddTrendStorePart {
     pub trend_store: TrendStoreRef,
@@ -1362,7 +1362,7 @@ impl Changed for AddedTrendStorePart {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveTrendStorePart {
     pub name: String,
@@ -1405,7 +1405,7 @@ impl Change for RemoveTrendStorePart {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemovedTrendStorePart {
     pub trend_store: TrendStoreRef,
@@ -1432,7 +1432,7 @@ impl Changed for RemovedTrendStorePart {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct ModifyTrendStoreData {
     pub trend_store: TrendStoreRef,
@@ -1632,7 +1632,7 @@ impl Change for AddTrendStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddedTrendStore {
     pub trend_store: TrendStoreRef,
@@ -1653,7 +1653,7 @@ impl Changed for AddedTrendStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveTrendStore {
     pub trend_store: TrendStoreRef,
@@ -1693,7 +1693,7 @@ impl Change for RemoveTrendStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemovedTrendStore {
     pub trend_store: TrendStore,
@@ -1714,7 +1714,7 @@ impl Changed for RemovedTrendStore {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateStatistics {
     pub trend_store_part_name: Option<String>,
 }
@@ -1759,7 +1759,7 @@ impl Change for CreateStatistics {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct CreatedStatistics {
     pub trend_store_part_name: Option<String>,

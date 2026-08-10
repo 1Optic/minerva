@@ -123,7 +123,7 @@ pub async fn load_relations_from_db<T: GenericClient + Send + Sync>(
     Ok(relations)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddRelation {
     pub relation: Relation,
@@ -178,7 +178,7 @@ impl Changed for AddedRelation {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateRelationView {
     pub relation_name: String,
@@ -398,7 +398,7 @@ pub async fn remove_relation<T: GenericClient>(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RemoveRelation {
     pub relation_name: String,
