@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use clap::Parser;
 
 use erased_serde::Serializer;
-use minerva::change::Change;
+use minerva::change::{Change, Changed};
 use minerva::error::RuntimeError;
 use minerva::graph::GraphNode;
 use minerva::graph::dependee_graph;
@@ -273,13 +273,15 @@ async fn update(
 
     for (index, change) in changes_internal.iter().enumerate() {
         println!("\n\n* [{}/{num_changes}] {change}", index + 1);
-        let mut actual_change = *change.clone();
-        if skip_sse {
-            actual_change.as_ref().remove_sse_changes();
-        }
 
-        if !interactive || interact(client, actual_change.as_ref()).await? {
-            match actual_change.apply(client).await {
+        if !interactive || interact(client, change.as_ref()).await? {
+            let change_result: Result<Box<dyn Changed>, Error>;
+            if skip_sse {
+                change_result = change.apply_no_sse(client).await;
+            } else {
+                change_result = change.apply(client).await;
+            }
+            match change_result {
                 Ok(changed) => {
                     let now = chrono::offset::Local::now();
 
