@@ -1358,6 +1358,8 @@ impl Change for UpdateTrigger {
             }));
         }
 
+        let existing_trigger = load_trigger(&mut transaction, &self.trigger.name).await?;
+
         // Tear down
         drop_notification_data_function(&self.trigger, &mut transaction).await?;
 
@@ -1388,6 +1390,8 @@ impl Change for UpdateTrigger {
         link_trend_stores(&self.trigger, &mut transaction).await?;
 
         set_description(&self.trigger, &mut transaction).await?;
+
+        set_thresholds(&existing_trigger, &mut transaction).await?;
 
         let check_result = if self.verify {
             Some(run_checks(&self.trigger.name, &mut transaction).await?)
