@@ -27,7 +27,10 @@ pub struct DiffOpt {
     ignore_deletions: bool,
     #[arg(long)]
     stage_deletions: bool,
-    #[arg(long, help = "include changes that may be caused by the self-service environment")]
+    #[arg(
+        long,
+        help = "include changes that may be caused by the self-service environment"
+    )]
     include_sse: bool,
     #[arg(long, help = "output diff in json format")]
     json: bool,
