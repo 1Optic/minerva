@@ -216,9 +216,10 @@ impl Trigger {
                 .find(|other_threshold| threshold.name == other_threshold.name)
             {
                 Some(other_threshold) => {
-                    if include_sse & (
-                    !self.compare_data_types(&threshold.data_type, &other_threshold.data_type)
-                        || threshold.value != other_threshold.value)
+                    if include_sse
+                        & (!self
+                            .compare_data_types(&threshold.data_type, &other_threshold.data_type)
+                            || threshold.value != other_threshold.value)
                     {
                         changes.push(format!("change threshold {}", threshold.name));
                     }
@@ -1314,11 +1315,11 @@ impl UpdateTrigger {
             Some(changes) => {
                 let filtered_changes: Vec<String> = changes
                     .iter()
-                    .filter(|change| !change.starts_with(&"change threshold"))
+                    .filter(|change| !change.starts_with("change threshold"))
                     .cloned()
                     .collect();
                 filtered_changes
-            },
+            }
             None => Vec::new(),
         }
     }
@@ -1349,16 +1350,11 @@ impl Change for UpdateTrigger {
     async fn apply_no_sse(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        if !trigger_exists(&self.trigger.name, &mut transaction).await? {
-            return Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Trigger {} does not exist. Use the create command to create the trigger.",
-                    self.trigger.name
-                ),
-            }));
-        }
-
-        let existing_trigger = load_trigger(&mut transaction, &self.trigger.name).await?;
+        let existing_trigger = load_trigger(&mut transaction, &self.trigger.name)
+            .await
+            .map_err(|e| {
+                RuntimeError::from_msg(format!("Could not load current trigger definition: {e}"))
+            })?;
 
         // Tear down
         drop_notification_data_function(&self.trigger, &mut transaction).await?;
@@ -1412,7 +1408,7 @@ impl Change for UpdateTrigger {
         set_thresholds(&self.trigger, &mut transaction).await?;
 
         set_enabled(&mut transaction, &self.trigger.name, self.trigger.enabled).await?;
-        
+
         transaction.commit().await?;
 
         self.apply_no_sse(client).await
