@@ -1,10 +1,10 @@
 use super::error::Error;
-use std::fmt::Debug;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::marker::{Send, Sync};
 use tokio_postgres::Client;
-use serde::{Deserialize, Serialize};
 
 #[typetag::serde(tag = "type")]
 pub trait Changed: erased_serde::Serialize + Display + Send + Sync {
@@ -71,7 +71,7 @@ pub trait Change: fmt::Display + Send + Sync + Debug + erased_serde::Serialize {
         }
     }
 
-    fn remove_sse_changes(&mut self) -> () {}
+    fn remove_sse_changes(&mut self) {}
 }
 
 #[derive(Serialize, Deserialize, Debug)]
