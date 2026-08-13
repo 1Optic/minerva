@@ -57,8 +57,7 @@ impl fmt::Debug for StageTrendsForDeletion {
             f,
             "StageTrendsForDeletion(TrendStorePart({}), {})",
             self.trend_store_part_name,
-            self
-                .trends
+            self.trends
                 .iter()
                 .map(|t| format!("'{}'", t))
                 .collect::<Vec<String>>()
@@ -369,8 +368,7 @@ impl fmt::Debug for RemoveTrends {
             f,
             "RemoveTrends(TrendStorePart({}), {})",
             self.trend_store_part_name,
-            self
-                .trends
+            self.trends
                 .iter()
                 .map(|t| format!("'{}'", t))
                 .collect::<Vec<String>>()
@@ -489,8 +487,7 @@ impl fmt::Debug for AddTrends {
             f,
             "AddTrends(TrendStorePart({}), {})",
             self.trend_store_part_name,
-            self
-                .trends
+            self.trends
                 .iter()
                 .map(|t| format!("{}", t))
                 .collect::<Vec<String>>()

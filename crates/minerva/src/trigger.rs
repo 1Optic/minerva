@@ -702,10 +702,7 @@ async fn create_kpi_function<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error creating KPI function: {e}")))?;
 
-    Ok(format!(
-        "Added KPI function for trigger '{}'",
-        trigger.name
-    ))
+    Ok(format!("Added KPI function for trigger '{}'", trigger.name))
 }
 
 async fn create_rule<T: GenericClient + Sync + Send>(
@@ -1830,12 +1827,8 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
     )
     .await?;
 
-    let data_function_source = load_function_src(
-        conn,
-        "trigger_rule",
-        &format!("{}_notification_data", name),
-    )
-    .await?;
+    let data_function_source =
+        load_function_src(conn, "trigger_rule", &format!("{}_notification_data", name)).await?;
 
     let condition_function_source = load_function_src(conn, "trigger_rule", name).await?;
 

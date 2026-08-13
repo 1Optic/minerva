@@ -2178,11 +2178,7 @@ pub struct AddTrendMaterialization {
 
 impl fmt::Display for AddTrendMaterialization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "AddTrendMaterialization({})",
-            self.trend_materialization
-        )
+        write!(f, "AddTrendMaterialization({})", self.trend_materialization)
     }
 }
 
@@ -2267,10 +2263,7 @@ impl Change for RemoveTrendMaterialization {
             .await
             .map_err(|e| {
                 Error::Runtime(RuntimeError {
-                    msg: format!(
-                        "Error loading trend materialization '{}': {}",
-                        self.name, e
-                    ),
+                    msg: format!("Error loading trend materialization '{}': {}", self.name, e),
                 })
             })?;
 

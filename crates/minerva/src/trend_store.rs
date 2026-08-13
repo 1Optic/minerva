@@ -2220,10 +2220,7 @@ pub async fn analyze_trend_store_part(
 
     let max_expressions_part = max_expressions.join(", ");
 
-    let query = format!(
-        "SELECT {} FROM trend.\"{}\" p ",
-        max_expressions_part, name
-    );
+    let query = format!("SELECT {} FROM trend.\"{}\" p ", max_expressions_part, name);
 
     let row = client.query_one(&query, &[]).await.map_err(|e| {
         DatabaseError::from_msg(format!("Could not analyze trend store part '{name}': {e}"))
