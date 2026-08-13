@@ -14,7 +14,7 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   TESTCONTAINERS_HOST_OVERRIDE: "host.docker.internal"
 
-image: "harbor.hendrikx-itc.nl/1optic/rust-ci:1.95.0.0@sha256:794278e69ec7190dbf95c6f4fbaec8527d5e030a498abbac2f5bca2ab70d9d55"
+image: harbor.hendrikx-itc.nl/1optic/rust-ci:1.97.1
 
 stages:
   - analyze
@@ -25,7 +25,7 @@ stages:
 lint-openapi:
   stage: analyze
   image:
-    name: redocly/cli@sha256:85551648194a5ceb73db0ebda84d643891de0792445a16fa560903b7057b9135
+    name: redocly/cli:2.46.0
     entrypoint: [""]
   script:
     - redocly lint api-spec/openapi.yaml
