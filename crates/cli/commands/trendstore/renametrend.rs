@@ -34,7 +34,7 @@ impl TrendStoreRenameTrend {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error renaming trend '{}' of trend store part '{}': {e}",
-                        &self.from, &self.trend_store_part
+                        self.from, self.trend_store_part
                     ),
                 })
             })?;
@@ -43,7 +43,7 @@ impl TrendStoreRenameTrend {
             return Err(Error::Runtime(RuntimeError {
                 msg: format!(
                     "No trend found matching trend store part name '{}' and name '{}'",
-                    &self.trend_store_part, &self.from
+                    self.trend_store_part, self.from
                 ),
             }));
         }

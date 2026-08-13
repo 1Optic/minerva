@@ -47,7 +47,7 @@ impl TrendStoreDiff {
                     println!("Differences with the database");
 
                     for change in changes {
-                        println!("{}", &change);
+                        println!("{}", change);
                     }
                 }
 

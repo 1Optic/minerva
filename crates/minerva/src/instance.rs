@@ -391,7 +391,7 @@ impl MinervaInstance {
                 let node = GraphNode::TrendStorePart(trend_store_part.name.clone());
                 let node_idx = graph.add_node(node);
 
-                table_node_map.insert(format!("trend.{}", &trend_store_part.name), node_idx);
+                table_node_map.insert(format!("trend.{}", trend_store_part.name), node_idx);
             }
         }
 
@@ -403,13 +403,13 @@ impl MinervaInstance {
             let node = GraphNode::AttributeStore(attribute_store_name.clone());
             let node_idx = graph.add_node(node);
 
-            table_node_map.insert(format!("attribute.{}", &attribute_store_name), node_idx);
+            table_node_map.insert(format!("attribute.{}", attribute_store_name), node_idx);
         }
 
         for relation in &self.relations {
             let relation_node_index = graph.add_node(GraphNode::Relation(relation.name.clone()));
 
-            table_node_map.insert(format!("relation.{}", &relation.name), relation_node_index);
+            table_node_map.insert(format!("relation.{}", relation.name), relation_node_index);
 
             if let Some(view_src) = &relation.query {
                 // Parse the SQL with the relation definition to find what tables it has as
@@ -947,8 +947,8 @@ impl MinervaInstance {
             println!("* {change}");
 
             match change.apply(client).await {
-                Ok(message) => println!("> {}", &message),
-                Err(err) => println!("! Error applying change: {}", &err),
+                Ok(message) => println!("> {}", message),
+                Err(err) => println!("! Error applying change: {}", err),
             }
         }
 
@@ -1342,7 +1342,7 @@ async fn load_sql(client: &mut Client, path: &PathBuf) -> Result<(), String> {
         Err(e) => {
             return Err(format!(
                 "Could not open sql file '{}': {}",
-                &path.to_string_lossy(),
+                path.to_string_lossy(),
                 e
             ));
         }
@@ -1425,7 +1425,7 @@ where
         match entry {
             Ok(path) => {
                 if path.is_dir() {
-                    println!("Directory '{}'", &path.to_string_lossy());
+                    println!("Directory '{}'", path.to_string_lossy());
                 } else {
                     match path.extension() {
                         Some(ext) => {
@@ -1433,12 +1433,12 @@ where
                             match ext_str {
                                 "sql" => match load_sql(client, &path).await {
                                     Ok(()) => {
-                                        println!("Executed sql '{}'", &path.to_string_lossy())
+                                        println!("Executed sql '{}'", path.to_string_lossy())
                                     }
                                     Err(e) => {
                                         println!(
                                             "Error executing sql '{}': {}",
-                                            &path.to_string_lossy(),
+                                            path.to_string_lossy(),
                                             e
                                         );
                                     }
@@ -1447,14 +1447,14 @@ where
                                     Ok(msg) => {
                                         println!(
                                             "Executed '{}' with psql: {}",
-                                            &path.to_string_lossy(),
+                                            path.to_string_lossy(),
                                             msg
                                         );
                                     }
                                     Err(e) => {
                                         println!(
                                             "Error executing '{}' with psql: {}",
-                                            &path.to_string_lossy(),
+                                            path.to_string_lossy(),
                                             e
                                         );
                                     }
@@ -1466,7 +1466,7 @@ where
                                         Err(e) => {
                                             println!(
                                                 "Error retrieving meta data for '{}': {}",
-                                                &path.to_string_lossy(),
+                                                path.to_string_lossy(),
                                                 e
                                             );
                                         }
@@ -1480,14 +1480,14 @@ where
                                                     Ok(msg) => {
                                                         println!(
                                                             "Executed '{}': {}",
-                                                            &path.to_string_lossy(),
+                                                            path.to_string_lossy(),
                                                             msg
                                                         );
                                                     }
                                                     Err(e) => {
                                                         println!(
                                                             "Error executing '{}': {}",
-                                                            &path.to_string_lossy(),
+                                                            path.to_string_lossy(),
                                                             e
                                                         );
                                                     }

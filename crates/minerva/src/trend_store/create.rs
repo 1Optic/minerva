@@ -346,7 +346,7 @@ pub async fn create_staging_table<T: GenericClient>(
     trend_store_part: &TrendStorePart,
 ) -> Result<(), CreateTrendStoreError> {
     let staging_table_schema = "trend";
-    let staging_table_name = escape_identifier(&format!("{}_staging", &trend_store_part.name));
+    let staging_table_name = escape_identifier(&format!("{}_staging", trend_store_part.name));
 
     let mut column_specs: Vec<String> = trend_store_part
         .base_columns()

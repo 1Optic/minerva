@@ -35,7 +35,7 @@ impl InitializeOpt {
             create_database(&client, database_name).await.map_err(|e| {
                 Error::Database(minerva::error::DatabaseError::from_msg(format!(
                     "Could not create database '{}': {e}",
-                    &database_name
+                    database_name
                 )))
             })?;
 
@@ -92,7 +92,7 @@ impl InitializeOpt {
         if !self.instance_root.is_dir() {
             return Err(Error::Configuration(ConfigurationError::from_msg(format!(
                 "Not a valid directory: '{}'",
-                &self.instance_root.to_string_lossy()
+                self.instance_root.to_string_lossy()
             ))));
         }
 

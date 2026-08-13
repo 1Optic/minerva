@@ -97,10 +97,10 @@ impl RevertOpt {
                                 let mut serializer = Box::new(<dyn Serializer>::erase(json));
                                 let _ = changed.erased_serialize(&mut serializer);
 
-                                println!("> {}", &changed);
+                                println!("> {}", changed);
                             }
                             Err(err) => {
-                                println!("! Error applying change: {}", &err);
+                                println!("! Error applying change: {}", err);
                             }
                         }
                     }

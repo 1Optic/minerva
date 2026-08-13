@@ -26,7 +26,7 @@ impl Cmd for TrendStoreCheck {
             if count > 1 {
                 println!(
                     "Error: {} trend store parts with name '{}'",
-                    count, &trend_store_part.name
+                    count, trend_store_part.name
                 );
             }
         }

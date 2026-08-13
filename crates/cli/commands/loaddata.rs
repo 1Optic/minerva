@@ -60,14 +60,14 @@ impl LoadDataOpt {
             Err(e) => {
                 println!(
                     "Could not load CSV file '{}': {}",
-                    &self.file.as_path().to_string_lossy(),
+                    self.file.as_path().to_string_lossy(),
                     e
                 );
             }
             Ok(()) => {
                 println!(
                     "Finished processing file '{}'",
-                    &self.file.as_path().to_string_lossy()
+                    self.file.as_path().to_string_lossy()
                 );
             }
         }

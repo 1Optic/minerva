@@ -344,7 +344,7 @@ pub(super) async fn delete_entity_set(pool: Data<Pool>, id: Path<i32>) -> impl R
                     match result {
                         Ok(_) => HttpResponse::Ok().json(Success {
                             code: 200,
-                            message: format!("Entity set number {} deleted", &es_id),
+                            message: format!("Entity set number {} deleted", es_id),
                         }),
                         Err(e) => {
                             let mut messages = Map::new();

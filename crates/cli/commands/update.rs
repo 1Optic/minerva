@@ -104,7 +104,7 @@ impl UpdateOpt {
                             return Err(Error::Configuration(ConfigurationError {
                                 msg: format!(
                                     "Environment variable '{}' could not be read: {}",
-                                    &ENV_MINERVA_INSTANCE_ROOT, e
+                                    ENV_MINERVA_INSTANCE_ROOT, e
                                 ),
                             }));
                         }
@@ -276,10 +276,10 @@ async fn update(
                     let mut serializer = Box::new(<dyn Serializer>::erase(json));
                     let _ = changed.erased_serialize(&mut serializer);
 
-                    println!("> {}", &changed);
+                    println!("> {}", changed);
                 }
                 Err(err) => {
-                    println!("! Error applying change: {}", &err);
+                    println!("! Error applying change: {}", err);
                 }
             }
         }
@@ -330,10 +330,10 @@ pub async fn update_variation(
                     let mut serializer = Box::new(<dyn Serializer>::erase(json));
                     let _ = changed.erased_serialize(&mut serializer);
 
-                    println!("> {}", &changed);
+                    println!("> {}", changed);
                 }
                 Err(err) => {
-                    println!("! Error applying change: {}", &err);
+                    println!("! Error applying change: {}", err);
                 }
             }
         }

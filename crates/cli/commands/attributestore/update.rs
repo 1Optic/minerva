@@ -45,7 +45,7 @@ impl AttributeStoreUpdate {
 
                 match apply_result {
                     Ok(_) => {
-                        println!("{}", &change);
+                        println!("{}", change);
                     }
                     Err(e) => {
                         println!("Error applying update: {e}");

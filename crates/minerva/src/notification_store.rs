@@ -38,7 +38,7 @@ impl fmt::Display for AddNotificationStoreAttributes {
         write!(
             f,
             "AddAttributes({}, {:?})",
-            &self.notification_store, &self.attributes
+            self.notification_store, self.attributes
         )
     }
 }
@@ -94,7 +94,7 @@ impl Display for AddedAttributes {
         write!(
             f,
             "Added attributes to notification store '{}'",
-            &self.notification_store
+            self.notification_store
         )
     }
 }
@@ -113,7 +113,7 @@ pub struct NotificationStoreRef {
 
 impl Display for NotificationStoreRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NotificationStore({})", &self.data_source)
+        write!(f, "NotificationStore({})", self.data_source)
     }
 }
 
@@ -167,7 +167,7 @@ impl NotificationStore {
 
 impl fmt::Display for NotificationStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NotificationStore({})", &self.data_source,)
+        write!(f, "NotificationStore({})", self.data_source,)
     }
 }
 
@@ -179,7 +179,7 @@ pub struct AddNotificationStore {
 
 impl fmt::Display for AddNotificationStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddNotificationStore({})", &self.notification_store)
+        write!(f, "AddNotificationStore({})", self.notification_store)
     }
 }
 
@@ -194,7 +194,7 @@ impl Change for AddNotificationStore {
             self.notification_store
                 .attributes
                 .iter()
-                .map(|att| format!("('{}', '{}', '')", &att.name, &att.data_type))
+                .map(|att| format!("('{}', '{}', '')", att.name, att.data_type))
                 .collect::<Vec<String>>()
                 .join(",")
         );
@@ -221,7 +221,7 @@ pub struct AddedNotificationStore {
 
 impl Display for AddedNotificationStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Created attribute store '{}'", &self.notification_store)
+        write!(f, "Created attribute store '{}'", self.notification_store)
     }
 }
 

@@ -134,7 +134,7 @@ async fn get_source<T: GenericClient + Send + Sync>(
         .map_err(|e| {
             format!(
                 "Error searching for source trend store part for trend '{}': {e}",
-                &trend_name
+                trend_name
             )
         })?;
 
@@ -173,9 +173,9 @@ async fn get_source<T: GenericClient + Send + Sync>(
         .map_err(|_| {
             format!(
                 "Could not find source trend store part for trend '{}', granularity '{}', entity type '{}'",
-                &trend_name,
-                &*DEFAULT_GRANULARITY,
-                &entity_type,
+                trend_name,
+                *DEFAULT_GRANULARITY,
+                entity_type,
             )
         })?;
 
@@ -305,7 +305,7 @@ impl KpiImplementedData {
     fn target_trend_store_part(&self, granularity: &str) -> String {
         format!(
             "{}-{}_{}_{}",
-            *DATASOURCE, &self.tsp_name, &self.entity_type, granularity
+            *DATASOURCE, self.tsp_name, self.entity_type, granularity
         )
     }
 
@@ -608,7 +608,7 @@ pub(super) async fn get_kpi(
         .await
         .map_err(|_| Error {
             code: 404,
-            message: format!("KPI {} not found", &kpiname),
+            message: format!("KPI {} not found", kpiname),
         })?;
 
     let materialization_id: i32 = kpi.get(5);
@@ -805,7 +805,7 @@ pub(super) async fn delete_kpi(
         .await
         .map_err(|_| ServiceError {
             kind: ServiceErrorKind::NotFound,
-            message: format!("KPI '{}' not found", &kpiname),
+            message: format!("KPI '{}' not found", kpiname),
         })?;
 
     let materialization_id: i32 = kpi.get(5);

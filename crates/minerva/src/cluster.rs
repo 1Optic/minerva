@@ -625,7 +625,7 @@ impl MinervaCluster {
 
         debug!(
             "Setting Citus coordinator host address: {}:{}",
-            &coordinator_addr, &postgresql_port
+            coordinator_addr, postgresql_port
         );
 
         let mut workers = Vec::new();

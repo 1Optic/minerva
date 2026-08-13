@@ -23,7 +23,7 @@ pub struct EntityType {
 
 impl fmt::Display for EntityType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EntityType({})", &self.name)
+        write!(f, "EntityType({})", self.name)
     }
 }
 
@@ -68,7 +68,7 @@ impl fmt::Display for AddPrimaryAlias {
         writeln!(
             f,
             "AddPrimaryAlias({}, {}):",
-            &self.entity_type, &self.primary_alias
+            self.entity_type, self.primary_alias
         )?;
 
         Ok(())
@@ -90,7 +90,7 @@ impl Change for AddPrimaryAlias {
 
         let query = format!(
             "ALTER TABLE entity.\"{}\" ADD COLUMN primary_alias text GENERATED ALWAYS AS ({}) STORED",
-            &self.entity_type, &self.primary_alias
+            self.entity_type, self.primary_alias
         );
 
         transaction.execute(&query, &[]).await?;
@@ -136,7 +136,7 @@ pub struct RemovePrimaryAlias {
 
 impl fmt::Display for RemovePrimaryAlias {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "RemovePrimaryAlias({}):", &self.entity_type)?;
+        writeln!(f, "RemovePrimaryAlias({}):", self.entity_type)?;
 
         Ok(())
     }
@@ -166,7 +166,7 @@ impl Change for RemovePrimaryAlias {
 
         let query = format!(
             "ALTER TABLE entity.\"{}\" DROP COLUMN primary_alias",
-            &self.entity_type
+            self.entity_type
         );
 
         transaction.execute(&query, &[]).await?;
@@ -219,7 +219,7 @@ impl fmt::Display for ChangePrimaryAlias {
         writeln!(
             f,
             "ChangePrimaryAlias({}, {}):",
-            &self.entity_type, &self.primary_alias
+            self.entity_type, self.primary_alias
         )?;
 
         Ok(())
@@ -241,7 +241,7 @@ impl Change for ChangePrimaryAlias {
 
         let query = format!(
             "ALTER TABLE entity.\"{}\" ALTER COLUMN primary_alias SET EXPRESSION AS ({})",
-            &self.entity_type, &self.primary_alias
+            self.entity_type, self.primary_alias
         );
 
         transaction.execute(&query, &[]).await?;
@@ -325,7 +325,7 @@ pub struct AddEntityType {
 
 impl fmt::Display for AddEntityType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddEntityType({})", &self.entity_type)
+        write!(f, "AddEntityType({})", self.entity_type)
     }
 }
 
@@ -355,7 +355,7 @@ pub struct AddedEntityType {
 
 impl Display for AddedEntityType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Created entity_type '{}'", &self.entity_type)
+        write!(f, "Created entity_type '{}'", self.entity_type)
     }
 }
 

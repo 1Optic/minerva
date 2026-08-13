@@ -109,7 +109,7 @@ impl TrendViewMaterializationRef {
     ) -> Result<(), Error> {
         let query = format!(
             "CREATE VIEW trend.{} AS {}",
-            &escape_identifier(&materialization_view_name(&self.target_trend_store_part)),
+            escape_identifier(&materialization_view_name(&self.target_trend_store_part)),
             view,
         );
 
@@ -188,7 +188,7 @@ impl TrendViewMaterialization {
     ) -> Result<(), Error> {
         let query = format!(
             "CREATE VIEW trend.{} AS {}",
-            &escape_identifier(&materialization_view_name(&self.target_trend_store_part)),
+            escape_identifier(&materialization_view_name(&self.target_trend_store_part)),
             self.view,
         );
 
@@ -206,7 +206,7 @@ impl TrendViewMaterialization {
     ) -> Result<(), Error> {
         let view_ident = format!(
             "trend.{}",
-            &escape_identifier(&materialization_view_name(&self.target_trend_store_part))
+            escape_identifier(&materialization_view_name(&self.target_trend_store_part))
         );
 
         let query = concat!(
@@ -358,7 +358,7 @@ pub async fn drop_materialization_view<T: GenericClient + Send + Sync>(
 ) -> Result<(), Error> {
     let query = format!(
         "DROP VIEW IF EXISTS trend.{}",
-        &escape_identifier(&materialization_view_name(materialization_name)),
+        escape_identifier(&materialization_view_name(materialization_name)),
     );
 
     match client.execute(query.as_str(), &[]).await {
@@ -528,7 +528,7 @@ impl fmt::Display for UpdateTrendViewMaterializationAttributes {
         write!(
             f,
             "UpdateTrendViewMaterializationAttributes({})",
-            &self.trend_view_materialization,
+            self.trend_view_materialization,
         )
     }
 }
@@ -662,7 +662,7 @@ impl fmt::Display for UpdateTrendFunctionMaterializationAttributes {
         write!(
             f,
             "UpdateTrendFunctionMaterializationAttributes({})",
-            &self.trend_function_materialization.target_trend_store_part,
+            self.trend_function_materialization.target_trend_store_part,
         )
     }
 }
@@ -680,7 +680,7 @@ impl fmt::Display for UpdateView {
         write!(
             f,
             "UpdateView({}, {})",
-            &self.trend_view_materialization.target_trend_store_part,
+            self.trend_view_materialization.target_trend_store_part,
             materialization_view_name(&self.trend_view_materialization.target_trend_store_part)
         )
     }
@@ -767,7 +767,7 @@ impl InformationOption for ViewDiff {
 
 impl Display for ViewDiff {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -824,8 +824,8 @@ impl fmt::Display for UpdateFunction {
         write!(
             f,
             "UpdateFunction({}, {})",
-            &self.trend_function_materialization.target_trend_store_part,
-            &self.trend_function_materialization.target_trend_store_part
+            self.trend_function_materialization.target_trend_store_part,
+            self.trend_function_materialization.target_trend_store_part
         )
     }
 }
@@ -848,7 +848,7 @@ impl InformationOption for FunctionDiff {
 
 impl Display for FunctionDiff {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -865,7 +865,7 @@ impl Display for UpdatedFunction {
         write!(
             f,
             "Updated function '{}'",
-            &self.trend_function_materialization.target_trend_store_part
+            self.trend_function_materialization.target_trend_store_part
         )
     }
 }
@@ -892,10 +892,10 @@ impl TrendMaterializationFunction {
     pub fn function_definition(&self, name: &str) -> String {
         format!(
             "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS {} AS $function$\n{}\n$function$ LANGUAGE {}",
-            &escape_identifier(name),
-            &self.return_type,
-            &self.src.trim(),
-            &self.language,
+            escape_identifier(name),
+            self.return_type,
+            self.src.trim(),
+            self.language,
         )
     }
 }
@@ -926,7 +926,7 @@ impl TrendFunctionMaterializationRef {
     ) -> Result<(), Error> {
         let query = format!(
             "DROP FUNCTION trend.{}(timestamp with time zone)",
-            &escape_identifier(&self.target_trend_store_part),
+            escape_identifier(&self.target_trend_store_part),
         );
 
         client
@@ -1266,12 +1266,12 @@ impl fmt::Display for TrendMaterialization {
             TrendMaterialization::View(view_materialization) => write!(
                 f,
                 "TrendViewMaterialization('{}')",
-                &view_materialization.target_trend_store_part
+                view_materialization.target_trend_store_part
             ),
             TrendMaterialization::Function(function_materialization) => write!(
                 f,
                 "TrendFunctionMaterialization('{}')",
-                &function_materialization.target_trend_store_part
+                function_materialization.target_trend_store_part
             ),
         }
     }
@@ -1527,7 +1527,7 @@ pub fn load_materializations_from(
             Ok(path) => match trend_materialization_from_config(&path) {
                 Ok(materialization) => Some(materialization),
                 Err(e) => {
-                    println!("Error loading materialization '{}': {}", &path.display(), e);
+                    println!("Error loading materialization '{}': {}", path.display(), e);
                     None
                 }
             },
@@ -1595,7 +1595,7 @@ pub async fn load_materialization<T: GenericClient + Send + Sync>(
     let old_data_stability_delay_str: Option<String> = row.get(9);
     let old_data_threshold_str: Option<String> = row.get(10);
 
-    let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
+    let fingerprint_function_name = format!("{}_fingerprint", target_trend_store_part);
     let (_fingerprint_function_lang, fingerprint_function_def) =
         get_function_def(conn, &fingerprint_function_name)
             .await
@@ -1729,7 +1729,7 @@ async fn trend_materialization_from_row<T: GenericClient + Send + Sync>(
     let old_data_threshold_str: Option<String> = row.get(9);
     let old_data_stability_delay_str: Option<String> = row.get(10);
 
-    let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
+    let fingerprint_function_name = format!("{}_fingerprint", target_trend_store_part);
     let (_fingerprint_function_lang, fingerprint_function_def) =
         get_function_def(client, &fingerprint_function_name)
             .await
@@ -1913,7 +1913,7 @@ pub async fn load_materializations<T: GenericClient + Send + Sync>(
         let old_data_threshold_str: Option<String> = row.get(9);
         let old_data_stability_delay_str: Option<String> = row.get(10);
 
-        let fingerprint_function_name = format!("{}_fingerprint", &target_trend_store_part);
+        let fingerprint_function_name = format!("{}_fingerprint", target_trend_store_part);
         let (_fingerprint_function_lang, fingerprint_function_def) =
             get_function_def(conn, &fingerprint_function_name)
                 .await
@@ -2181,7 +2181,7 @@ impl fmt::Display for AddTrendMaterialization {
         write!(
             f,
             "AddTrendMaterialization({})",
-            &self.trend_materialization
+            self.trend_materialization
         )
     }
 }
@@ -2199,7 +2199,7 @@ impl Change for AddTrendMaterialization {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error adding trend materialization '{}': {}",
-                        &self.trend_materialization, e
+                        self.trend_materialization, e
                     ),
                 })
             })?;
@@ -2231,7 +2231,7 @@ impl Display for AddedTrendMaterialization {
         write!(
             f,
             "Added trend materialization '{}'",
-            &self.trend_materialization
+            self.trend_materialization
         )
     }
 }
@@ -2253,7 +2253,7 @@ pub struct RemoveTrendMaterialization {
 
 impl fmt::Display for RemoveTrendMaterialization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveTrendMaterialization({})", &self.name)
+        write!(f, "RemoveTrendMaterialization({})", self.name)
     }
 }
 
@@ -2269,7 +2269,7 @@ impl Change for RemoveTrendMaterialization {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error loading trend materialization '{}': {}",
-                        &self.name, e
+                        self.name, e
                     ),
                 })
             })?;
@@ -2280,7 +2280,7 @@ impl Change for RemoveTrendMaterialization {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error removing trend materialization '{}': {}",
-                        &self.name, e
+                        self.name, e
                     ),
                 })
             })?;
@@ -2304,7 +2304,7 @@ impl Display for RemovedTrendMaterialization {
         write!(
             f,
             "Removed trend materialization '{}'",
-            &self.trend_materialization.name()
+            self.trend_materialization.name()
         )
     }
 }
@@ -2329,7 +2329,7 @@ impl fmt::Display for UpdateTrendMaterialization {
         write!(
             f,
             "UpdateTrendMaterialization({})",
-            &self.trend_materialization
+            self.trend_materialization
         )
     }
 }
@@ -2360,7 +2360,7 @@ impl Change for UpdateTrendMaterialization {
                 return Err(Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error updating trend materialization '{}': {}",
-                        &self.trend_materialization, e
+                        self.trend_materialization, e
                     ),
                 }));
             }
@@ -2385,7 +2385,7 @@ impl Display for UpdatedTrendMaterialization {
         write!(
             f,
             "Updated trend materialization '{}'",
-            &self.new_trend_materialization
+            self.new_trend_materialization
         )
     }
 }
@@ -2578,7 +2578,7 @@ async fn connect_materialization_sources<T: GenericClient + Send + Sync>(
                             ),
                         )?;
 
-                let mapping_function = format!("{}(timestamptz)", &trend_source.mapping_function);
+                let mapping_function = format!("{}(timestamptz)", trend_source.mapping_function);
 
                 let insert_count = client
                     .execute(

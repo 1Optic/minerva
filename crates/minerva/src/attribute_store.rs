@@ -55,7 +55,7 @@ impl From<&Attribute> for AttributeDescr {
 
 impl fmt::Display for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Attribute({}: {})", &self.name, &self.data_type)
+        write!(f, "Attribute({}: {})", self.name, self.data_type)
     }
 }
 
@@ -75,8 +75,8 @@ impl fmt::Display for AddAttributeStoreAttributes {
         writeln!(
             f,
             "AddAttributes({}, {}):",
-            &self.attribute_store,
-            &self.attributes.len()
+            self.attribute_store,
+            self.attributes.len()
         )?;
 
         for att in &self.attributes {
@@ -92,7 +92,7 @@ impl fmt::Debug for AddAttributeStoreAttributes {
         write!(
             f,
             "AddAttributes({}, {:?})",
-            &self.attribute_store, &self.attributes
+            self.attribute_store, self.attributes
         )
     }
 }
@@ -179,8 +179,8 @@ impl fmt::Display for RemoveAttributes {
         writeln!(
             f,
             "RemoveAttributes({}, {})",
-            &self.attribute_store,
-            &self.attributes.len()
+            self.attribute_store,
+            self.attributes.len()
         )?;
 
         for att in &self.attributes {
@@ -196,7 +196,7 @@ impl fmt::Debug for RemoveAttributes {
         write!(
             f,
             "RemoveAttributes({}, {:?})",
-            &self.attribute_store, &self.attributes
+            self.attribute_store, self.attributes
         )
     }
 }
@@ -269,8 +269,8 @@ impl Display for RemovedAttributes {
         write!(
             f,
             "Removed {} attributes from attribute store '{}'",
-            &self.attributes.len(),
-            &self.attribute_store
+            self.attributes.len(),
+            self.attribute_store
         )
     }
 }
@@ -298,7 +298,7 @@ impl InformationOption for AttributeRemoveValueInformation {
     }
 
     async fn retrieve(&self, client: &mut Client) -> Vec<String> {
-        let attribute_store_name = format!("{}_{}", &self.data_source, &self.entity_type);
+        let attribute_store_name = format!("{}_{}", self.data_source, self.entity_type);
         let expressions: Vec<String> = self
             .attribute_names
             .iter()
@@ -350,7 +350,7 @@ impl InformationOption for AttributeRemoveValueInformation {
 
 impl Display for AttributeRemoveValueInformation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -367,7 +367,7 @@ impl fmt::Display for ChangeAttribute {
         write!(
             f,
             "ChangeAttribute({}, {})",
-            &self.attribute_store, &self.attribute_name
+            self.attribute_store, self.attribute_name
         )
     }
 }
@@ -377,7 +377,7 @@ impl fmt::Debug for ChangeAttribute {
         write!(
             f,
             "ChangeAttribute({}, {})",
-            &self.attribute_store, &self.attribute_name
+            self.attribute_store, self.attribute_name
         )
     }
 }
@@ -450,7 +450,7 @@ impl Display for ChangedAttributeDataType {
         write!(
             f,
             "Changed type of attribute '{}' in store '{}'",
-            &self.attribute_name, &self.attribute_store
+            self.attribute_name, self.attribute_store
         )
     }
 }
@@ -482,7 +482,7 @@ impl fmt::Display for AttributeStoreRef {
         write!(
             f,
             "AttributeStore({}, {})",
-            &self.data_source, &self.entity_type
+            self.data_source, self.entity_type
         )
     }
 }
@@ -577,7 +577,7 @@ impl fmt::Display for AttributeStore {
         write!(
             f,
             "AttributeStore({}, {})",
-            &self.data_source, &self.entity_type
+            self.data_source, self.entity_type
         )
     }
 }
@@ -590,7 +590,7 @@ pub struct AddAttributeStore {
 
 impl fmt::Display for AddAttributeStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddAttributeStore({})", &self.attribute_store)
+        write!(f, "AddAttributeStore({})", self.attribute_store)
     }
 }
 
@@ -627,7 +627,7 @@ impl Change for AddAttributeStore {
         .map_err(|e| {
             DatabaseError::from_msg(format!(
                 "Error creating attribute store '{}': {e}",
-                &self.attribute_store
+                self.attribute_store
             ))
         })?;
 
@@ -647,7 +647,7 @@ pub struct AddedAttributeStore {
 
 impl Display for AddedAttributeStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Created attribute store '{}'", &self.attribute_store)
+        write!(f, "Created attribute store '{}'", self.attribute_store)
     }
 }
 
@@ -668,7 +668,7 @@ pub struct RemoveAttributeStore {
 
 impl Display for RemoveAttributeStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveAttributeStore({})", &self.attribute_store)
+        write!(f, "RemoveAttributeStore({})", self.attribute_store)
     }
 }
 

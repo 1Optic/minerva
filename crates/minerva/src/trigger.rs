@@ -128,7 +128,7 @@ pub struct FileTrigger {
 
 impl fmt::Display for Trigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Trigger({})", &self.name,)
+        write!(f, "Trigger({})", self.name,)
     }
 }
 
@@ -153,9 +153,9 @@ impl Trigger {
     fn kpi_function(&self) -> String {
         format!(
             "CREATE OR REPLACE FUNCTION trigger_rule.{}(timestamp with time zone) RETURNS SETOF trigger_rule.{} AS $function$\n{}\n$function$ LANGUAGE plpgsql STABLE",
-            escape_identifier(&format!("{}_kpi", &self.name)),
-            escape_identifier(&format!("{}_kpi", &self.name)),
-            &self.kpi_function,
+            escape_identifier(&format!("{}_kpi", self.name)),
+            escape_identifier(&format!("{}_kpi", self.name)),
+            self.kpi_function,
         )
     }
 
@@ -241,11 +241,11 @@ impl Trigger {
         let regex = Regex::new(r"(?s)SELECT\s*\(.*\)").unwrap();
         let this_condition = match regex.captures(&self.condition) {
             Some(_capture) => self.condition.clone().trim().to_string(),
-            None => format!("SELECT ({})", &self.condition.trim().to_string()),
+            None => format!("SELECT ({})", self.condition.trim()),
         };
         let other_condition = match regex.captures(&other.condition) {
             Some(_capture) => other.condition.clone().trim().to_string(),
-            None => format!("SELECT ({})", &other.condition.trim().to_string()),
+            None => format!("SELECT ({})", other.condition.trim()),
         };
         let this_condition_json = parse_sql(&this_condition).unwrap();
         let other_condition_json = parse_sql(&other_condition).unwrap();
@@ -255,11 +255,11 @@ impl Trigger {
 
         let this_weight = match regex.captures(&self.weight) {
             Some(_capture) => self.weight.clone().trim().to_string(),
-            None => format!("SELECT ({})", &self.weight.trim().to_string()),
+            None => format!("SELECT ({})", self.weight.trim()),
         };
         let other_weight = match regex.captures(&other.weight) {
             Some(_capture) => other.weight.clone().trim().to_string(),
-            None => format!("SELECT ({})", &other.weight.trim().to_string()),
+            None => format!("SELECT ({})", other.weight.trim()),
         };
         let this_weight_json = parse_sql(&this_weight).unwrap();
         let other_weight_json = parse_sql(&other_weight).unwrap();
@@ -269,11 +269,11 @@ impl Trigger {
 
         let this_notification = match regex.captures(&self.notification) {
             Some(_capture) => self.notification.clone().trim().to_string(),
-            None => format!("SELECT ({})::text", &self.notification),
+            None => format!("SELECT ({})::text", self.notification),
         };
         let other_notification = match regex.captures(&other.notification) {
             Some(_capture) => other.notification.clone().trim().to_string(),
-            None => format!("SELECT ({})::text", &other.notification.trim().to_string()),
+            None => format!("SELECT ({})::text", other.notification.trim()),
         };
         let this_notification_json = parse_sql(&this_notification).unwrap();
         let other_notification_json = parse_sql(&other_notification).unwrap();
@@ -467,7 +467,7 @@ pub struct AddTrigger {
 
 impl fmt::Display for AddTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddTrigger({})", &self.trigger)
+        write!(f, "AddTrigger({})", self.trigger)
     }
 }
 
@@ -586,10 +586,10 @@ impl Display for AddedTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.check_result {
             Some(result) => {
-                write!(f, "Created trigger '{}': {}", &self.trigger_name, result)
+                write!(f, "Created trigger '{}': {}", self.trigger_name, result)
             }
             None => {
-                write!(f, "Created trigger '{}'", &self.trigger_name)
+                write!(f, "Created trigger '{}'", self.trigger_name)
             }
         }
     }
@@ -608,7 +608,7 @@ async fn create_type<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> Result<String, Error> {
-    let type_name = format!("{}_kpi", &trigger.name);
+    let type_name = format!("{}_kpi", trigger.name);
 
     let query = format!(
         "DROP TYPE IF EXISTS trigger_rule.{} CASCADE",
@@ -633,14 +633,14 @@ async fn create_type<T: GenericClient + Sync + Send>(
 
     let column_spec = cols
         .iter()
-        .map(|(name, data_type)| format!("{} {}", escape_identifier(name), &data_type))
+        .map(|(name, data_type)| format!("{} {}", escape_identifier(name), data_type))
         .collect::<Vec<String>>()
         .join(", ");
 
     let query = format!(
         "CREATE TYPE trigger_rule.{} AS ({})",
         escape_identifier(&type_name),
-        &column_spec,
+        column_spec,
     );
 
     client
@@ -648,7 +648,7 @@ async fn create_type<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error creating KPI type: {e}")))?;
 
-    Ok(format!("Added KPI type for trigger '{}'", &trigger.name))
+    Ok(format!("Added KPI type for trigger '{}'", trigger.name))
 }
 
 async fn cleanup_rule<T: GenericClient + Sync + Send>(
@@ -662,7 +662,7 @@ async fn cleanup_rule<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error cleaning up rule: {e}")))?;
 
-    Ok(format!("Cleaned up rule for trigger '{}'", &trigger.name))
+    Ok(format!("Cleaned up rule for trigger '{}'", trigger.name))
 }
 
 async fn rename_trigger<T: GenericClient + Sync + Send>(
@@ -679,7 +679,7 @@ async fn rename_trigger<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Renamed trigger '{}' to '{}'",
-        &old_name, &trigger.name
+        old_name, trigger.name
     ))
 }
 
@@ -687,14 +687,14 @@ async fn create_kpi_function<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> Result<String, Error> {
-    let function_name = format!("{}_kpi", &trigger.name);
-    let type_name = format!("{}_kpi", &trigger.name);
+    let function_name = format!("{}_kpi", trigger.name);
+    let type_name = format!("{}_kpi", trigger.name);
 
     let query = format!(
         "CREATE FUNCTION trigger_rule.{}(timestamp with time zone) RETURNS SETOF trigger_rule.{} AS $trigger${}$trigger$ LANGUAGE plpgsql STABLE;",
-        &escape_identifier(&function_name),
-        &escape_identifier(&type_name),
-        &trigger.kpi_function,
+        escape_identifier(&function_name),
+        escape_identifier(&type_name),
+        trigger.kpi_function,
     );
 
     client
@@ -704,7 +704,7 @@ async fn create_kpi_function<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Added KPI function for trigger '{}'",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -736,7 +736,7 @@ async fn create_rule<T: GenericClient + Sync + Send>(
     if !notification_store_exists(client, &trigger.notification_store).await? {
         return Err(Error::Configuration(ConfigurationError::from_msg(format!(
             "Error creating rule: No notification store found named '{}'",
-            &trigger.notification_store
+            trigger.notification_store
         ))));
     }
 
@@ -762,7 +762,7 @@ async fn create_rule<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error creating rule: {e}")))?;
 
-    Ok(format!("Added rule for trigger '{}'", &trigger.name))
+    Ok(format!("Added rule for trigger '{}'", trigger.name))
 }
 
 async fn setup_rule<T: GenericClient + Sync + Send>(
@@ -814,7 +814,7 @@ async fn setup_rule<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error creating rule: {e}")))?;
 
-    Ok(format!("Added rule for trigger '{}'", &trigger.name))
+    Ok(format!("Added rule for trigger '{}'", trigger.name))
 }
 
 async fn set_weight<T: GenericClient + Sync + Send>(
@@ -828,7 +828,7 @@ async fn set_weight<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting weight: {e}")))?;
 
-    Ok(format!("Set weight for trigger '{}'", &trigger.name))
+    Ok(format!("Set weight for trigger '{}'", trigger.name))
 }
 
 async fn set_tags<T: GenericClient + Sync + Send>(
@@ -843,7 +843,7 @@ async fn set_tags<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting tags: {e}")))?;
 
-    Ok(format!("Set tags for trigger '{}'", &trigger_name))
+    Ok(format!("Set tags for trigger '{}'", trigger_name))
 }
 
 async fn set_fingerprint_function<T: GenericClient + Sync + Send>(
@@ -853,7 +853,7 @@ async fn set_fingerprint_function<T: GenericClient + Sync + Send>(
     // Because fingerprint functions are currently not in use, this has not been implemented yet.
     Ok(format!(
         "Setting fingerprint function for trigger '{}' skipped",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -861,7 +861,7 @@ pub async fn set_thresholds<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> Result<String, Error> {
-    let function_name = format!("{}_set_thresholds", &trigger.name);
+    let function_name = format!("{}_set_thresholds", trigger.name);
     let function_args = trigger
         .thresholds
         .iter()
@@ -871,7 +871,7 @@ pub async fn set_thresholds<T: GenericClient + Sync + Send>(
 
     let query = format!(
         "SELECT trigger_rule.{}({})",
-        &escape_identifier(&function_name),
+        escape_identifier(&function_name),
         function_args,
     );
 
@@ -880,7 +880,7 @@ pub async fn set_thresholds<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting thresholds: {e}")))?;
 
-    Ok(format!("Set thresholds for trigger '{}'", &trigger.name))
+    Ok(format!("Set thresholds for trigger '{}'", trigger.name))
 }
 
 async fn set_condition<T: GenericClient + Sync + Send>(
@@ -894,7 +894,7 @@ async fn set_condition<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting condition: {e}")))?;
 
-    Ok(format!("Set condition for trigger '{}'", &trigger.name))
+    Ok(format!("Set condition for trigger '{}'", trigger.name))
 }
 
 async fn define_notification_message<T: GenericClient + Sync + Send>(
@@ -904,7 +904,7 @@ async fn define_notification_message<T: GenericClient + Sync + Send>(
     let query = "SELECT trigger.define_notification_message($1, $2)";
     debug!(
         "query: SELECT trigger.define_notification_message('{}', '{}')",
-        &trigger.name, &trigger.notification
+        trigger.name, trigger.notification
     );
 
     client
@@ -912,7 +912,7 @@ async fn define_notification_message<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting message: {e}")))?;
 
-    Ok(format!("Set message for trigger '{}'", &trigger.name))
+    Ok(format!("Set message for trigger '{}'", trigger.name))
 }
 
 async fn define_notification_data<T: GenericClient + Sync + Send>(
@@ -926,18 +926,18 @@ async fn define_notification_data<T: GenericClient + Sync + Send>(
         .await
         .map_err(|e| DatabaseError::from_msg(format!("Error setting data: {e}")))?;
 
-    Ok(format!("Set data for trigger '{}'", &trigger.name))
+    Ok(format!("Set data for trigger '{}'", trigger.name))
 }
 
 async fn drop_notification_data_function<T: GenericClient + Sync + Send>(
     trigger: &Trigger,
     client: &mut T,
 ) -> Result<String, Error> {
-    let function_name = format!("{}_notification_data", &trigger.name);
+    let function_name = format!("{}_notification_data", trigger.name);
 
     let query = format!(
         "DROP FUNCTION IF EXISTS trigger_rule.{}(timestamp with time zone);",
-        &escape_identifier(&function_name),
+        escape_identifier(&function_name),
     );
 
     client
@@ -947,7 +947,7 @@ async fn drop_notification_data_function<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Dropped data function for trigger '{}'",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -959,7 +959,7 @@ async fn create_mapping_functions<T: GenericClient + Sync + Send>(
         let query = format!(
             "CREATE FUNCTION trend.{}(timestamp with time zone) RETURNS SETOF timestamp with time zone AS $${}$$ LANGUAGE sql STABLE",
             escape_identifier(&mapping_function.name),
-            &mapping_function.source,
+            mapping_function.source,
         );
 
         client.execute(&query, &[]).await.map_err(|e| {
@@ -969,7 +969,7 @@ async fn create_mapping_functions<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Created mapping functions for trigger '{}'",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -1007,7 +1007,7 @@ async fn link_trend_stores<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Linked trend stores for trigger '{}'",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -1117,7 +1117,7 @@ where
         }
         _ => Err(Error::Runtime(RuntimeError::from_msg(format!(
             "Unsupported granularity: {}",
-            &granularity_text
+            granularity_text
         )))),
     }
 }
@@ -1163,7 +1163,7 @@ async fn run_checks<T: GenericClient + Sync + Send>(
 
             Ok(format!(
                 "Checks run successfully for '{}': '{}'",
-                trigger_name, &check_timestamp
+                trigger_name, check_timestamp
             ))
         }
     }
@@ -1181,7 +1181,7 @@ async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
 
     Ok(format!(
         "Unlinked trend stores for trigger '{}'",
-        &trigger.name
+        trigger.name
     ))
 }
 
@@ -1193,7 +1193,7 @@ pub struct DeleteTrigger {
 
 impl fmt::Display for DeleteTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DeleteTrigger({})", &self.trigger_name)
+        write!(f, "DeleteTrigger({})", self.trigger_name)
     }
 }
 
@@ -1224,7 +1224,7 @@ impl Change for DeleteTrigger {
         if count == 0 {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "No trigger found matching name '{}'",
-                &self.trigger_name
+                self.trigger_name
             ))));
         }
 
@@ -1246,7 +1246,7 @@ pub struct DeletedTrigger {
 
 impl Display for DeletedTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Removed trigger '{}'", &self.trigger.name)
+        write!(f, "Removed trigger '{}'", self.trigger.name)
     }
 }
 
@@ -1310,7 +1310,7 @@ impl fmt::Display for UpdateTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.changes {
             Some(changes) => {
-                writeln!(f, "UpdateTrigger({}):", &self.trigger.name,)?;
+                writeln!(f, "UpdateTrigger({}):", self.trigger.name,)?;
 
                 for change in changes {
                     writeln!(f, " - {}", change)?;
@@ -1319,7 +1319,7 @@ impl fmt::Display for UpdateTrigger {
                 Ok(())
             }
             None => {
-                write!(f, "UpdateTrigger({})", &self.trigger)
+                write!(f, "UpdateTrigger({})", self.trigger)
             }
         }
     }
@@ -1335,7 +1335,7 @@ impl Change for UpdateTrigger {
             return Err(Error::Runtime(RuntimeError {
                 msg: format!(
                     "Trigger {} does not exist. Use the create command to create the trigger.",
-                    &self.trigger.name
+                    self.trigger.name
                 ),
             }));
         }
@@ -1401,10 +1401,10 @@ impl Display for UpdatedTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.check_result {
             Some(result) => {
-                write!(f, "Updated trigger '{}': {}", &self.trigger_name, result)
+                write!(f, "Updated trigger '{}': {}", self.trigger_name, result)
             }
             None => {
-                write!(f, "Updated trigger '{}'", &self.trigger_name)
+                write!(f, "Updated trigger '{}'", self.trigger_name)
             }
         }
     }
@@ -1427,7 +1427,7 @@ pub struct UpdateTriggerTags {
 
 impl fmt::Display for UpdateTriggerTags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateTriggerTags({})", &self.trigger_name)
+        write!(f, "UpdateTriggerTags({})", self.trigger_name)
     }
 }
 
@@ -1440,7 +1440,7 @@ impl Change for UpdateTriggerTags {
         if !trigger_exists(&self.trigger_name, &mut transaction).await? {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "No trigger with name '{}'",
-                &self.trigger_name
+                self.trigger_name
             ))));
         }
 
@@ -1469,7 +1469,7 @@ impl Display for UpdatedTriggerTags {
         write!(
             f,
             "Updated trigger tags for trigger '{}'",
-            &self.trigger_name
+            self.trigger_name
         )
     }
 }
@@ -1495,7 +1495,7 @@ pub struct RenameTrigger {
 
 impl fmt::Display for RenameTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateTrigger({})", &self.trigger)
+        write!(f, "UpdateTrigger({})", self.trigger)
     }
 }
 
@@ -1516,7 +1516,7 @@ impl Change for RenameTrigger {
         if !trigger_exists(&self.old_name, &mut transaction).await? {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "No trigger with name '{}'",
-                &self.old_name
+                self.old_name
             ))));
         }
 
@@ -1590,14 +1590,14 @@ impl Display for RenamedTrigger {
                 write!(
                     f,
                     "Renamed trigger '{}' to '{}': {}",
-                    &self.old_name, &self.new_name, result
+                    self.old_name, self.new_name, result
                 )
             }
             None => {
                 write!(
                     f,
                     "Renamed trigger '{}' to '{}'",
-                    &self.old_name, &self.new_name
+                    self.old_name, self.new_name
                 )
             }
         }
@@ -1619,7 +1619,7 @@ pub struct VerifyTrigger {
 
 impl fmt::Display for VerifyTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "VerifyTrigger({})", &self.trigger_name)
+        write!(f, "VerifyTrigger({})", self.trigger_name)
     }
 }
 
@@ -1668,7 +1668,7 @@ pub struct EnableTrigger {
 
 impl fmt::Display for EnableTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EnableTrigger({})", &self.trigger_name)
+        write!(f, "EnableTrigger({})", self.trigger_name)
     }
 }
 
@@ -1721,7 +1721,7 @@ pub struct DisableTrigger {
 
 impl fmt::Display for DisableTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DisableTrigger({})", &self.trigger_name)
+        write!(f, "DisableTrigger({})", self.trigger_name)
     }
 }
 
@@ -1821,19 +1821,19 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
         .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     let kpi_function_source =
-        load_function_src(conn, "trigger_rule", &format!("{}_kpi", &name)).await?;
+        load_function_src(conn, "trigger_rule", &format!("{}_kpi", name)).await?;
 
     let notification_function_source = load_function_src(
         conn,
         "trigger_rule",
-        &format!("{}_notification_message", &name),
+        &format!("{}_notification_message", name),
     )
     .await?;
 
     let data_function_source = load_function_src(
         conn,
         "trigger_rule",
-        &format!("{}_notification_data", &name),
+        &format!("{}_notification_data", name),
     )
     .await?;
 
@@ -1842,7 +1842,7 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
     let condition = extract_rule_from_src(&condition_function_source)?;
 
     let weight_function_source =
-        load_function_src(conn, "trigger_rule", &format!("{}_weight", &name)).await?;
+        load_function_src(conn, "trigger_rule", &format!("{}_weight", name)).await?;
 
     let thresholds = load_thresholds(conn, name)
         .await
@@ -1853,7 +1853,7 @@ pub async fn load_trigger<T: GenericClient + Send + Sync>(
         .map_err(|e| TriggerError::DatabaseError(DatabaseError::from_msg(e.to_string())))?;
 
     let fingerprint_function_source =
-        load_function_src(conn, "trigger_rule", &format!("{}_fingerprint", &name)).await?;
+        load_function_src(conn, "trigger_rule", &format!("{}_fingerprint", name)).await?;
 
     let trend_store_links = load_trend_store_links(conn, name)
         .await
@@ -1946,7 +1946,7 @@ pub struct CreateNotifications {
 
 impl fmt::Display for CreateNotifications {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CreateNotifications({})", &self.trigger_name)
+        write!(f, "CreateNotifications({})", self.trigger_name)
     }
 }
 

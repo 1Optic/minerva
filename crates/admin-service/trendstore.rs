@@ -558,7 +558,7 @@ pub(super) async fn get_trend_store_part(
         .await
         .map_err(|_| Error {
             code: 404,
-            message: format!("Trend store part with id {} not found", &tsp_id),
+            message: format!("Trend store part with id {} not found", tsp_id),
         })
         .map(|row| TrendStorePartFull {
             id: tsp_id,
@@ -601,7 +601,7 @@ pub(super) async fn find_trend_store_part(
         .await
         .map_err(|_| Error {
             code: 404,
-            message: format!("Trend store part with name {} not found", &name),
+            message: format!("Trend store part with name {} not found", name),
         })
         .map(|row| (row.get(0), row.get(1), row.get(2)))?;
 
@@ -950,7 +950,7 @@ pub(super) async fn get_trend_store(
             &[&tsid],
         ).await.map_err(|_| Error {
             code: 404,
-            message: format!("Trend store with id {} not found", &tsid),
+            message: format!("Trend store with id {} not found", tsid),
         }).map(|row| TrendStoreFull {
             id: tsid,
             entity_type: row.get(1),

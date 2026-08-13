@@ -47,7 +47,7 @@ impl std::fmt::Display for MaterializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             MaterializeError::UnexpectedError(message) => {
-                write!(f, "{}", &message)
+                write!(f, "{}", message)
             }
         }
     }
@@ -81,7 +81,7 @@ pub struct MaterializationChunk {
 
 impl std::fmt::Display for MaterializationChunk {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} - {}", &self.timestamp.to_rfc3339(), &self.name)
+        write!(f, "{} - {}", self.timestamp.to_rfc3339(), self.name)
     }
 }
 
@@ -141,7 +141,7 @@ impl MaterializationChunk {
             .map_err(|e| {
                 let message = format!(
                     "Error getting sources for materialization '{}': {}",
-                    &self.name, &e
+                    self.name, e
                 );
                 MaterializeError::UnexpectedError(message)
             })?;
@@ -160,12 +160,12 @@ impl MaterializationChunk {
 
                         match result {
                             Ok(_) => {
-                                println!("Updated statistics of '{}'", &partition_stats.name);
+                                println!("Updated statistics of '{}'", partition_stats.name);
                             }
                             Err(e) => {
                                 println!(
                                     "Error updating statistics of '{}': {}",
-                                    &partition_stats.name, e
+                                    partition_stats.name, e
                                 );
                             }
                         }
@@ -173,7 +173,7 @@ impl MaterializationChunk {
                 }
                 Err(e) => println!(
                     "Could not fetch or create statistics of {} - {}: {}",
-                    &materialization_source, &self.timestamp, e
+                    materialization_source, self.timestamp, e
                 ),
             }
         }
@@ -219,7 +219,7 @@ impl PartitionStats {
         &self,
         client: &T,
     ) -> Result<u64, deadpool_postgres::tokio_postgres::Error> {
-        let materialize_query = format!("ANALYZE trend_partition.\"{}\"(timestamp)", &self.name);
+        let materialize_query = format!("ANALYZE trend_partition.\"{}\"(timestamp)", self.name);
 
         client.execute(materialize_query.as_str(), &[]).await
     }
@@ -232,7 +232,7 @@ struct MaterializationSource {
 
 impl std::fmt::Display for MaterializationSource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}({})", &self.name, &self.timestamp_mapping_func)
+        write!(f, "{}({})", self.name, self.timestamp_mapping_func)
     }
 }
 
@@ -460,7 +460,7 @@ impl MaterializationFetcher {
             let client = match self.pool.get().await {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("Error connecting to database: {}", &e);
+                    println!("Error connecting to database: {}", e);
                     continue;
                 }
             };
@@ -474,12 +474,12 @@ impl MaterializationFetcher {
 
                     for materialization in materializations {
                         if guard.insert(materialization.clone()) {
-                            let message = format!("{}", &materialization);
+                            let message = format!("{}", materialization);
 
                             match queue_sender.send(materialization) {
                                 Err(e) => println!(
                                     "Could not queue materialization chunk {}: {}",
-                                    &message, e
+                                    message, e
                                 ),
                                 Ok(()) => new += 1,
                             }
@@ -514,7 +514,7 @@ async fn materialize(
 
     match conn_result {
         Err(e) => {
-            println!("Error connecting to database: {}", &e);
+            println!("Error connecting to database: {}", e);
         }
         Ok(client) => {
             let start = Instant::now();
@@ -549,13 +549,13 @@ async fn materialize(
 
                     println!(
                         "Materialized {}: {} ({} ms)",
-                        &materialization,
+                        materialization,
                         record_count,
                         duration.as_millis()
                     );
                 }
                 Err(e) => {
-                    println!("Error materializing {}: {}", &materialization, e);
+                    println!("Error materializing {}: {}", materialization, e);
                 }
             }
         }

@@ -108,9 +108,9 @@ impl std::error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Database(e) => write!(f, "{}", &e),
-            Error::Configuration(e) => write!(f, "{}", &e.msg),
-            Error::Runtime(e) => write!(f, "{}", &e.msg),
+            Error::Database(e) => write!(f, "{}", e),
+            Error::Configuration(e) => write!(f, "{}", e.msg),
+            Error::Runtime(e) => write!(f, "{}", e.msg),
         }
     }
 }

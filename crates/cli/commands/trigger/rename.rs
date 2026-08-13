@@ -29,7 +29,7 @@ impl TriggerRename {
         if trigger.name == self.old_name {
             return Err(Error::Runtime(RuntimeError::from_msg(format!(
                 "Old name is the same as new name: '{}' = '{}'",
-                &self.old_name, &trigger.name
+                self.old_name, trigger.name
             ))));
         }
 

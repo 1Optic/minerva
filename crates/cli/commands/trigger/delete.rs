@@ -21,7 +21,7 @@ impl TriggerDelete {
 
         change.apply(&mut client).await?;
 
-        println!("Deleted trigger '{}'", &self.name);
+        println!("Deleted trigger '{}'", self.name);
 
         Ok(())
     }

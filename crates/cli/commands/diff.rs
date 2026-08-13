@@ -39,7 +39,7 @@ impl DiffOpt {
                 return Err(Error::Configuration(ConfigurationError {
                     msg: format!(
                         "Environment variable '{}' could not be read: {}",
-                        &ENV_MINERVA_INSTANCE_ROOT, e
+                        ENV_MINERVA_INSTANCE_ROOT, e
                     ),
                 }));
             }
@@ -93,7 +93,7 @@ impl DiffOpt {
                 let _ = changes.erased_serialize(&mut serializer);
             } else {
                 for change in changes {
-                    println!("* {}", &change);
+                    println!("* {}", change);
                 }
             }
 

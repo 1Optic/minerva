@@ -44,7 +44,7 @@ pub fn get_db_config() -> Result<Config, Error> {
             "require" => SslMode::Require,
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
-                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                    msg: format!("Unsupported SSL mode '{}'", env_sslmode),
                 }));
             }
         };
@@ -115,7 +115,7 @@ pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client
             match config.connect(tls.clone()).await.map_err(|e| {
                 ConfigurationError::from_msg(format!(
                     "Could not setup TLS database connection to {:?}: {}",
-                    &config, e
+                    config, e
                 ))
             }) {
                 Ok((client, connection)) => break (client, connection),
@@ -148,7 +148,7 @@ pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client
             match config.connect(NoTls).await.map_err(|e| {
                 ConfigurationError::from_msg(format!(
                     "Could not setup TLS database connection to {:?}: {}",
-                    &config, e
+                    config, e
                 ))
             }) {
                 Ok((client, connection)) => break (client, connection),

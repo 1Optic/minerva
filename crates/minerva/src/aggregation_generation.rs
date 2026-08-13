@@ -223,7 +223,7 @@ pub fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Resul
         std::fs::create_dir(&trend_store_dir_path).map_err(|e| {
             format!(
                 "Could not create trend store directory '{}': {e}",
-                &trend_store_dir_path.to_string_lossy()
+                trend_store_dir_path.to_string_lossy()
             )
         })?;
     }
@@ -234,7 +234,7 @@ pub fn save_trend_store(instance_root: &Path, trend_store: &TrendStore) -> Resul
     let file = File::create(&trend_store_file_path).map_err(|e| {
         format!(
             "Could not create trend store file '{}': {e}",
-            &trend_store_file_path.to_string_lossy()
+            trend_store_file_path.to_string_lossy()
         )
     })?;
 

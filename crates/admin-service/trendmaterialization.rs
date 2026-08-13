@@ -252,7 +252,7 @@ impl TrendViewMaterializationData {
             .await
             .map_err(|e| Error {
                 code: 404,
-                message: format!("Creation reported as succeeded, but could not find created view materialization afterward: {}", &e)
+                message: format!("Creation reported as succeeded, but could not find created view materialization afterward: {}", e)
             })?;
 
         let id: i32 = row.get(0);
@@ -270,7 +270,7 @@ impl TrendViewMaterializationData {
             .await
             .map_err(|e| Error {
                 code: 404,
-                message: format!("Creation reported as succeeded, but could not find created view materialization afterward: {}", &e)
+                message: format!("Creation reported as succeeded, but could not find created view materialization afterward: {}", e)
             })
             .map(|rows| rows
                 .iter()
@@ -364,7 +364,7 @@ impl TrendFunctionMaterializationData {
 
                 Error {
                     code: 404,
-                    message: format!("Creation reported as succeeded, but could not find created function materialization afterward: {}", &e)
+                    message: format!("Creation reported as succeeded, but could not find created function materialization afterward: {}", e)
                 }
             })?;
 
@@ -623,7 +623,7 @@ pub(super) async fn get_trend_view_materialization(
         .await
         .map_err(|_| Error {
             code: 404,
-            message: format!("Trend view materialization with id {} not found", &vm_id),
+            message: format!("Trend view materialization with id {} not found", vm_id),
         })
         .map(|row| TrendViewMaterializationFull {
             id: row.get(0),

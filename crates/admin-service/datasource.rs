@@ -82,7 +82,7 @@ pub(super) async fn get_data_source(
         .await
         .map_err(|_| Error {
             code: 404,
-            message: format!("Data source with id {} not found", &ds_id),
+            message: format!("Data source with id {} not found", ds_id),
         })
         .map(|row| DataSource {
             id: row.get(0),
