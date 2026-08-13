@@ -282,7 +282,7 @@ async fn change_thresholds_fn(
             let mut messages = Map::new();
             messages.insert(
                 "general".to_string(),
-                format!("Unable to parse granularity {}", &granularity).into(),
+                format!("Unable to parse granularity {}", granularity).into(),
             );
             Ok(HttpResponse::BadRequest().json(messages))
         }
@@ -290,7 +290,7 @@ async fn change_thresholds_fn(
             let mut messages = Map::new();
             messages.insert(
                 "general".to_string(),
-                format!("Unable to load function {}", &function).into(),
+                format!("Unable to load function {}", function).into(),
             );
             Ok(HttpResponse::InternalServerError().json(messages))
         }
@@ -602,7 +602,7 @@ pub(super) async fn get_template(pool: Data<Pool>, id: Path<i32>) -> impl Respon
                     let mut messages = Map::new();
                     messages.insert(
                         "id".to_string(),
-                        format!("No template with id {}", &back_id).into(),
+                        format!("No template with id {}", back_id).into(),
                     );
                     HttpResponse::NotFound().json(messages)
                 }

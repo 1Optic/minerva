@@ -66,7 +66,7 @@ pub fn get_db_config() -> Result<Config, Error> {
             "require" => SslMode::Require,
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
-                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                    msg: format!("Unsupported SSL mode '{}'", env_sslmode),
                 }));
             }
         };
@@ -126,7 +126,7 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
         let (client, connection) = config.connect(tls).await.map_err(|e| {
             ConfigurationError::from_msg(format!(
                 "Could not setup TLS database connection to {:?}: {}",
-                &config, e
+                config, e
             ))
         })?;
 

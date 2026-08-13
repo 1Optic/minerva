@@ -174,7 +174,7 @@ fn default_extra_data() -> Value {
 
 impl fmt::Display for Trend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Trend({}, {})", &self.name, &self.data_type)
+        write!(f, "Trend({}, {})", self.name, self.data_type)
     }
 }
 
@@ -388,8 +388,8 @@ fn insert_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> String 
         "INSERT INTO trend.{}(entity_id, timestamp, created, job_id, {}{}) VALUES ({}) ON CONFLICT (entity_id, timestamp) DO UPDATE SET {}",
         escape_identifier(&trend_store_part.name),
         alias_part,
-        &trend_names_part,
-        &values_placeholders,
+        trend_names_part,
+        values_placeholders,
         update_part,
     );
 
@@ -410,7 +410,7 @@ fn copy_from_query(trend_store_part: &TrendStorePart, trends: &[&Trend]) -> Stri
             true => "name, ",
             false => "",
         },
-        &trend_names_part
+        trend_names_part
     );
 
     query
@@ -1394,7 +1394,7 @@ impl TrendStorePart {
 
 impl fmt::Display for TrendStorePart {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TrendStorePart({})", &self.name)
+        write!(f, "TrendStorePart({})", self.name)
     }
 }
 
@@ -1432,9 +1432,9 @@ impl fmt::Display for TrendStoreRef {
         write!(
             f,
             "TrendStore({}, {}, {})",
-            &self.data_source,
-            &self.entity_type,
-            &humantime::format_duration(self.granularity).to_string()
+            self.data_source,
+            self.entity_type,
+            humantime::format_duration(self.granularity)
         )
     }
 }
@@ -1530,9 +1530,9 @@ impl fmt::Display for TrendStore {
         write!(
             f,
             "TrendStore({}, {}, {})",
-            &self.data_source,
-            &self.entity_type,
-            &humantime::format_duration(self.granularity).to_string()
+            self.data_source,
+            self.entity_type,
+            humantime::format_duration(self.granularity)
         )
     }
 }
@@ -1674,7 +1674,7 @@ pub async fn load_trend_store_ref_for_part<T: GenericClient>(
     let granularity_str: String = row.get(2);
 
     let granularity = parse_interval(&granularity_str)
-        .map_err(|e| format!("Error parsing granularity '{}': {}", &granularity_str, e))?;
+        .map_err(|e| format!("Error parsing granularity '{}': {}", granularity_str, e))?;
 
     Ok(TrendStoreRef {
         data_source: row.get(0),
@@ -1880,21 +1880,21 @@ pub async fn load_trend_stores(conn: &mut Client) -> Result<Vec<TrendStore>, Err
         let granularity = parse_interval(&granularity_str).map_err(|e| {
             RuntimeError::from_msg(format!(
                 "Error parsing granularity '{}': {}",
-                &granularity_str, e
+                granularity_str, e
             ))
         })?;
 
         let partition_size = parse_interval(&partition_size_str).map_err(|e| {
             RuntimeError::from_msg(format!(
                 "Error parsing partition size '{}': {}",
-                &partition_size_str, e
+                partition_size_str, e
             ))
         })?;
 
         let retention_period = parse_interval(&retention_period_str).map_err(|e| {
             RuntimeError::from_msg(format!(
                 "Error parsing retention period '{}': {}",
-                &retention_period_str, e
+                retention_period_str, e
             ))
         })?;
 
@@ -2025,7 +2025,7 @@ pub async fn create_partitions_for_trend_store<T: GenericClient>(
         println!(
             "Creating {} partitions for trend store {}",
             result.len(),
-            &trend_store_id
+            trend_store_id
         );
     }
 
@@ -2047,7 +2047,7 @@ pub async fn create_partitions_for_trend_store<T: GenericClient>(
                 transaction.commit().await?;
                 println!(
                     "Created partition for '{}': '{}'",
-                    &part_name, &partition_name
+                    part_name, partition_name
                 );
             }
             Err(e) => {
@@ -2065,7 +2065,7 @@ pub async fn create_partitions_for_trend_store_and_timestamp<T: GenericClient>(
     trend_store_id: i32,
     timestamp: DateTime<Utc>,
 ) -> Result<(), Error> {
-    debug!("Creating partitions for trend store {}", &trend_store_id);
+    debug!("Creating partitions for trend store {}", trend_store_id);
 
     let query = concat!(
         "WITH partition_indexes AS (",
@@ -2102,7 +2102,7 @@ pub async fn create_partitions_for_trend_store_and_timestamp<T: GenericClient>(
 
         debug!(
             "Created partition for '{}': '{}'",
-            &part_name, &partition_name
+            part_name, partition_name
         );
     }
 
@@ -2220,10 +2220,7 @@ pub async fn analyze_trend_store_part(
 
     let max_expressions_part = max_expressions.join(", ");
 
-    let query = format!(
-        "SELECT {} FROM trend.\"{}\" p ",
-        &max_expressions_part, name
-    );
+    let query = format!("SELECT {} FROM trend.\"{}\" p ", max_expressions_part, name);
 
     let row = client.query_one(&query, &[]).await.map_err(|e| {
         DatabaseError::from_msg(format!("Could not analyze trend store part '{name}': {e}"))

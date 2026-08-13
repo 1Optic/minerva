@@ -26,7 +26,7 @@ pub struct AttributeMaterializationTarget {
 
 impl fmt::Display for AttributeMaterializationTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}_{}", &self.data_source, &self.entity_type)
+        write!(f, "{}_{}", self.data_source, self.entity_type)
     }
 }
 
@@ -38,7 +38,7 @@ pub struct AttributeMaterializationRef {
 
 impl fmt::Display for AttributeMaterializationRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}_{}", &self.data_source, &self.entity_type)
+        write!(f, "{}_{}", self.data_source, self.entity_type)
     }
 }
 
@@ -59,7 +59,7 @@ pub struct AttributeMaterialization {
 
 impl fmt::Display for AttributeMaterialization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AttributeMaterialization('{}')", &self.attribute_store)
+        write!(f, "AttributeMaterialization('{}')", self.attribute_store)
     }
 }
 
@@ -85,7 +85,7 @@ impl AttributeMaterialization {
         let query = format!(
             "CREATE VIEW {}.{} AS {}",
             MATERIALIZATION_VIEW_SCHEMA,
-            &escape_identifier(&attribute_materialization_view_name(&self.attribute_store)),
+            escape_identifier(&attribute_materialization_view_name(&self.attribute_store)),
             self.query,
         );
 
@@ -110,7 +110,7 @@ impl AttributeMaterialization {
         let src_view = format!(
             "{}.{}",
             MATERIALIZATION_VIEW_SCHEMA,
-            &escape_identifier(&attribute_materialization_view_name(&self.attribute_store))
+            escape_identifier(&attribute_materialization_view_name(&self.attribute_store))
         );
 
         client
@@ -225,7 +225,7 @@ pub fn load_attribute_materializations_from(
                 Err(e) => {
                     println!(
                         "Error loading attribute materialization '{}': {}",
-                        &path.display(),
+                        path.display(),
                         e
                     );
                     None
@@ -357,7 +357,7 @@ impl fmt::Display for AddAttributeMaterialization {
         write!(
             f,
             "AddAttributeMaterialization({})",
-            &self.attribute_materialization
+            self.attribute_materialization
         )
     }
 }
@@ -375,7 +375,7 @@ impl Change for AddAttributeMaterialization {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error adding attribute materialization '{}': {}",
-                        &self.attribute_materialization, e
+                        self.attribute_materialization, e
                     ),
                 })
             })?;

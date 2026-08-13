@@ -235,7 +235,7 @@ fn get_db_config() -> Result<Config, Error> {
             "require" => SslMode::Require,
             _ => {
                 return Err(Error::Configuration(ConfigurationError {
-                    msg: format!("Unsupported SSL mode '{}'", &env_sslmode),
+                    msg: format!("Unsupported SSL mode '{}'", env_sslmode),
                 }));
             }
         };
@@ -281,8 +281,8 @@ fn show_config(config: &Config) -> String {
 
     format!(
         "host={} port={} user={} dbname={} sslmode={}",
-        &host,
-        &port,
+        host,
+        port,
         config.get_user().unwrap_or(""),
         dbname,
         sslmode
@@ -294,7 +294,7 @@ fn connect_db() -> Result<Pool, Error> {
 
     let config_repr = show_config(&config);
 
-    info!("Connecting to database: {}", &config_repr);
+    info!("Connecting to database: {}", config_repr);
 
     make_db_pool(&config)
 }

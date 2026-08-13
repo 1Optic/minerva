@@ -23,9 +23,9 @@ impl TrendMaterializationCheck {
                 .unwrap();
 
             if issues.is_empty() {
-                println!("'{}': Ok", &materialization);
+                println!("'{}': Ok", materialization);
             } else {
-                println!("'{}':", &materialization);
+                println!("'{}':", materialization);
                 for issue in issues {
                     println!(" - {issue}");
                 }

@@ -22,7 +22,7 @@ pub struct Relation {
 
 impl fmt::Display for Relation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Relation({})", &self.name)
+        write!(f, "Relation({})", self.name)
     }
 }
 
@@ -131,7 +131,7 @@ pub struct AddRelation {
 
 impl fmt::Display for AddRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddRelation({})", &self.relation)
+        write!(f, "AddRelation({})", self.relation)
     }
 }
 
@@ -167,7 +167,7 @@ pub struct AddedRelation {
 
 impl Display for AddedRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Added relation '{}'", &self.relation_name)
+        write!(f, "Added relation '{}'", self.relation_name)
     }
 }
 
@@ -187,7 +187,7 @@ pub struct UpdateRelationView {
 
 impl fmt::Display for UpdateRelationView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UpdateRelationView({})", &self.relation_name)
+        write!(f, "UpdateRelationView({})", self.relation_name)
     }
 }
 
@@ -223,7 +223,7 @@ pub struct UpdatedRelation {
 
 impl Display for UpdatedRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Updated relation {}", &self.relation_name)
+        write!(f, "Updated relation {}", self.relation_name)
     }
 }
 
@@ -406,7 +406,7 @@ pub struct RemoveRelation {
 
 impl fmt::Display for RemoveRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveRelation({})", &self.relation_name)
+        write!(f, "RemoveRelation({})", self.relation_name)
     }
 }
 
@@ -436,7 +436,7 @@ pub struct RemovedRelation {
 
 impl Display for RemovedRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Removed relation '{}'", &self.relation.name)
+        write!(f, "Removed relation '{}'", self.relation.name)
     }
 }
 

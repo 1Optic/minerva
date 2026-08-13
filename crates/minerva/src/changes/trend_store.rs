@@ -39,12 +39,12 @@ impl fmt::Display for StageTrendsForDeletion {
         writeln!(
             f,
             "StageTrendsForDeletion(TrendStorePart({}), {}):",
-            &self.trend_store_part_name,
+            self.trend_store_part_name,
             self.trends.len()
         )?;
 
         for t in &self.trends {
-            writeln!(f, " - {}", &t)?;
+            writeln!(f, " - {}", t)?;
         }
 
         Ok(())
@@ -56,11 +56,10 @@ impl fmt::Debug for StageTrendsForDeletion {
         write!(
             f,
             "StageTrendsForDeletion(TrendStorePart({}), {})",
-            &self.trend_store_part_name,
-            &self
-                .trends
+            self.trend_store_part_name,
+            self.trends
                 .iter()
-                .map(|t| format!("'{}'", &t))
+                .map(|t| format!("'{}'", t))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -142,7 +141,7 @@ impl Change for StageTrendsForDeletion {
             trend_column_rename.update(&mut tx).await.map_err(|e| {
                 DatabaseError::from_msg(format!(
                     "Error staging trend '{}' for removal in trend store part '{}': {}",
-                    &trend_column_rename.trend_name, &self.trend_store_part_name, e
+                    trend_column_rename.trend_name, self.trend_store_part_name, e
                 ))
             })?;
         }
@@ -175,8 +174,8 @@ impl Display for TrendsStagedForDeletion {
         write!(
             f,
             "Staged {} trends for deletion in trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
+            self.trends.len(),
+            self.trend_store_part_name
         )
     }
 }
@@ -212,8 +211,8 @@ impl Display for RestoreTrendsStagedForDeletion {
         write!(
             f,
             "Staged {} trends for deletion in trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
+            self.trends.len(),
+            self.trend_store_part_name
         )
     }
 }
@@ -351,12 +350,12 @@ impl fmt::Display for RemoveTrends {
         writeln!(
             f,
             "RemoveTrends(TrendStorePart({}), {}):",
-            &self.trend_store_part_name,
+            self.trend_store_part_name,
             self.trends.len()
         )?;
 
         for t in &self.trends {
-            writeln!(f, " - {}", &t)?;
+            writeln!(f, " - {}", t)?;
         }
 
         Ok(())
@@ -368,11 +367,10 @@ impl fmt::Debug for RemoveTrends {
         write!(
             f,
             "RemoveTrends(TrendStorePart({}), {})",
-            &self.trend_store_part_name,
-            &self
-                .trends
+            self.trend_store_part_name,
+            self.trends
                 .iter()
-                .map(|t| format!("'{}'", &t))
+                .map(|t| format!("'{}'", t))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -392,7 +390,7 @@ impl Change for RemoveTrends {
                 .map_err(|e| {
                     DatabaseError::from_msg(format!(
                         "Could not load trend '{}' definition from the database: {}",
-                        &trend_name, e
+                        trend_name, e
                     ))
                 })?;
 
@@ -406,7 +404,7 @@ impl Change for RemoveTrends {
             remove.remove(&mut tx).await.map_err(|e| {
                 DatabaseError::from_msg(format!(
                     "Error removing trend '{}' from trend store part: {}",
-                    &trend_name, e
+                    trend_name, e
                 ))
             })?;
         }
@@ -439,8 +437,8 @@ impl Display for RemovedTrends {
         write!(
             f,
             "Removed {} trends from trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
+            self.trends.len(),
+            self.trend_store_part_name
         )
     }
 }
@@ -471,12 +469,12 @@ impl fmt::Display for AddTrends {
         writeln!(
             f,
             "AddTrends(TrendStorePart({}), {}):",
-            &self.trend_store_part_name,
-            &self.trends.len()
+            self.trend_store_part_name,
+            self.trends.len()
         )?;
 
         for t in &self.trends {
-            writeln!(f, " - {}: {}", &t.name, &t.data_type)?;
+            writeln!(f, " - {}: {}", t.name, t.data_type)?;
         }
 
         Ok(())
@@ -488,11 +486,10 @@ impl fmt::Debug for AddTrends {
         write!(
             f,
             "AddTrends(TrendStorePart({}), {})",
-            &self.trend_store_part_name,
-            &self
-                .trends
+            self.trend_store_part_name,
+            self.trends
                 .iter()
-                .map(|t| format!("{}", &t))
+                .map(|t| format!("{}", t))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -532,8 +529,8 @@ impl Display for AddedTrends {
         write!(
             f,
             "Added {} trends to trend store part '{}'",
-            &self.trends.len(),
-            &self.trend_store_part_name
+            self.trends.len(),
+            self.trend_store_part_name
         )
     }
 }
@@ -617,7 +614,7 @@ impl fmt::Display for AddAliasColumn {
         writeln!(
             f,
             "AddAlias(TrendStorePart({})):",
-            &self.trend_store_part_name
+            self.trend_store_part_name
         )?;
 
         Ok(())
@@ -678,7 +675,7 @@ impl Display for AddedAliasColumn {
         write!(
             f,
             "Added alias column to trend store part '{}'",
-            &self.trend_store_part_name
+            self.trend_store_part_name
         )
     }
 }
@@ -700,7 +697,7 @@ pub struct RemoveAliasColumn {
 
 impl fmt::Display for RemoveAliasColumn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "RemoveAlias({}):", &self.trend_store_part_name)?;
+        writeln!(f, "RemoveAlias({}):", self.trend_store_part_name)?;
 
         Ok(())
     }
@@ -753,7 +750,7 @@ impl Display for RemovedAliasColumn {
         write!(
             f,
             "Removed alias column to trend store part '{}'",
-            &self.trend_store_part_name
+            self.trend_store_part_name
         )
     }
 }
@@ -780,7 +777,7 @@ impl fmt::Display for ModifyTrendDataType {
         write!(
             f,
             "Trend({}, {}->{})",
-            &self.trend_name, &self.from_type, &self.to_type
+            self.trend_name, self.from_type, self.to_type
         )
     }
 }
@@ -803,7 +800,7 @@ impl fmt::Display for ModifyTrendDataTypes {
         writeln!(
             f,
             "ModifyTrendDataTypes({}, {}/{}):",
-            &self.trend_store_part_name,
+            self.trend_store_part_name,
             self.modifications.len(),
             self.total_trend_count,
         )?;
@@ -824,8 +821,8 @@ impl fmt::Debug for ModifyTrendDataTypes {
         write!(
             f,
             "ModifyTrendDataTypes({}, {})",
-            &self.trend_store_part_name,
-            &modifications.join(", "),
+            self.trend_store_part_name,
+            modifications.join(", "),
         )
     }
 }
@@ -891,7 +888,7 @@ impl Change for ModifyTrendDataTypes {
             .map(|m| {
                 format!(
                     "ALTER \"{}\" TYPE {} USING CAST(\"{}\" AS {})",
-                    &m.trend_name, &m.to_type, &m.trend_name, &m.to_type
+                    m.trend_name, m.to_type, m.trend_name, m.to_type
                 )
             })
             .collect();
@@ -901,7 +898,7 @@ impl Change for ModifyTrendDataTypes {
         let alter_query = format!(
             "ALTER TABLE trend.{} {}",
             escape_identifier(&self.trend_store_part_name),
-            &alter_type_parts_str
+            alter_type_parts_str
         );
 
         let alter_query_slice: &str = &alter_query;
@@ -958,7 +955,7 @@ impl Display for ModifiedTrendDataTypes {
         write!(
             f,
             "Altered trend data types for trend store part '{}'",
-            &self.trend_store_part_name
+            self.trend_store_part_name
         )
     }
 }
@@ -1016,7 +1013,7 @@ impl InformationOption for TrendExtraDiff {
 
 impl Display for TrendExtraDiff {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -1093,7 +1090,7 @@ impl InformationOption for TrendTypeChangeValueInformation {
 
 impl Display for TrendTypeChangeValueInformation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -1160,7 +1157,7 @@ impl InformationOption for TrendRemoveValueInformation {
 
 impl Display for TrendRemoveValueInformation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name())
+        write!(f, "{}", self.name())
     }
 }
 
@@ -1178,7 +1175,7 @@ impl fmt::Display for ModifyTrendExtraData {
         write!(
             f,
             "Trend({}.{})",
-            &self.trend_store_part_name, &self.trend_name,
+            self.trend_store_part_name, self.trend_name,
         )
     }
 }
@@ -1242,7 +1239,7 @@ impl Display for ModifiedTrendExtraData {
         write!(
             f,
             "Altered extra_data for trend '{}'.'{}'",
-            &self.trend_store_part_name, &self.trend_name
+            self.trend_store_part_name, self.trend_name
         )
     }
 }
@@ -1303,7 +1300,7 @@ impl fmt::Display for AddTrendStorePart {
         write!(
             f,
             "AddTrendStorePart({}, {})",
-            &self.trend_store, &self.trend_store_part
+            self.trend_store, self.trend_store_part
         )
     }
 }
@@ -1327,7 +1324,7 @@ impl Change for AddTrendStorePart {
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
                     "Error creating trend store part '{}': {}",
-                    &self.trend_store_part.name, e
+                    self.trend_store_part.name, e
                 ))
             })?;
 
@@ -1352,7 +1349,7 @@ impl Display for AddedTrendStorePart {
         write!(
             f,
             "Added trend store part '{}' to trend store '{}'",
-            &self.trend_store_part_name, &self.trend_store
+            self.trend_store_part_name, self.trend_store
         )
     }
 }
@@ -1374,7 +1371,7 @@ pub struct RemoveTrendStorePart {
 
 impl fmt::Display for RemoveTrendStorePart {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveTrendStorePart({})", &self.name)
+        write!(f, "RemoveTrendStorePart({})", self.name)
     }
 }
 
@@ -1396,7 +1393,7 @@ impl Change for RemoveTrendStorePart {
             .map_err(|e| {
                 DatabaseError::from_msg(format!(
                     "Error removing trend store part '{}': {}",
-                    &self.name, e
+                    self.name, e
                 ))
             })?;
 
@@ -1421,7 +1418,7 @@ impl Display for RemovedTrendStorePart {
         write!(
             f,
             "Removed trend store part '{}'",
-            &self.trend_store_part.name
+            self.trend_store_part.name
         )
     }
 }
@@ -1444,10 +1441,10 @@ pub struct AddTrendStore {
 
 impl fmt::Display for AddTrendStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "AddTrendStore({})", &self.trend_store)?;
+        writeln!(f, "AddTrendStore({})", self.trend_store)?;
 
         for part in &self.trend_store.parts {
-            writeln!(f, " - {}", &part.name)?;
+            writeln!(f, " - {}", part.name)?;
         }
 
         Ok(())
@@ -1480,7 +1477,7 @@ pub struct AddedTrendStore {
 
 impl Display for AddedTrendStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Added trend store {}", &self.trend_store)
+        write!(f, "Added trend store {}", self.trend_store)
     }
 }
 
@@ -1519,7 +1516,7 @@ impl Change for RemoveTrendStore {
             .map_err(|e| {
                 RuntimeError::from_msg(format!(
                     "Could not load trend store {}: {e}",
-                    &self.trend_store
+                    self.trend_store
                 ))
             })?;
 
@@ -1562,7 +1559,7 @@ pub struct CreateStatistics {
 impl fmt::Display for CreateStatistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.trend_store_part_name {
-            Some(tsp) => writeln!(f, "CreateStatitics({})", &tsp)?,
+            Some(tsp) => writeln!(f, "CreateStatitics({})", tsp)?,
             None => writeln!(f, "CreateAllStatitics()")?,
         };
         Ok(())
@@ -1609,7 +1606,7 @@ impl Display for CreatedStatistics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.trend_store_part_name {
             Some(name) => {
-                write!(f, "Created statistics for trend store part {}", &name)
+                write!(f, "Created statistics for trend store part {}", name)
             }
             None => {
                 write!(f, "Created statistics for all trend store parts")

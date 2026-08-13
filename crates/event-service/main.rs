@@ -92,7 +92,7 @@ impl fmt::Display for Notification {
         write!(
             f,
             "Notification: rule {} for entity {} at {}",
-            &self.rule, &self.entity, date,
+            self.rule, self.entity, date,
         )
     }
 }
@@ -111,7 +111,7 @@ fn get_db_config() -> Result<TokioConfig, String> {
             "disable" => SslMode::Disable,
             "prefer" => SslMode::Prefer,
             "require" => SslMode::Require,
-            _ => return Err(format!("Unsupported SSL mode '{}'", &env_sslmode)),
+            _ => return Err(format!("Unsupported SSL mode '{}'", env_sslmode)),
         };
 
         let config = config
@@ -154,8 +154,8 @@ fn show_config(config: &TokioConfig) -> String {
 
     format!(
         "host={} port={} user={} dbname={} sslmode={}",
-        &host,
-        &port,
+        host,
+        port,
         config.get_user().unwrap_or(""),
         dbname,
         sslmode
@@ -167,7 +167,7 @@ fn connect_db() -> Result<Pool, String> {
 
     let config_repr = show_config(&config);
 
-    info!("Connecting to database: {}", &config_repr);
+    info!("Connecting to database: {}", config_repr);
 
     make_db_pool(&config)
 }

@@ -37,7 +37,7 @@ impl TrendMaterializationCreate {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error adding trend materialization '{}': {}",
-                        &trend_materialization, e
+                        trend_materialization, e
                     ),
                 })
             })?;

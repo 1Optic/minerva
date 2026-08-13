@@ -98,7 +98,7 @@ pub(super) async fn get_entity_type(pool: Data<Pool>, id: Path<i32>) -> impl Res
                 }
                 Err(_e) => HttpResponse::NotFound().json(Error {
                     code: 404,
-                    message: format!("Entity type with id {} not found", &et_id),
+                    message: format!("Entity type with id {} not found", et_id),
                 }),
             }
         }

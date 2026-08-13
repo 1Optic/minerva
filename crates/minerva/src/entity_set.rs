@@ -61,13 +61,13 @@ impl From<String> for EntitySetError {
 
 impl fmt::Display for EntitySet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EntitySet({}:{})", &self.owner, &self.name,)
+        write!(f, "EntitySet({}:{})", self.owner, self.name,)
     }
 }
 
 impl fmt::Display for NewEntitySet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EntitySet({}:{})", &self.owner, &self.name,)
+        write!(f, "EntitySet({}:{})", self.owner, self.name,)
     }
 }
 
@@ -215,7 +215,7 @@ impl EntitySet {
                     &[
                         &self.id,
                         &self.name,
-                        &format!("{}__{}", &self.name, &self.owner),
+                        &format!("{}__{}", self.name, self.owner),
                         &self.group,
                         &owner,
                         &description,
@@ -234,7 +234,7 @@ impl EntitySet {
 
                 println!(
                     "SELECT name, \"group\", source_entity_type, owner, description, first_appearance, modified FROM attribute.minerva_entity_set es WHERE entity_id = {}",
-                    &self.id,
+                    self.id,
                 );
 
                 let newdata = conn.query_one(
@@ -273,7 +273,7 @@ impl fmt::Display for ChangeEntitySet {
         write!(
             f,
             "ChangeEntitySet({}:{})",
-            &self.entity_set.owner, &self.entity_set.name
+            self.entity_set.owner, self.entity_set.name
         )
     }
 }
@@ -289,7 +289,7 @@ impl Change for ChangeEntitySet {
             EntitySetError::ExistingEntitySet(name, owner) => {
                 Error::Database(DatabaseError::UniqueViolation(format!(
                     "An entity set with name {} and owner {} already exists.",
-                    &name, &owner,
+                    name, owner,
                 )))
             }
             EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
@@ -322,7 +322,7 @@ pub struct ChangedEntitySet {
 
 impl Display for ChangedEntitySet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Entity set '{}'.'{}' updated", &self.owner, &self.name)
+        write!(f, "Entity set '{}'.'{}' updated", self.owner, self.name)
     }
 }
 
@@ -418,7 +418,7 @@ impl fmt::Display for CreateEntitySet {
         write!(
             f,
             "CreateEntitySet({}:{})",
-            &self.entity_set.owner, &self.entity_set.name
+            self.entity_set.owner, self.entity_set.name
         )
     }
 }
@@ -434,7 +434,7 @@ impl Change for CreateEntitySet {
             EntitySetError::ExistingEntitySet(name, owner) => {
                 Error::Database(DatabaseError::UniqueViolation(format!(
                     "An entity set with name {} and owner {} already exists.",
-                    &name, &owner,
+                    name, owner,
                 )))
             }
             EntitySetError::EmptyEntitySet => Error::Runtime(RuntimeError::from_msg(
@@ -473,7 +473,7 @@ impl Display for CreatedEntitySet {
         write!(
             f,
             "Entity set number '{}':'{}' created",
-            &self.owner, &self.name
+            self.owner, self.name
         )
     }
 }

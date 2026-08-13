@@ -21,7 +21,7 @@ impl TrendMaterializationRemove {
 
         change.apply(&mut client).await?;
 
-        println!("Removed trend materialization '{}'", &self.name);
+        println!("Removed trend materialization '{}'", self.name);
 
         Ok(())
     }

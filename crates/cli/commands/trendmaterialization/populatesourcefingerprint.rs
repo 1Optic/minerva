@@ -21,14 +21,14 @@ impl TrendMaterializationPopulateSourceFingerprint {
                 Error::Runtime(RuntimeError {
                     msg: format!(
                         "Error populating state for trend materialization '{}': {e}",
-                        &self.materialization
+                        self.materialization
                     ),
                 })
             })?;
 
         println!(
             "Populated state for trend materialization '{}'",
-            &self.materialization
+            self.materialization
         );
 
         Ok(())

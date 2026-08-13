@@ -19,7 +19,7 @@ pub struct VirtualEntity {
 
 impl fmt::Display for VirtualEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "VirtualEntity({})", &self.name)
+        write!(f, "VirtualEntity({})", self.name)
     }
 }
 
@@ -129,7 +129,7 @@ pub struct AddVirtualEntity {
 
 impl fmt::Display for AddVirtualEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AddVirtualEntity({})", &self.virtual_entity)
+        write!(f, "AddVirtualEntity({})", self.virtual_entity)
     }
 }
 
@@ -148,7 +148,7 @@ impl Change for AddVirtualEntity {
         tx.execute(&query, &[]).await.map_err(|e| {
             DatabaseError::from_msg(format!(
                 "Error creating virtual entity '{}': {e}",
-                &self.virtual_entity.name
+                self.virtual_entity.name
             ))
         })?;
 
@@ -174,7 +174,7 @@ pub struct AddedVirtualEntity {
 
 impl Display for AddedVirtualEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Added virtual entity {}", &self.virtual_entity)
+        write!(f, "Added virtual entity {}", self.virtual_entity)
     }
 }
 
@@ -195,7 +195,7 @@ pub struct RemoveVirtualEntity {
 
 impl fmt::Display for RemoveVirtualEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoveVirtualEntity({})", &self.name)
+        write!(f, "RemoveVirtualEntity({})", self.name)
     }
 }
 
@@ -212,7 +212,7 @@ impl Change for RemoveVirtualEntity {
         tx.execute(&query, &[]).await.map_err(|e| {
             DatabaseError::from_msg(format!(
                 "Error removing virtual entity '{}': {e}",
-                &self.name
+                self.name
             ))
         })?;
 
@@ -230,7 +230,7 @@ pub struct RemovedVirtualEntity {
 
 impl Display for RemovedVirtualEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Removed virtual entity {}", &self.virtual_entity)
+        write!(f, "Removed virtual entity {}", self.virtual_entity)
     }
 }
 

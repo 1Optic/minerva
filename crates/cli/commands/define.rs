@@ -187,7 +187,7 @@ pub fn save_attribute_store(
         std::fs::create_dir(&attribute_store_dir_path).map_err(|e| {
             format!(
                 "Could not create attribute store directory '{}': {e}",
-                &attribute_store_dir_path.to_string_lossy()
+                attribute_store_dir_path.to_string_lossy()
             )
         })?;
     }
