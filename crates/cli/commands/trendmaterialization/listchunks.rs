@@ -1,5 +1,5 @@
 use clap::Parser;
-
+use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
 use crate::commands::common::{Cmd, CmdResult, connect_db};
 use materialize::materialize::{MaterializeConfig, load_materialization_chunks};
 
@@ -23,8 +23,14 @@ impl TrendMaterializationChunkList {
             .unwrap();
 
         let mut table = comfy_table::Table::new();
-        let style = "     ═╪ ┆          ";
-        table.load_preset(style);
+        let style = TableStyle::new()
+            .top_border(LineStyle::none())
+            .header_lines(ContentLineStyle::none().junction('┆'))
+            .header_separator(LineStyle::none().junction('╪').fill('═'))
+            .content_lines(ContentLineStyle::none().junction('┆'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none());
+        table.load_style(style);
         table.set_header(vec!["Timestamp", "Name"]);
 
         for chunk in chunks {

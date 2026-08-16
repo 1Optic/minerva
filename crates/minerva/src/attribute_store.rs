@@ -4,7 +4,6 @@ use std::fmt::Display;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
 use postgres_protocol::escape::escape_identifier;
@@ -328,8 +327,7 @@ impl InformationOption for AttributeRemoveValueInformation {
             let mut table = Table::new();
 
             table
-                .load_preset(UTF8_FULL_CONDENSED)
-                .apply_modifier(UTF8_ROUND_CORNERS)
+                .load_style(UTF8_FULL_CONDENSED.with_rounded_corners())
                 .set_header(vec!["attribute", "value"]);
 
             for (index, attribute_name) in self.attribute_names.iter().enumerate() {

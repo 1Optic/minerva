@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local};
 use clap::Parser;
 
-use comfy_table::Table;
+use comfy_table::{ContentLineStyle, LineStyle, TableStyle, Table};
 
 use minerva::error::DatabaseError;
 use minerva::trigger::get_notifications;
@@ -24,9 +24,15 @@ impl TriggerPreviewNotifications {
             .await
             .map_err(|e| DatabaseError::from_msg(format!("Error getting notifications: {e}")))?;
 
-        let mut table = Table::new();
-        let style = "     ═╪ ┆          ";
-        table.load_preset(style);
+        let mut table: Table = Table::new();
+        let style = TableStyle::new()
+            .top_border(LineStyle::none())
+            .header_lines(ContentLineStyle::none().junction('┆'))
+            .header_separator(LineStyle::none().junction('╪').fill('═'))
+            .content_lines(ContentLineStyle::none().junction('┆'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none());
+        table.load_style(style);
         table.set_header(vec!["entity_id", "timestamp", "weight", "data"]);
         for trigger in triggers {
             table.add_row(vec![
