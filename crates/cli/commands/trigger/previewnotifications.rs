@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local};
 use clap::Parser;
 
-use comfy_table::{ContentLineStyle, LineStyle, TableStyle, Table};
+use comfy_table::{ContentLineStyle, LineStyle, Table, TableStyle};
 
 use minerva::error::DatabaseError;
 use minerva::trigger::get_notifications;

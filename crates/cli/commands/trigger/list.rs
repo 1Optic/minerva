@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use comfy_table::{ContentLineStyle, LineStyle, TableStyle, Table};
+use comfy_table::{ContentLineStyle, LineStyle, Table, TableStyle};
 
 use minerva::error::DatabaseError;
 use minerva::trigger::list_triggers;
@@ -26,7 +26,8 @@ impl TriggerList {
             .content_lines(ContentLineStyle::none().junction('┆'))
             .row_separator(LineStyle::none())
             .bottom_border(LineStyle::none());
-        table.load_style(style);        table.set_header(vec![
+        table.load_style(style);
+        table.set_header(vec![
             "Name",
             "Notification Store",
             "Granularity",

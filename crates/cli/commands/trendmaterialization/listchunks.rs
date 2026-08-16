@@ -1,6 +1,6 @@
+use crate::commands::common::{Cmd, CmdResult, connect_db};
 use clap::Parser;
 use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
-use crate::commands::common::{Cmd, CmdResult, connect_db};
 use materialize::materialize::{MaterializeConfig, load_materialization_chunks};
 
 #[derive(Debug, Parser, PartialEq)]
