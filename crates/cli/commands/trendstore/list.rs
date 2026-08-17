@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use comfy_table;
+use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
 
 use minerva::trend_store::list_trend_stores;
 
@@ -16,8 +16,14 @@ impl TrendStoreList {
         let trend_stores = list_trend_stores(&mut client).await.unwrap();
 
         let mut table = comfy_table::Table::new();
-        let style = "     ═╪ ┆          ";
-        table.load_preset(style);
+        let style = TableStyle::new()
+            .top_border(LineStyle::none())
+            .header_lines(ContentLineStyle::none().junction('┆'))
+            .header_separator(LineStyle::none().junction('╪').fill('═'))
+            .content_lines(ContentLineStyle::none().junction('┆'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none());
+        table.load_style(style);
         table.set_header(vec!["Id", "Data Source", "Entity Type", "Granularity"]);
 
         for trend_store in trend_stores {

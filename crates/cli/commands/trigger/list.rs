@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use comfy_table::Table;
+use comfy_table::{ContentLineStyle, LineStyle, Table, TableStyle};
 
 use minerva::error::DatabaseError;
 use minerva::trigger::list_triggers;
@@ -19,8 +19,14 @@ impl TriggerList {
             .map_err(|e| DatabaseError::from_msg(format!("Error listing triggers: {e}")))?;
 
         let mut table = Table::new();
-        let style = "     ═╪ ┆          ";
-        table.load_preset(style);
+        let style = TableStyle::new()
+            .top_border(LineStyle::none())
+            .header_lines(ContentLineStyle::none().junction('┆'))
+            .header_separator(LineStyle::none().junction('╪').fill('═'))
+            .content_lines(ContentLineStyle::none().junction('┆'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none());
+        table.load_style(style);
         table.set_header(vec![
             "Name",
             "Notification Store",

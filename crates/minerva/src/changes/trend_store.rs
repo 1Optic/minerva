@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
 use console::Style;
@@ -1064,8 +1063,7 @@ impl InformationOption for TrendTypeChangeValueInformation {
         let mut table = Table::new();
 
         table
-            .load_preset(UTF8_FULL_CONDENSED)
-            .apply_modifier(UTF8_ROUND_CORNERS)
+            .load_style(UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["trend", "from", "to", "max"]);
 
         for (index, trend_change) in self.trend_changes.iter().enumerate() {
@@ -1136,8 +1134,7 @@ impl InformationOption for TrendRemoveValueInformation {
         let mut table = Table::new();
 
         table
-            .load_preset(UTF8_FULL_CONDENSED)
-            .apply_modifier(UTF8_ROUND_CORNERS)
+            .load_style(UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["trend", "max"]);
 
         for (index, trend_name) in self.trend_names.iter().enumerate() {

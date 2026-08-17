@@ -22,7 +22,7 @@ tempfile = "3.27.0"
 reqwest = { version = "0.13.4", features = ["json"] }
 rust_decimal = "1.42.1"
 rust_decimal_macros = "1.40.0"
-testcontainers = "0.27.3"
+testcontainers = "0.28.0"
 url = "2.5.8"
 log = "0.4.33"
 async-trait = "0.1.92"

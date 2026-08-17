@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use crate::commands::common::{Cmd, CmdResult, connect_db};
+use comfy_table::{ContentLineStyle, LineStyle, TableStyle};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct TrendMaterializationList {}
@@ -18,8 +19,14 @@ impl TrendMaterializationList {
             .unwrap();
 
         let mut table = comfy_table::Table::new();
-        let style = "     ═╪ ┆          ";
-        table.load_preset(style);
+        let style = TableStyle::new()
+            .top_border(LineStyle::none())
+            .header_lines(ContentLineStyle::none().junction('┆'))
+            .header_separator(LineStyle::none().junction('╪').fill('═'))
+            .content_lines(ContentLineStyle::none().junction('┆'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none());
+        table.load_style(style);
         table.set_header(vec!["Id", "Name"]);
 
         for row in rows {
