@@ -34,7 +34,7 @@ rand = { version = "0.10.2" }
 testcontainers = "0.28.0"
 quick_cache = "0.7.0"
 refinery = { version = "0.9.2", features = ["tokio-postgres"] }
-bollard = "0.21.0"
+bollard = "0.21.1"
 erased-serde = "0.4.10"
 petgraph = "0.8.3"
 pg_query = "6.2.0"
