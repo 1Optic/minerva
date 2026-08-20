@@ -23,8 +23,8 @@ use async_trait::async_trait;
 
 use crate::changes::trend_store::{
     AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
-    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
-    StageTrendsForDeletion,
+    ModifyTrendExtraData, ModifyTrendStoreData, RemoveAliasColumn, RemoveTrendStorePart,
+    RemoveTrends, StageTrendsForDeletion,
 };
 use crate::entity::{EntityIdType, EntityMapping, default_entity_id_type};
 use crate::instance::DeploymentIgnore;
@@ -1475,6 +1475,24 @@ impl TrendStore {
         options: TrendStoreDiffOptions,
     ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        if self.retention_period != other.retention_period
+            || self.partition_size != other.partition_size
+        {
+            changes.push(Box::new(ModifyTrendStoreData {
+                trend_store: self.into(),
+                partition_size: if self.partition_size != other.partition_size {
+                    Some(other.partition_size)
+                } else {
+                    None
+                },
+                retention_period: if self.retention_period != other.retention_period {
+                    Some(other.retention_period)
+                } else {
+                    None
+                },
+            }));
+        }
 
         for other_part in &other.parts {
             match self
