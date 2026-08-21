@@ -1289,7 +1289,7 @@ impl TrendStorePart {
     pub fn diff(
         &self,
         other: &TrendStorePart,
-        options: TrendStorePartDiffOptions,
+        options: &TrendStorePartDiffOptions,
     ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
@@ -1468,18 +1468,11 @@ fn default_retention_period() -> Duration {
 }
 
 impl TrendStore {
-    #[must_use]
-    pub fn diff(
-        &self,
-        other: &TrendStore,
-        options: TrendStoreDiffOptions,
-    ) -> Vec<Box<dyn Change + Send>> {
-        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
-
+    fn attributes_diff(&self, other: &TrendStore) -> Option<Box<ModifyTrendStoreData>> {
         if self.retention_period != other.retention_period
             || self.partition_size != other.partition_size
         {
-            changes.push(Box::new(ModifyTrendStoreData {
+            Some(Box::new(ModifyTrendStoreData {
                 trend_store: self.into(),
                 partition_size: if self.partition_size != other.partition_size {
                     Some(other.partition_size)
@@ -1491,8 +1484,37 @@ impl TrendStore {
                 } else {
                     None
                 },
-            }));
+            }))
+        } else {
+            None
         }
+    }
+
+    fn new_parts(&self, other: &TrendStore) -> Vec<Box<dyn Change + Send>> {
+        other
+            .parts
+            .iter()
+            .filter(|other_part| {
+                !self
+                    .parts
+                    .iter()
+                    .any(|my_part| my_part.name == other_part.name)
+            })
+            .map(|other_part| {
+                Box::new(AddTrendStorePart {
+                    trend_store: self.into(),
+                    trend_store_part: other_part.clone(),
+                }) as Box<dyn Change + Send>
+            })
+            .collect()
+    }
+
+    fn part_differences(
+        &self,
+        other: &TrendStore,
+        part_diff_options: &TrendStorePartDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         for other_part in &other.parts {
             match self
@@ -1501,34 +1523,51 @@ impl TrendStore {
                 .find(|my_part| my_part.name == other_part.name)
             {
                 Some(my_part) => {
-                    changes.append(&mut my_part.diff(other_part, options.part_diff_options()));
+                    changes.append(&mut my_part.diff(other_part, part_diff_options));
                 }
-                None => {
-                    changes.push(Box::new(AddTrendStorePart {
-                        trend_store: self.into(),
-                        trend_store_part: other_part.clone(),
-                    }));
-                }
+                None => {}
             }
         }
 
+        changes
+    }
+
+    fn removed_parts(&self, other: &TrendStore) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
         for my_part in &self.parts {
-            match &other
+            if !&other
                 .parts
                 .iter()
-                .find(|other_part| my_part.name == other_part.name)
+                .any(|other_part| my_part.name == other_part.name)
             {
-                Some(_) => {
-                    // Ok, the trend store part still exists
-                }
-                None => {
-                    if !options.ignore_deletions {
-                        changes.push(Box::new(RemoveTrendStorePart {
-                            name: my_part.name.clone(),
-                        }));
-                    }
-                }
+                changes.push(Box::new(RemoveTrendStorePart {
+                    name: my_part.name.clone(),
+                }));
             }
+        }
+
+        changes
+    }
+
+    #[must_use]
+    pub fn diff(
+        &self,
+        other: &TrendStore,
+        options: TrendStoreDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        if let Some(attributes_change) = self.attributes_diff(other) {
+            changes.push(attributes_change);
+        }
+
+        changes.append(&mut self.new_parts(other));
+
+        changes.append(&mut self.part_differences(other, &options.part_diff_options()));
+
+        if !options.ignore_deletions {
+            changes.append(&mut self.removed_parts(other));
         }
 
         changes
