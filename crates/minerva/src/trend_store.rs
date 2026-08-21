@@ -1517,15 +1517,12 @@ impl TrendStore {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
         for other_part in &other.parts {
-            match self
+            if let Some(my_part) = self
                 .parts
                 .iter()
                 .find(|my_part| my_part.name == other_part.name)
             {
-                Some(my_part) => {
-                    changes.append(&mut my_part.diff(other_part, part_diff_options));
-                }
-                None => {}
+                changes.append(&mut my_part.diff(other_part, part_diff_options));
             }
         }
 
