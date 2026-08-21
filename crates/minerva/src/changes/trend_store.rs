@@ -3,6 +3,7 @@ use chrono::Utc;
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::*;
 use console::Style;
+use humantime::format_duration;
 use postgres_protocol::escape::escape_identifier;
 use rand::distr::{Alphanumeric, SampleString};
 use rust_decimal::Decimal;
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{self, Display};
+use std::time::Duration;
 use thiserror::Error;
 use tokio_postgres::{Client, GenericClient};
 
@@ -1426,6 +1428,170 @@ impl Changed for RemovedTrendStorePart {
         Some(Box::new(AddTrendStorePart {
             trend_store: self.trend_store.clone(),
             trend_store_part: self.trend_store_part.clone(),
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ModifyTrendStoreData {
+    pub trend_store: TrendStoreRef,
+    #[serde(with = "humantime_serde")]
+    pub partition_size: Option<Duration>,
+    #[serde(with = "humantime_serde")]
+    pub retention_period: Option<Duration>,
+}
+
+impl fmt::Display for ModifyTrendStoreData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "ModifyTrendStore({}, {}, {})",
+            self.trend_store.data_source,
+            self.trend_store.entity_type,
+            format_duration(self.trend_store.granularity)
+        )?;
+
+        if let Some(partition_size) = self.partition_size {
+            writeln!(f, " - partition_size: {}", format_duration(partition_size))?;
+        }
+
+        if let Some(retention_period) = self.retention_period {
+            writeln!(
+                f,
+                " - retention_period: {}",
+                format_duration(retention_period)
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+#[typetag::serde]
+impl Change for ModifyTrendStoreData {
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let query = concat!(
+            "SELECT trend_store.id, partition_size::text, retention_period::text FROM trend_directory.trend_store ",
+            "JOIN directory.entity_type et ON et.id = trend_store.entity_type_id ",
+            "JOIn directory.data_source ds ON ds.id = trend_store.data_source_id ",
+            "WHERE et.name = $1 AND ds.name = $2 AND granularity = $3::text::interval"
+        );
+        let rows = client
+            .query(
+                query,
+                &[
+                    &self.trend_store.entity_type,
+                    &self.trend_store.data_source,
+                    &format_duration(self.trend_store.granularity).to_string(),
+                ],
+            )
+            .await?;
+
+        if rows.is_empty() {
+            return Err(RuntimeError::from_msg(format!(
+                "Trend store {}_{}_{} does not exist",
+                self.trend_store.entity_type,
+                self.trend_store.data_source,
+                format_duration(self.trend_store.granularity)
+            ))
+            .into());
+        }
+        let row = &rows[0];
+        let id: i32 = row.get("id");
+        let current_partition_size: Duration = humantime::parse_duration(
+            row.get::<_, String>("partition_size")
+                .replace("mons", "months")
+                .as_str(),
+        )
+        .map_err(|e| RuntimeError::from_msg(format!("Error parsing partition_size: {e}")))?;
+        let current_retention_period: Duration = humantime::parse_duration(
+            row.get::<_, String>("retention_period")
+                .replace("mons", "months")
+                .as_str(),
+        )
+        .map_err(|e| RuntimeError::from_msg(format!("Error parsing retention_period: {e}")))?;
+
+        if let Some(partition_size) = self.partition_size {
+            let query = concat!(
+                "UPDATE trend_directory.trend_store ",
+                "SET partition_size = $1::text::interval ",
+                "WHERE id = $2"
+            );
+            client
+                .execute(query, &[&format_duration(partition_size).to_string(), &id])
+                .await?;
+        }
+        if let Some(retention_period) = self.retention_period {
+            let query = concat!(
+                "UPDATE trend_directory.trend_store ",
+                "SET retention_period = $1::text::interval ",
+                "WHERE id = $2"
+            );
+            client
+                .execute(
+                    query,
+                    &[&format_duration(retention_period).to_string(), &id],
+                )
+                .await?;
+        }
+        Ok(Box::new(ModifiedTrendStoreData {
+            trend_store: self.trend_store.clone(),
+            old_partition_size: self.partition_size.map(|_| current_partition_size),
+            old_retention_period: self.retention_period.map(|_| current_retention_period),
+            new_partition_size: self.partition_size,
+            new_retention_period: self.retention_period,
+        }))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub struct ModifiedTrendStoreData {
+    pub trend_store: TrendStoreRef,
+    #[serde(with = "humantime_serde")]
+    pub old_partition_size: Option<Duration>,
+    #[serde(with = "humantime_serde")]
+    pub old_retention_period: Option<Duration>,
+    #[serde(with = "humantime_serde")]
+    pub new_partition_size: Option<Duration>,
+    #[serde(with = "humantime_serde")]
+    pub new_retention_period: Option<Duration>,
+}
+
+impl Display for ModifiedTrendStoreData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Modified trend store {}_{}_{}: {}{}{}",
+            self.trend_store.data_source,
+            self.trend_store.entity_type,
+            format_duration(self.trend_store.granularity),
+            match self.new_partition_size {
+                Some(size) => format!("partition_size: {}", format_duration(size)),
+                None => "".to_string(),
+            },
+            if self.new_partition_size.is_some() && self.new_retention_period.is_some() {
+                ", ".to_string()
+            } else {
+                "".to_string()
+            },
+            match self.new_retention_period {
+                Some(period) => format!("retention_period: {}", format_duration(period)),
+                None => "".to_string(),
+            },
+        )
+    }
+}
+
+#[typetag::serde]
+impl Changed for ModifiedTrendStoreData {
+    fn revert(&self) -> Option<Box<dyn Change>> {
+        Some(Box::new(ModifyTrendStoreData {
+            trend_store: self.trend_store.clone(),
+            partition_size: self.old_partition_size,
+            retention_period: self.old_retention_period,
         }))
     }
 }

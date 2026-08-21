@@ -23,8 +23,8 @@ use async_trait::async_trait;
 
 use crate::changes::trend_store::{
     AddAliasColumn, AddTrendStorePart, AddTrends, ModifyTrendDataType, ModifyTrendDataTypes,
-    ModifyTrendExtraData, RemoveAliasColumn, RemoveTrendStorePart, RemoveTrends,
-    StageTrendsForDeletion,
+    ModifyTrendExtraData, ModifyTrendStoreData, RemoveAliasColumn, RemoveTrendStorePart,
+    RemoveTrends, StageTrendsForDeletion,
 };
 use crate::entity::{EntityIdType, EntityMapping, default_entity_id_type};
 use crate::instance::DeploymentIgnore;
@@ -1289,7 +1289,7 @@ impl TrendStorePart {
     pub fn diff(
         &self,
         other: &TrendStorePart,
-        options: TrendStorePartDiffOptions,
+        options: &TrendStorePartDiffOptions,
     ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
@@ -1468,6 +1468,85 @@ fn default_retention_period() -> Duration {
 }
 
 impl TrendStore {
+    fn attributes_diff(&self, other: &TrendStore) -> Option<Box<ModifyTrendStoreData>> {
+        if self.retention_period != other.retention_period
+            || self.partition_size != other.partition_size
+        {
+            Some(Box::new(ModifyTrendStoreData {
+                trend_store: self.into(),
+                partition_size: if self.partition_size != other.partition_size {
+                    Some(other.partition_size)
+                } else {
+                    None
+                },
+                retention_period: if self.retention_period != other.retention_period {
+                    Some(other.retention_period)
+                } else {
+                    None
+                },
+            }))
+        } else {
+            None
+        }
+    }
+
+    fn new_parts(&self, other: &TrendStore) -> Vec<Box<dyn Change + Send>> {
+        other
+            .parts
+            .iter()
+            .filter(|other_part| {
+                !self
+                    .parts
+                    .iter()
+                    .any(|my_part| my_part.name == other_part.name)
+            })
+            .map(|other_part| {
+                Box::new(AddTrendStorePart {
+                    trend_store: self.into(),
+                    trend_store_part: other_part.clone(),
+                }) as Box<dyn Change + Send>
+            })
+            .collect()
+    }
+
+    fn part_differences(
+        &self,
+        other: &TrendStore,
+        part_diff_options: &TrendStorePartDiffOptions,
+    ) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        for other_part in &other.parts {
+            if let Some(my_part) = self
+                .parts
+                .iter()
+                .find(|my_part| my_part.name == other_part.name)
+            {
+                changes.append(&mut my_part.diff(other_part, part_diff_options));
+            }
+        }
+
+        changes
+    }
+
+    fn removed_parts(&self, other: &TrendStore) -> Vec<Box<dyn Change + Send>> {
+        let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
+
+        for my_part in &self.parts {
+            if !&other
+                .parts
+                .iter()
+                .any(|other_part| my_part.name == other_part.name)
+            {
+                changes.push(Box::new(RemoveTrendStorePart {
+                    name: my_part.name.clone(),
+                }));
+            }
+        }
+
+        changes
+    }
+
     #[must_use]
     pub fn diff(
         &self,
@@ -1476,41 +1555,16 @@ impl TrendStore {
     ) -> Vec<Box<dyn Change + Send>> {
         let mut changes: Vec<Box<dyn Change + Send>> = Vec::new();
 
-        for other_part in &other.parts {
-            match self
-                .parts
-                .iter()
-                .find(|my_part| my_part.name == other_part.name)
-            {
-                Some(my_part) => {
-                    changes.append(&mut my_part.diff(other_part, options.part_diff_options()));
-                }
-                None => {
-                    changes.push(Box::new(AddTrendStorePart {
-                        trend_store: self.into(),
-                        trend_store_part: other_part.clone(),
-                    }));
-                }
-            }
+        if let Some(attributes_change) = self.attributes_diff(other) {
+            changes.push(attributes_change);
         }
 
-        for my_part in &self.parts {
-            match &other
-                .parts
-                .iter()
-                .find(|other_part| my_part.name == other_part.name)
-            {
-                Some(_) => {
-                    // Ok, the trend store part still exists
-                }
-                None => {
-                    if !options.ignore_deletions {
-                        changes.push(Box::new(RemoveTrendStorePart {
-                            name: my_part.name.clone(),
-                        }));
-                    }
-                }
-            }
+        changes.append(&mut self.new_parts(other));
+
+        changes.append(&mut self.part_differences(other, &options.part_diff_options()));
+
+        if !options.ignore_deletions {
+            changes.append(&mut self.removed_parts(other));
         }
 
         changes
