@@ -1,4 +1,4 @@
-CREATE FUNCTION directory.change_ownership_for_all_schemas(new_owner text)
+CREATE OR REPLACE FUNCTION directory.change_ownership_for_all_schemas(new_owner text)
   RETURNS void AS $$
     SET LOCAL citus.multi_shard_modify_mode TO 'sequential';
     SELECT directory.change_ownership_for_schema('alias', new_owner);
