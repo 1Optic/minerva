@@ -204,40 +204,41 @@ impl fmt::Debug for RemoveAttributes {
 #[typetag::serde]
 impl Change for RemoveAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
+
         let mut attributes: Vec<Attribute> = Vec::new();
         let tx = client.transaction().await?;
+
+        for attribute in &self.attributes {
+            let full_attribute = load_attribute(&tx, &self.attribute_store, attribute).await?;
+
+            attributes.push(full_attribute);
+        }
 
         tx.execute("SET citus.multi_shard_modify_mode TO 'sequential'", &[])
             .await?;
 
         let query = concat!(
-            "SELECT attribute_directory.drop_attribute(attribute_store, $1) ",
+            "SELECT attribute_directory.drop_attributes(attribute_store, $1) ",
             "FROM attribute_directory.attribute_store ",
             "JOIN directory.data_source ON data_source.id = attribute_store.data_source_id ",
             "JOIN directory.entity_type ON entity_type.id = attribute_store.entity_type_id ",
             "WHERE data_source.name = $2 AND entity_type.name = $3",
         );
 
-        for attribute in &self.attributes {
-            let full_attribute = load_attribute(&tx, &self.attribute_store, attribute).await?;
-
-            attributes.push(full_attribute);
-
-            tx.query(
-                query,
-                &[
-                    &attribute,
-                    &self.attribute_store.data_source,
-                    &self.attribute_store.entity_type,
-                ],
-            )
-            .await
-            .map_err(|e| {
-                DatabaseError::from_msg(format!(
-                    "Error removing attribute '{attribute}' from attribute store: {e}"
-                ))
-            })?;
-        }
+        tx.query(
+            query,
+            &[
+                &self.attributes,
+                &self.attribute_store.data_source,
+                &self.attribute_store.entity_type,
+            ],
+        )
+        .await
+        .map_err(|e| {
+            DatabaseError::from_msg(format!(
+                "Error removing attributes from attribute store: {e}"
+            ))
+        })?;
 
         tx.commit().await?;
 
