@@ -204,7 +204,6 @@ impl fmt::Debug for RemoveAttributes {
 #[typetag::serde]
 impl Change for RemoveAttributes {
     async fn apply(&self, client: &mut Client) -> ChangeResult {
-
         let mut attributes: Vec<Attribute> = Vec::new();
         let tx = client.transaction().await?;
 
