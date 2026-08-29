@@ -19,7 +19,7 @@ tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4", "with-serd
 rustls = { version = "0.23.43", features = ["ring"] }
 tokio-postgres-rustls = "0.14.0"
 rustls-native-certs = "0.8.4"
-log = "0.4.33"
+log = "0.4.34"
 env_logger = "0.11.11"
 deadpool-postgres = "0.14.2"
 reqwest = { version = "0.13.4", features = ["json"] }
