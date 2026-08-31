@@ -1596,7 +1596,7 @@ impl Changed for ModifiedTrendStoreData {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddTrendStore {
     pub trend_store: TrendStore,
