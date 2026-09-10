@@ -152,8 +152,8 @@ impl TrendViewMaterialization {
                 ") ",
                 "FROM trend_directory.trend_store_part WHERE name = $6",
             ),
-            &create_text_interval(self.attributes.old_data_threshold),
-            &create_text_interval(self.attributes.old_data_stability_delay),
+            create_text_interval(self.attributes.old_data_threshold),
+            create_text_interval(self.attributes.old_data_stability_delay),
         );
 
         let description_default = serde_json::json!("{}");
@@ -1069,8 +1069,8 @@ impl TrendFunctionMaterialization {
                 ") ",
                 "FROM trend_directory.trend_store_part WHERE name = $6",
             ),
-            &create_text_interval(self.attributes.old_data_threshold),
-            &create_text_interval(self.attributes.old_data_stability_delay),
+            create_text_interval(self.attributes.old_data_threshold),
+            create_text_interval(self.attributes.old_data_stability_delay),
         );
 
         let description_default = serde_json::json!("{}");
@@ -2477,7 +2477,7 @@ pub async fn reset_source_fingerprint<T: GenericClient + Send + Sync>(
             "JOIN trend_directory.materialization m ON ms.materialization_id = m.id ",
             "WHERE m::text = $1 AND nms.materialization_id = m.id AND nms.timestamp = ms.timestamp"
         ),
-        &materialization
+        materialization
     );
 
     client
