@@ -23,6 +23,8 @@ pub struct StartOpt {
     create_partitions: bool,
     #[arg(long = "node-count", help = "number of worker nodes")]
     node_count: Option<u8>,
+    #[arg(long, help = "run the coordinator as the only Citus node")]
+    single_node: bool,
     #[arg(
         long = "with-definition",
         help = "Minerva instance definition root directory"
@@ -62,12 +64,14 @@ impl StartOpt {
                     }),
                     config_file,
                     worker_count: node_count,
+                    single_node: self.single_node,
                     ..Default::default()
                 }
             } else {
                 MinervaClusterConfig {
                     config_file,
                     worker_count: node_count,
+                    single_node: self.single_node,
                     ..Default::default()
                 }
             }
@@ -75,6 +79,7 @@ impl StartOpt {
             MinervaClusterConfig {
                 config_file,
                 worker_count: node_count,
+                single_node: self.single_node,
                 ..Default::default()
             }
         };

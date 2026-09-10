@@ -342,6 +342,7 @@ pub struct MinervaClusterConfig {
     pub image_provider: Box<dyn ImageProvider + Sync + Send>,
     pub config_file: PathBuf,
     pub worker_count: u8,
+    pub single_node: bool,
     pub prefix: String,
     pub print_stdout: bool,
     pub print_stderr: bool,
@@ -353,6 +354,7 @@ impl Default for MinervaClusterConfig {
             image_provider: Box::new(FixedImageProvider::default()),
             config_file: PathBuf::from_iter([env!("CARGO_MANIFEST_DIR"), "postgresql.conf"]),
             worker_count: 3,
+            single_node: false,
             prefix: generate_name(6),
             print_stdout: true,
             print_stderr: true,
@@ -413,14 +415,17 @@ impl Connector {
 pub struct MinervaClusterConnector {
     pub worker_connectors: Vec<Connector>,
     pub coordinator_connector: Connector,
+    pub single_node: bool,
 }
 
 impl MinervaClusterConnector {
     pub async fn create_role(&self, query: &str) -> Result<(), Error> {
         self.coordinator_connector.create_role(query).await?;
 
-        for worker_conn in &self.worker_connectors {
-            worker_conn.create_role(query).await?;
+        if !self.single_node {
+            for worker_conn in &self.worker_connectors {
+                worker_conn.create_role(query).await?;
+            }
         }
 
         Ok(())
@@ -429,49 +434,51 @@ impl MinervaClusterConnector {
     pub async fn create_db(&self) -> Result<TestDatabase, MinervaClusterError> {
         let database_name = generate_name(16);
 
-        for worker_connector in &self.worker_connectors {
-            {
-                info!(
-                    "Connecting to worker node '{}:{}'",
-                    worker_connector.internal_addr, worker_connector.port
-                );
-                let config = worker_connector.connect_config(DEFAULT_POSTGRES_USER);
-                let worker_client = connect_to_db(&config, 3).await.map_err(|e| {
-                    MinervaClusterError::DatabaseCreation(format!(
-                        "Could not connect to worker node: {e}"
-                    ))
-                })?;
-
-                create_database(&worker_client, &database_name)
-                    .await
-                    .map_err(|e| {
+        if !self.single_node {
+            for worker_connector in &self.worker_connectors {
+                {
+                    info!(
+                        "Connecting to worker node '{}:{}'",
+                        worker_connector.internal_addr, worker_connector.port
+                    );
+                    let config = worker_connector.connect_config(DEFAULT_POSTGRES_USER);
+                    let worker_client = connect_to_db(&config, 3).await.map_err(|e| {
                         MinervaClusterError::DatabaseCreation(format!(
-                            "Could not create database on worker node: {e}"
+                            "Could not connect to worker node: {e}"
                         ))
                     })?;
 
-                info!("Created database '{database_name}' on worker node");
+                    create_database(&worker_client, &database_name)
+                        .await
+                        .map_err(|e| {
+                            MinervaClusterError::DatabaseCreation(format!(
+                                "Could not create database on worker node: {e}"
+                            ))
+                        })?;
+
+                    info!("Created database '{database_name}' on worker node");
+                }
+
+                let worker_client_db =
+                    connect_to_db(&worker_connector.connect_config(&database_name), 3)
+                        .await
+                        .map_err(|e| {
+                            MinervaClusterError::DatabaseCreation(format!(
+                                "Could not connect to new database on worker node: {e}"
+                            ))
+                        })?;
+
+                worker_client_db
+                    .execute("CREATE EXTENSION citus", &[])
+                    .await
+                    .map_err(|e| {
+                        MinervaClusterError::DatabaseCreation(format!(
+                            "Could not create Citus extension on worker node: {e}"
+                        ))
+                    })?;
+
+                info!("Created Citus extension on worker node in database '{database_name}'");
             }
-
-            let worker_client_db =
-                connect_to_db(&worker_connector.connect_config(&database_name), 3)
-                    .await
-                    .map_err(|e| {
-                        MinervaClusterError::DatabaseCreation(format!(
-                            "Could not connect to new database on worker node: {e}"
-                        ))
-                    })?;
-
-            worker_client_db
-                .execute("CREATE EXTENSION citus", &[])
-                .await
-                .map_err(|e| {
-                    MinervaClusterError::DatabaseCreation(format!(
-                        "Could not create Citus extension on worker node: {e}"
-                    ))
-                })?;
-
-            info!("Created Citus extension on worker node in database '{database_name}'");
         }
 
         let config = self
@@ -523,18 +530,28 @@ impl MinervaClusterConnector {
                 ))
             })?;
 
-        for worker_connector in &self.worker_connectors {
-            add_worker(
-                &mut db_client,
-                worker_connector.internal_addr,
-                worker_connector.internal_port,
-            )
-            .await
-            .map_err(|e| {
-                MinervaClusterError::DatabaseCreation(format!(
-                    "Could not connect worker node to coordinator: {e}"
-                ))
-            })?;
+        if self.single_node {
+            add_worker(&mut db_client, coordinator_addr, coordinator_port as u16)
+                .await
+                .map_err(|e| {
+                    MinervaClusterError::DatabaseCreation(format!(
+                        "Could not connect coordinator as worker node: {e}"
+                    ))
+                })?;
+        } else {
+            for worker_connector in &self.worker_connectors {
+                add_worker(
+                    &mut db_client,
+                    worker_connector.internal_addr,
+                    worker_connector.internal_port,
+                )
+                .await
+                .map_err(|e| {
+                    MinervaClusterError::DatabaseCreation(format!(
+                        "Could not connect worker node to coordinator: {e}"
+                    ))
+                })?;
+            }
         }
 
         Ok(TestDatabase {
@@ -559,9 +576,15 @@ impl MinervaCluster {
 
         let image_ref = config.image_provider.image().await;
 
+        let controller_name = if config.single_node {
+            "minerva".to_string()
+        } else {
+            format!("{network_name}_coordinator")
+        };
+
         let controller_container = create_citus_container(
             &image_ref,
-            &format!("{network_name}_coordinator"),
+            &controller_name,
             Some(5432),
             &config.config_file,
         )
@@ -632,7 +655,13 @@ impl MinervaCluster {
 
         let image_ref = config.image_provider.image().await;
 
-        for i in 1..=config.worker_count {
+        let worker_count = if config.single_node {
+            0
+        } else {
+            config.worker_count
+        };
+
+        for i in 1..=worker_count {
             let worker =
                 create_worker_node(&image_ref, &network_name, i, &config.config_file).await?;
 
@@ -642,6 +671,7 @@ impl MinervaCluster {
         let cluster_connector = MinervaClusterConnector {
             coordinator_connector,
             worker_connectors: workers.iter().map(|w| w.connector.clone()).collect(),
+            single_node: config.single_node,
         };
 
         cluster_connector
@@ -664,7 +694,11 @@ impl MinervaCluster {
 
     #[must_use]
     pub fn size(&self) -> usize {
-        self.workers.len()
+        if self.connector.single_node {
+            1
+        } else {
+            self.workers.len()
+        }
     }
 
     pub async fn connect_to_coordinator(&self) -> Client {
