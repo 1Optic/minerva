@@ -22,4 +22,4 @@ rustls-native-certs = "0.8.4"
 log = "0.4.34"
 env_logger = "0.11.11"
 deadpool-postgres = "0.14.2"
-reqwest = { version = "0.13.4", features = ["json"] }
+reqwest = { version = "0.13.5", features = ["json"] }
