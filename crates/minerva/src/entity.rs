@@ -366,9 +366,8 @@ impl EntityMapping for CachingEntityMapping {
 
                 let query = format!(
                     "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
-                    SELECT l.name, e.primary_alias FROM lookup_list l \
-                    LEFT JOIN entity.{} e ON l.name = e.name ",
-                    escape_identifier(entity_type)
+                    SELECT l.name, (entity.{}(l.name)).primary_alias FROM lookup_list l",
+                    escape_identifier(&format!("to_{}", entity_type))
                 );
 
                 let mut names_list: Vec<&str> = Vec::new();
