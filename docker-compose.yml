@@ -1,0 +1,12 @@
+services:
+  minerva:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    container_name: minerva
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./examples/tiny_instance_v2:/minerva-instance
