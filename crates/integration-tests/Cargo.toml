@@ -17,7 +17,7 @@ chrono = { version = "0.4.45", features = ["serde"] }
 serde_json = "1.0.151"
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
-rand = "0.10.2"
+rand = "0.10.3"
 tempfile = "3.27.0"
 reqwest = { version = "0.13.5", features = ["json"] }
 rust_decimal = "1.43.0"
