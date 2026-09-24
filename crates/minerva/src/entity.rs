@@ -359,16 +359,7 @@ impl EntityMapping for CachingEntityMapping {
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
         match &self.uses_alias_column(entity_type, client).await? {
             true => {
-                // Ensure that all entities actually exist in the database
-                self.names_to_entity_ids(client, entity_type, names).await?;
-
                 let mut aliases: HashMap<String, String> = HashMap::new();
-
-                let query = format!(
-                    "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
-                    SELECT l.name, (entity.{}(l.name)).primary_alias FROM lookup_list l",
-                    escape_identifier(&format!("to_{}", entity_type))
-                );
 
                 let mut names_list: Vec<&str> = Vec::new();
 
@@ -382,6 +373,12 @@ impl EntityMapping for CachingEntityMapping {
                         names_list.push(name.as_ref());
                     }
                 }
+
+                let query = format!(
+                    "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
+                    SELECT l.name, (entity.{}(l.name)).primary_alias FROM lookup_list l",
+                    escape_identifier(&format!("to_{}", entity_type))
+                );
 
                 // Only lookup in the database if there is anything left to lookup
                 if !names_list.is_empty() {
