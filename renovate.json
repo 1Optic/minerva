@@ -27,6 +27,7 @@
     {
       "matchPackageNames": [
         "quay.io/buildah/stable",
+        "registry.hub.docker.com/commitlint/commitlint",
         "sonarsource/sonar-scanner-cli"
       ],
       "pinDigests": false
