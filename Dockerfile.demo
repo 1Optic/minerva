@@ -10,7 +10,7 @@ ENV POSTGIS_MAJOR=3
 RUN apt-get update && apt-get install -y --no-install-recommends \
  curl \
  "postgresql-$PG_MAJOR-postgis-$POSTGIS_MAJOR" \
- && curl -fsS https://pkgs.1optic.io/minerva-cli_9.45.3-1_amd64.deb -o minerva.deb \
+ && curl -fsS https://pkgs.1optic.io/minerva-cli_9.46.0-1_amd64.deb -o minerva.deb \
  && dpkg -i minerva.deb \
  && rm minerva.deb \
  && rm -rf /var/lib/apt/lists/*
