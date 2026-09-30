@@ -27,7 +27,7 @@ url = "2.5.8"
 log = "0.4.34"
 async-trait = "0.1.92"
 toxiproxy_rust = "0.1.6"
-thiserror = "2.0.20"
+thiserror = "2.0.21"
 postgres-protocol = "0.6.12"
 
 [[test]]
