@@ -59,19 +59,19 @@ pub trait Change: fmt::Display + Send + Sync + Debug + erased_serde::Serialize {
         Vec::new()
     }
 
-    fn is_sse_change(&self) -> bool {
-        false
+    fn is_provisioned_change(&self) -> bool {
+        true
     }
 
-    async fn apply_no_sse(&self, client: &mut Client) -> ChangeResult {
-        if !self.is_sse_change() {
+    async fn apply_provisioned(&self, client: &mut Client) -> ChangeResult {
+        if self.is_provisioned_change() {
             self.apply(client).await
         } else {
             Ok(Box::new(NoChange {}))
         }
     }
 
-    fn remove_sse_changes(&mut self) {}
+    fn remove_unprovisioned_changes(&mut self) {}
 }
 
 #[derive(Serialize, Deserialize, Debug)]

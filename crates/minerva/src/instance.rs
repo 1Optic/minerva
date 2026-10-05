@@ -72,7 +72,7 @@ pub struct DiffOptions {
     pub ignore_deletions: bool,
     pub instance_ignores: Vec<DeploymentIgnore>,
     pub stage_deletions: bool,
-    pub include_sse: bool,
+    pub include_unprovisioned: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -880,14 +880,14 @@ impl MinervaInstance {
                 .find(|my_trigger| my_trigger.name == other_trigger.name)
             {
                 Some(my_trigger) => {
-                    let differences = my_trigger.differences(other_trigger, options.include_sse);
+                    let differences = my_trigger.differences(other_trigger, options.include_unprovisioned);
                     if !differences.is_empty() {
                         changes.push(Box::new(UpdateTrigger {
                             trigger: other_trigger.clone(),
                             verify: false,
                             changes: Some(differences),
                         }));
-                    } else if my_trigger.enabled != other_trigger.enabled && options.include_sse {
+                    } else if my_trigger.enabled != other_trigger.enabled && options.include_unprovisioned {
                         if other_trigger.enabled {
                             changes.push(Box::new(EnableTrigger {
                                 trigger_name: my_trigger.name.clone(),
@@ -919,7 +919,7 @@ impl MinervaInstance {
         }
 
         // Check for triggers to remove
-        if options.include_sse {
+        if options.include_unprovisioned {
             for my_trigger in &self.triggers {
                 if !options.ignore_deletions
                     && !other
