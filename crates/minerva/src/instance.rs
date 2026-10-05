@@ -880,14 +880,17 @@ impl MinervaInstance {
                 .find(|my_trigger| my_trigger.name == other_trigger.name)
             {
                 Some(my_trigger) => {
-                    let differences = my_trigger.differences(other_trigger, options.include_unprovisioned);
+                    let differences =
+                        my_trigger.differences(other_trigger, options.include_unprovisioned);
                     if !differences.is_empty() {
                         changes.push(Box::new(UpdateTrigger {
                             trigger: other_trigger.clone(),
                             verify: false,
                             changes: Some(differences),
                         }));
-                    } else if my_trigger.enabled != other_trigger.enabled && options.include_unprovisioned {
+                    } else if my_trigger.enabled != other_trigger.enabled
+                        && options.include_unprovisioned
+                    {
                         if other_trigger.enabled {
                             changes.push(Box::new(EnableTrigger {
                                 trigger_name: my_trigger.name.clone(),
