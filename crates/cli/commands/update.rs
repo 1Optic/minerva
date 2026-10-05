@@ -45,9 +45,9 @@ pub struct UpdateOpt {
     stage_deletions: bool,
     #[arg(
         long,
-        help = "include changes that may be caused by the self-service environment"
+        help = "include changes that can be changed outside the provisioned environment"
     )]
-    include_sse: bool,
+    include_unprovisioned: bool,
     #[arg(long)]
     from_diff: Option<PathBuf>,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
@@ -129,7 +129,7 @@ impl UpdateOpt {
                     ignore_deletions: self.ignore_deletions,
                     instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
                     stage_deletions: self.stage_deletions,
-                    include_sse: self.include_sse,
+                    include_unprovisioned: self.include_unprovisioned,
                 };
 
                 plan_update(&instance_db, &instance_def, diff_options)
@@ -151,7 +151,7 @@ impl UpdateOpt {
                 &mut client,
                 &log_dir,
                 update_plan.changes,
-                !self.include_sse,
+                !self.include_unprovisioned,
                 !self.non_interactive,
             )
             .await
@@ -188,8 +188,8 @@ fn plan_update(
     let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
     let mut changes = db_instance.diff(other, diff_options.clone());
 
-    if !diff_options.include_sse {
-        changes.retain(|c| !c.is_sse_change());
+    if !diff_options.include_unprovisioned {
+        changes.retain(|c| c.is_provisioned_change());
     }
 
     // Split the changes between changes on existing objects and changes for new objects
@@ -197,9 +197,9 @@ fn plan_update(
         .into_iter()
         .partition(|c| c.existing_object().is_some());
 
-    if !diff_options.include_sse {
+    if !diff_options.include_unprovisioned {
         for c in &mut changes_to_existing_objects {
-            c.remove_sse_changes();
+            c.remove_unprovisioned_changes();
         }
     }
 
@@ -262,14 +262,14 @@ async fn update(
     client: &mut Client,
     log_dir: &Path,
     changes: Vec<Box<dyn Change + std::marker::Send>>,
-    skip_sse: bool,
+    provisioned_only: bool,
     interactive: bool,
 ) -> CmdResult {
     println!("Applying changes:");
 
     let mut changes_internal = changes;
-    if skip_sse {
-        changes_internal.retain(|c| !c.is_sse_change());
+    if provisioned_only {
+        changes_internal.retain(|c| c.is_provisioned_change());
     }
 
     let num_changes = changes_internal.len();
@@ -278,8 +278,8 @@ async fn update(
         println!("\n\n* [{}/{num_changes}] {change}", index + 1);
 
         if !interactive || interact(client, change.as_ref()).await? {
-            let change_result = if skip_sse {
-                change.apply_no_sse(client).await
+            let change_result = if provisioned_only {
+                change.apply_provisioned(client).await
             } else {
                 change.apply(client).await
             };

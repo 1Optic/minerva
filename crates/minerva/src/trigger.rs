@@ -199,7 +199,7 @@ impl Trigger {
         )
     }
 
-    pub fn differences(&self, other: &Trigger, include_sse: bool) -> Vec<String> {
+    pub fn differences(&self, other: &Trigger, include_unprovisioned: bool) -> Vec<String> {
         let mut changes = Vec::new();
         // We need to use the experimental plpgsql parsing because the fingerprinting does not
         // yet work for plpgsql code.
@@ -216,7 +216,7 @@ impl Trigger {
                 .find(|other_threshold| threshold.name == other_threshold.name)
             {
                 Some(other_threshold) => {
-                    if include_sse
+                    if include_unprovisioned
                         & (!self
                             .compare_data_types(&threshold.data_type, &other_threshold.data_type)
                             || threshold.value != other_threshold.value)
@@ -1236,8 +1236,8 @@ impl Change for DeleteTrigger {
         Ok(Box::new(DeletedTrigger { trigger }))
     }
 
-    fn is_sse_change(&self) -> bool {
-        true
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
@@ -1310,7 +1310,7 @@ pub struct UpdateTrigger {
 }
 
 impl UpdateTrigger {
-    fn non_sse_changes(&self) -> Vec<String> {
+    fn provisioned_changes(&self) -> Vec<String> {
         match &self.changes {
             Some(changes) => {
                 let filtered_changes: Vec<String> = changes
@@ -1347,7 +1347,7 @@ impl fmt::Display for UpdateTrigger {
 #[async_trait]
 #[typetag::serde]
 impl Change for UpdateTrigger {
-    async fn apply_no_sse(&self, client: &mut Client) -> ChangeResult {
+    async fn apply_provisioned(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
         let existing_trigger = load_trigger(&mut transaction, &self.trigger.name)
@@ -1411,15 +1411,15 @@ impl Change for UpdateTrigger {
 
         transaction.commit().await?;
 
-        self.apply_no_sse(client).await
+        self.apply_provisioned(client).await
     }
 
-    fn is_sse_change(&self) -> bool {
-        self.non_sse_changes().is_empty()
+    fn is_provisioned_change(&self) -> bool {
+        !self.provisioned_changes().is_empty()
     }
 
-    fn remove_sse_changes(&mut self) {
-        self.changes = Some(self.non_sse_changes());
+    fn remove_unprovisioned_changes(&mut self) {
+        self.changes = Some(self.provisioned_changes());
     }
 }
 
@@ -1720,8 +1720,8 @@ impl Change for EnableTrigger {
         }))
     }
 
-    fn is_sse_change(&self) -> bool {
-        true
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
@@ -1777,8 +1777,8 @@ impl Change for DisableTrigger {
         }))
     }
 
-    fn is_sse_change(&self) -> bool {
-        true
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
