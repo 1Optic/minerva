@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- deps: Refresh Rust dependency lockfile to latest compatible versions, excluding updates awaiting pending status checks
+
 ## [9.46.0] - 2026-09-29
 
 ### Added
