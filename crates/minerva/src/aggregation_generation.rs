@@ -741,7 +741,7 @@ fn compile_entity_aggregation(
                 instance_config,
                 aggregation_context,
             )?;
-            add_to_aggregate_trend_store(instance_root, minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}' to trend store: {e}", aggregation_context.source_definition))
+            add_to_aggregate_trend_store(instance_root, minerva_instance, aggregation_context).map_err(|e| format!("Could not add result trend store part of function materialization from '{}', using '{}' to trend store: {e}", aggregation_context.source_definition, aggregation_context.definition.relation))
         }
         AggregationType::View => {
             generate_view_entity_aggregation(minerva_instance, aggregation_context)
