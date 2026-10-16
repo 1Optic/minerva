@@ -43,6 +43,11 @@ pub struct UpdateOpt {
     ignore_deletions: bool,
     #[arg(long)]
     stage_deletions: bool,
+    #[arg(
+        long,
+        help = "include changes that can be changed outside the provisioned environment"
+    )]
+    include_unprovisioned: bool,
     #[arg(long)]
     from_diff: Option<PathBuf>,
     #[arg(long, help = "Only generate a plan for the update steps and order")]
@@ -124,6 +129,7 @@ impl UpdateOpt {
                     ignore_deletions: self.ignore_deletions,
                     instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
                     stage_deletions: self.stage_deletions,
+                    include_unprovisioned: self.include_unprovisioned,
                 };
 
                 plan_update(&instance_db, &instance_def, diff_options)
@@ -145,6 +151,7 @@ impl UpdateOpt {
                 &mut client,
                 &log_dir,
                 update_plan.changes,
+                !self.include_unprovisioned,
                 !self.non_interactive,
             )
             .await
@@ -179,12 +186,22 @@ fn plan_update(
     diff_options: DiffOptions,
 ) -> UpdatePlan {
     let mut planned_changes: Vec<Box<dyn Change + std::marker::Send>> = Vec::new();
-    let changes = db_instance.diff(other, diff_options);
+    let mut changes = db_instance.diff(other, diff_options.clone());
+
+    if !diff_options.include_unprovisioned {
+        changes.retain(|c| c.is_provisioned_change());
+    }
 
     // Split the changes between changes on existing objects and changes for new objects
     let (mut changes_to_existing_objects, changes_to_new_objects): (Vec<_>, Vec<_>) = changes
         .into_iter()
         .partition(|c| c.existing_object().is_some());
+
+    if !diff_options.include_unprovisioned {
+        for c in &mut changes_to_existing_objects {
+            c.remove_unprovisioned_changes();
+        }
+    }
 
     let db_instance_graph = db_instance.dependency_graph();
 
@@ -245,17 +262,28 @@ async fn update(
     client: &mut Client,
     log_dir: &Path,
     changes: Vec<Box<dyn Change + std::marker::Send>>,
+    provisioned_only: bool,
     interactive: bool,
 ) -> CmdResult {
     println!("Applying changes:");
 
-    let num_changes = changes.len();
+    let mut changes_internal = changes;
+    if provisioned_only {
+        changes_internal.retain(|c| c.is_provisioned_change());
+    }
 
-    for (index, change) in changes.iter().enumerate() {
+    let num_changes = changes_internal.len();
+
+    for (index, change) in changes_internal.iter().enumerate() {
         println!("\n\n* [{}/{num_changes}] {change}", index + 1);
 
         if !interactive || interact(client, change.as_ref()).await? {
-            match change.apply(client).await {
+            let change_result = if provisioned_only {
+                change.apply_provisioned(client).await
+            } else {
+                change.apply(client).await
+            };
+            match change_result {
                 Ok(changed) => {
                     let now = chrono::offset::Local::now();
 

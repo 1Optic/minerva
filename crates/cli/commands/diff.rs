@@ -27,6 +27,11 @@ pub struct DiffOpt {
     ignore_deletions: bool,
     #[arg(long)]
     stage_deletions: bool,
+    #[arg(
+        long,
+        help = "include changes that can be changed outside the provisioned environment"
+    )]
+    include_unprovisioned: bool,
     #[arg(long, help = "output diff in json format")]
     json: bool,
 }
@@ -76,6 +81,7 @@ impl DiffOpt {
             ignore_deletions: self.ignore_deletions,
             instance_ignores: instance_config.deployment.unwrap_or_default().ignore,
             stage_deletions: self.stage_deletions,
+            include_unprovisioned: self.include_unprovisioned,
         };
 
         let changes = other_instance.diff(&instance_def, diff_options);

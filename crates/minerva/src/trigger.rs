@@ -199,7 +199,7 @@ impl Trigger {
         )
     }
 
-    pub fn differences(&self, other: &Trigger) -> Vec<String> {
+    pub fn differences(&self, other: &Trigger, include_unprovisioned: bool) -> Vec<String> {
         let mut changes = Vec::new();
         // We need to use the experimental plpgsql parsing because the fingerprinting does not
         // yet work for plpgsql code.
@@ -216,8 +216,10 @@ impl Trigger {
                 .find(|other_threshold| threshold.name == other_threshold.name)
             {
                 Some(other_threshold) => {
-                    if !self.compare_data_types(&threshold.data_type, &other_threshold.data_type)
-                        || threshold.value != other_threshold.value
+                    if include_unprovisioned
+                        & (!self
+                            .compare_data_types(&threshold.data_type, &other_threshold.data_type)
+                            || threshold.value != other_threshold.value)
                     {
                         changes.push(format!("change threshold {}", threshold.name));
                     }
@@ -458,7 +460,7 @@ pub async fn list_triggers(conn: &mut Client) -> Result<Vec<TriggerRepr>, String
     triggers
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct AddTrigger {
     pub trigger: Trigger,
@@ -1182,7 +1184,7 @@ async fn unlink_trend_stores<T: GenericClient + Sync + Send>(
     ))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct DeleteTrigger {
     pub trigger_name: String,
@@ -1232,6 +1234,10 @@ impl Change for DeleteTrigger {
         tx.commit().await?;
 
         Ok(Box::new(DeletedTrigger { trigger }))
+    }
+
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
@@ -1295,12 +1301,28 @@ pub fn load_trigger_from_file(path: &PathBuf) -> Result<Trigger, Error> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateTrigger {
     pub trigger: Trigger,
     pub verify: bool,
     pub changes: Option<Vec<String>>,
+}
+
+impl UpdateTrigger {
+    fn provisioned_changes(&self) -> Vec<String> {
+        match &self.changes {
+            Some(changes) => {
+                let filtered_changes: Vec<String> = changes
+                    .iter()
+                    .filter(|change| !change.starts_with("change threshold"))
+                    .cloned()
+                    .collect();
+                filtered_changes
+            }
+            None => Vec::new(),
+        }
+    }
 }
 
 impl fmt::Display for UpdateTrigger {
@@ -1325,17 +1347,14 @@ impl fmt::Display for UpdateTrigger {
 #[async_trait]
 #[typetag::serde]
 impl Change for UpdateTrigger {
-    async fn apply(&self, client: &mut Client) -> ChangeResult {
+    async fn apply_provisioned(&self, client: &mut Client) -> ChangeResult {
         let mut transaction = client.transaction().await?;
 
-        if !trigger_exists(&self.trigger.name, &mut transaction).await? {
-            return Err(Error::Runtime(RuntimeError {
-                msg: format!(
-                    "Trigger {} does not exist. Use the create command to create the trigger.",
-                    self.trigger.name
-                ),
-            }));
-        }
+        let existing_trigger = load_trigger(&mut transaction, &self.trigger.name)
+            .await
+            .map_err(|e| {
+                RuntimeError::from_msg(format!("Could not load current trigger definition: {e}"))
+            })?;
 
         // Tear down
         drop_notification_data_function(&self.trigger, &mut transaction).await?;
@@ -1356,8 +1375,6 @@ impl Change for UpdateTrigger {
 
         set_fingerprint_function(&self.trigger, &mut transaction).await?;
 
-        set_thresholds(&self.trigger, &mut transaction).await?;
-
         set_condition(&self.trigger, &mut transaction).await?;
 
         define_notification_message(&self.trigger, &mut transaction).await?;
@@ -1370,7 +1387,7 @@ impl Change for UpdateTrigger {
 
         set_description(&self.trigger, &mut transaction).await?;
 
-        set_enabled(&mut transaction, &self.trigger.name, self.trigger.enabled).await?;
+        set_thresholds(&existing_trigger, &mut transaction).await?;
 
         let check_result = if self.verify {
             Some(run_checks(&self.trigger.name, &mut transaction).await?)
@@ -1384,6 +1401,25 @@ impl Change for UpdateTrigger {
             trigger_name: self.trigger.name.clone(),
             check_result,
         }))
+    }
+
+    async fn apply(&self, client: &mut Client) -> ChangeResult {
+        let mut transaction = client.transaction().await?;
+        set_thresholds(&self.trigger, &mut transaction).await?;
+
+        set_enabled(&mut transaction, &self.trigger.name, self.trigger.enabled).await?;
+
+        transaction.commit().await?;
+
+        self.apply_provisioned(client).await
+    }
+
+    fn is_provisioned_change(&self) -> bool {
+        !self.provisioned_changes().is_empty()
+    }
+
+    fn remove_unprovisioned_changes(&mut self) {
+        self.changes = Some(self.provisioned_changes());
     }
 }
 
@@ -1414,7 +1450,7 @@ impl Changed for UpdatedTrigger {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct UpdateTriggerTags {
     pub trigger_name: String,
@@ -1482,7 +1518,7 @@ impl Changed for UpdatedTriggerTags {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct RenameTrigger {
     pub trigger: Trigger,
@@ -1608,7 +1644,7 @@ impl Changed for RenamedTrigger {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct VerifyTrigger {
     pub trigger_name: String,
@@ -1657,7 +1693,7 @@ impl Changed for VerifiedTrigger {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct EnableTrigger {
     pub trigger_name: String,
@@ -1682,6 +1718,10 @@ impl Change for EnableTrigger {
         Ok(Box::new(EnabledTrigger {
             trigger_name: self.trigger_name.clone(),
         }))
+    }
+
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
@@ -1710,7 +1750,7 @@ impl Changed for EnabledTrigger {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct DisableTrigger {
     pub trigger_name: String,
@@ -1735,6 +1775,10 @@ impl Change for DisableTrigger {
         Ok(Box::new(DisabledTrigger {
             trigger_name: self.trigger_name.clone(),
         }))
+    }
+
+    fn is_provisioned_change(&self) -> bool {
+        false
     }
 }
 
@@ -1930,7 +1974,7 @@ where
     Ok(notifications)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct CreateNotifications {
     pub trigger_name: String,
