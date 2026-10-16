@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.46.1] - 2026-10-16
+
+### Fixed
+
+- cli: Do not include non-provisioned objects in diff by default
+
 ## [9.46.0] - 2026-09-29
 
 ### Added
