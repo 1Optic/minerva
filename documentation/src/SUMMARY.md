@@ -12,3 +12,4 @@
   - [Attributes Schema](./design/attributes-schema.md)
   - [DDAs](./design/ddas.md)
   - [Multi-Stage Relation Materialization](./design/multi-stage-relation-materialization.md)
+  - [Worker Service](./design/worker-service.md)
