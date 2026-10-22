@@ -359,17 +359,7 @@ impl EntityMapping for CachingEntityMapping {
     ) -> Result<Vec<Option<String>>, EntityMappingError> {
         match &self.uses_alias_column(entity_type, client).await? {
             true => {
-                // Ensure that all entities actually exist in the database
-                self.names_to_entity_ids(client, entity_type, names).await?;
-
                 let mut aliases: HashMap<String, String> = HashMap::new();
-
-                let query = format!(
-                    "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
-                    SELECT l.name, e.primary_alias FROM lookup_list l \
-                    LEFT JOIN entity.{} e ON l.name = e.name ",
-                    escape_identifier(entity_type)
-                );
 
                 let mut names_list: Vec<&str> = Vec::new();
 
@@ -384,6 +374,13 @@ impl EntityMapping for CachingEntityMapping {
                     }
                 }
 
+                let query = format!(
+                    "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
+                    SELECT l.name, e.primary_alias FROM lookup_list l \
+                    LEFT JOIN entity.{} e ON l.name = e.name ",
+                    escape_identifier(entity_type)
+                );
+
                 // Only lookup in the database if there is anything left to lookup
                 if !names_list.is_empty() {
                     let rows = client
@@ -393,7 +390,16 @@ impl EntityMapping for CachingEntityMapping {
 
                     for row in rows {
                         let name: String = row.get(0);
-                        let alias: String = row.get(1);
+                        let alias_option: Option<String> =
+                            row.try_get(1).map_err(EntityMappingError::DatabaseError)?;
+                        let alias: String = match alias_option {
+                            Some(alias) => alias,
+                            None => {
+                                let entity =
+                                    create_entity_with_alias(client, entity_type, &name).await?;
+                                entity.alias.unwrap()
+                            }
+                        };
 
                         self.alias_cache
                             .insert((entity_type.to_string(), name.clone()), Some(alias.clone()));
