@@ -390,11 +390,13 @@ impl EntityMapping for CachingEntityMapping {
 
                     for row in rows {
                         let name: String = row.get(0);
-                        let alias_option: Option<String> = row.try_get(1).map_err(EntityMappingError::DatabaseError)?;
+                        let alias_option: Option<String> =
+                            row.try_get(1).map_err(EntityMappingError::DatabaseError)?;
                         let alias: String = match alias_option {
                             Some(alias) => alias,
                             None => {
-                                let entity = create_entity_with_alias(client, entity_type, &name).await?;
+                                let entity =
+                                    create_entity_with_alias(client, entity_type, &name).await?;
                                 entity.alias.unwrap()
                             }
                         };
