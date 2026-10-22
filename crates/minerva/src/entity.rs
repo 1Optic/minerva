@@ -376,8 +376,9 @@ impl EntityMapping for CachingEntityMapping {
 
                 let query = format!(
                     "WITH lookup_list AS (SELECT unnest($1::text[]) AS name) \
-                    SELECT l.name, (entity.{}(l.name)).primary_alias FROM lookup_list l",
-                    escape_identifier(&format!("to_{}", entity_type))
+                    SELECT l.name, e.primary_alias FROM lookup_list l \
+                    LEFT JOIN entity.{} e ON l.name = e.name ",
+                    escape_identifier(entity_type)
                 );
 
                 // Only lookup in the database if there is anything left to lookup
@@ -389,7 +390,14 @@ impl EntityMapping for CachingEntityMapping {
 
                     for row in rows {
                         let name: String = row.get(0);
-                        let alias: String = row.get(1);
+                        let alias_option: Option<String> = row.try_get(1).map_err(EntityMappingError::DatabaseError)?;
+                        let alias: String = match alias_option {
+                            Some(alias) => alias,
+                            None => {
+                                let entity = create_entity_with_alias(client, entity_type, &name).await?;
+                                entity.alias.unwrap()
+                            }
+                        };
 
                         self.alias_cache
                             .insert((entity_type.to_string(), name.clone()), Some(alias.clone()));
