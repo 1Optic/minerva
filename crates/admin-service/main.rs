@@ -1,12 +1,13 @@
 use std::{env, process::exit};
 
-use log::{error, info};
+use log::info;
 
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::Logger, web};
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use rustls::ClientConfig as RustlsClientConfig;
+use rustls_platform_verifier::BuilderVerifierExt;
 use tokio_postgres::{Config, NoTls, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
@@ -307,20 +308,12 @@ fn make_db_pool(config: &Config) -> Result<Pool, Error> {
     let mgr = if config.get_ssl_mode() == SslMode::Disable {
         Manager::from_config(config.clone(), NoTls, mgr_config)
     } else {
-        let mut roots = rustls::RootCertStore::empty();
-
-        let load_result = rustls_native_certs::load_native_certs();
-
-        for e in load_result.errors {
-            error!("Issue while loading TLS certificates: {e}");
-        }
-
-        for cert in load_result.certs {
-            roots.add(cert).unwrap();
-        }
-
-        let tls_config = RustlsClientConfig::builder()
-            .with_root_certificates(roots)
+        let arc_crypto_provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
+        let tls_config = RustlsClientConfig::builder_with_provider(arc_crypto_provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_platform_verifier()
+            .map_err(|e| Error::Runtime(format!("Could not create TLS config: {e}").into()))?
             .with_no_client_auth();
         let tls = MakeRustlsConnect::new(tls_config);
 

@@ -1,12 +1,13 @@
 use std::env;
 
 use rustls::ClientConfig as RustlsClientConfig;
+use rustls_platform_verifier::BuilderVerifierExt;
 use tokio;
 use tokio_postgres::{Client, NoTls};
 use tokio_postgres::{Config, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
-use minerva::error::{ConfigurationError, Error, RuntimeError};
+use minerva::error::{ConfigurationError, Error};
 
 pub type CmdResult = Result<(), Error>;
 
@@ -107,20 +108,14 @@ pub async fn connect_to_db(config: &Config) -> Result<Client, Error> {
 
         client
     } else {
-        let mut roots = rustls::RootCertStore::empty();
-
-        for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
-        {
-            roots.add(cert).map_err(|e| {
-                Error::Runtime(RuntimeError::from_msg(format!(
-                    "Could not add certificate to certificate store: {e}"
-                )))
-            })?;
-        }
-
-        let tls_config = RustlsClientConfig::builder()
-            .with_root_certificates(roots)
+        let arc_crypto_provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
+        let tls_config = RustlsClientConfig::builder_with_provider(arc_crypto_provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_platform_verifier()
+            .map_err(|e| Error::Runtime(format!("Could not create TLS config: {e}").into()))?
             .with_no_client_auth();
+
         let tls = MakeRustlsConnect::new(tls_config);
 
         let (client, connection) = config.connect(tls).await.map_err(|e| {

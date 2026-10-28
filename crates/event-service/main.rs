@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use rustls::ClientConfig as RustlsClientConfig;
+use rustls_platform_verifier::BuilderVerifierExt;
 use tokio_postgres::{Config as TokioConfig, Row, config::SslMode};
 use tokio_postgres_rustls::MakeRustlsConnect;
 
@@ -173,15 +174,14 @@ fn connect_db() -> Result<Pool, String> {
 }
 
 fn make_db_pool(config: &TokioConfig) -> Result<Pool, String> {
-    let mut roots = rustls::RootCertStore::empty();
-
-    for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-        roots.add(cert).unwrap();
-    }
-
-    let tls_config = RustlsClientConfig::builder()
-        .with_root_certificates(roots)
+    let arc_crypto_provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
+    let tls_config = RustlsClientConfig::builder_with_provider(arc_crypto_provider)
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_platform_verifier()
+        .map_err(|e| format!("Could not create TLS config: {e}"))?
         .with_no_client_auth();
+
     let tls = MakeRustlsConnect::new(tls_config);
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
