@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.46.2] - 2026-10-28
+
 ### Changed
 
 - deps: Refresh Rust dependency lockfile to latest compatible versions, excluding updates awaiting pending status checks
+
+### Fixed
+
+- db: Fix migration for database object ownership
 
 ## [9.46.1] - 2026-10-16
 
@@ -723,4 +729,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [9.45.1]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.0...9.45.1
 [9.45.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.1...9.45.2
 [9.45.3]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.2...9.45.3
-[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.3...HEAD
+[9.46.2]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.45.3...9.46.2
+[Unreleased]: https://gitlab.1optic.io/hitc/Minerva/minerva/-/compare/9.46.2...HEAD
