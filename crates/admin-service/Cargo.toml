@@ -12,19 +12,19 @@ path = "main.rs"
 [dependencies]
 actix-web = "4.18.1"
 actix-cors = "0.7.2"
-utoipa = { version = "5.5.0", features = ["chrono"] }
+utoipa = { version = "6.0.0", features = ["chrono"] }
 lazy_static = "1.5.1"
 minerva = { path = "../minerva" }
 tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4", "with-serde_json-1"] }
 rustls = { version = "0.23.46", features = ["ring"] }
-rustls-native-certs = "0.8.5"
+rustls-platform-verifier = "0.7.1"
 tokio-postgres-rustls = "0.14.0"
 serde = { version = "1.0.229", features = ["derive"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 humantime-serde = "1.1.1"
 serde_json = "1.0.154"
 deadpool-postgres = "0.14.2"
-utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "10.0.2", features = ["actix-web"] }
 env_logger = "0.11.11"
 derive_more = { version = "2.1.1", features = ["full"] }
 log = "0.4.34"

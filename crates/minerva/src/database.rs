@@ -4,6 +4,7 @@ use std::time::Duration;
 use log::debug;
 use postgres_secrets::{PgPass, pgpass::CredentialQuery};
 use rustls::ClientConfig as RustlsClientConfig;
+use rustls_platform_verifier::BuilderVerifierExt;
 
 use tokio_postgres::{Client, NoTls};
 use tokio_postgres::{Config, config::SslMode};
@@ -97,16 +98,14 @@ pub async fn connect_db() -> Result<Client, Error> {
 
 pub async fn connect_to_db(config: &Config, retry_count: usize) -> Result<Client, Error> {
     let client = if config.get_ssl_mode() != SslMode::Disable {
-        let mut roots = rustls::RootCertStore::empty();
-
-        for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
-        {
-            roots.add(cert).unwrap();
-        }
-
-        let tls_config = RustlsClientConfig::builder()
-            .with_root_certificates(roots)
+        let arc_crypto_provider = std::sync::Arc::new(rustls::crypto::ring::default_provider());
+        let tls_config = RustlsClientConfig::builder_with_provider(arc_crypto_provider)
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_platform_verifier()
+            .map_err(|e| Error::Runtime(format!("Could not create TLS config: {e}").into()))?
             .with_no_client_auth();
+
         let tls = MakeRustlsConnect::new(tls_config);
 
         let mut attempt_num = 1;
