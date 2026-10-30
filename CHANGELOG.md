@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.46.3] - 2026-10-30
+
+### Fixed
+
+- deps: switch from rustls-native-certs to rustls-platform-verifier
+
 ## [9.46.2] - 2026-10-28
 
 ### Changed
@@ -16,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - db: Fix migration for database object ownership
+- lib: Create entities if they do not exist when getting their alias
 
 ## [9.46.1] - 2026-10-16
 
