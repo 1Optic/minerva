@@ -28,7 +28,7 @@ rustls = "0.23.46"
 rustls-platform-verifier = "0.7.1"
 lazy_static = "1.5.1"
 thiserror = "2.0.21"
-log = "0.4.34"
+log = "0.4.35"
 url = { version = "2.5.8" }
 rand = { version = "0.10.3" }
 testcontainers = "0.28.0"
