@@ -40,7 +40,7 @@ lint-openapi:
   tags:
     - simple
   image:
-    name: redocly/cli:2.76.0@sha256:bd2a1637e39de2d7fc403b3a114b6f8ecbb7edcb6f814516c79b38be409747e9
+    name: redocly/cli:2.78.0@sha256:ab4ca2d6d1cfb316677b79ae6462132a7e4c496037b7eb405ca7d3818fe9346d
     entrypoint: [""]
   script:
     - redocly lint api-spec/openapi.yaml
