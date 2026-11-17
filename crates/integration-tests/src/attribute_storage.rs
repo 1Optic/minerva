@@ -42,7 +42,7 @@ const ATTRIBUTE_STORE_DEFINITION: &str = r"
 pub async fn load_attribute_data(
     cluster: MinervaClusterConnector,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let entity_mapping = CachingEntityMapping::new(100);
+    let mut entity_mapping = CachingEntityMapping::new(100);
 
     let test_database = cluster.create_db().await?;
 
@@ -72,7 +72,7 @@ pub async fn load_attribute_data(
 
         let tx = client.transaction().await?;
         let stored_count = attribute_store
-            .store(&tx, &entity_mapping, attributes, rows)
+            .store(&tx, &mut entity_mapping, attributes, rows)
             .await?;
         tx.commit().await?;
 

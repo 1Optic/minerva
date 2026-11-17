@@ -55,10 +55,10 @@ pub enum RawMeasurementStoreError {
 
 #[async_trait]
 pub trait RawMeasurementStore {
-    async fn store_raw<E: EntityMapping + Sync>(
+    async fn store_raw<E: EntityMapping + Sync + Send>(
         &self,
         client: &mut Client,
-        entity_mapping: &E,
+        entity_mapping: &mut E,
         job_id: i64,
         trends: &[String],
         data_package: &[(String, DateTime<chrono::Utc>, Vec<String>)],
@@ -489,10 +489,10 @@ impl<'a> SubPackageExtractor<'a> {
 
 #[async_trait]
 impl RawMeasurementStore for TrendStore {
-    async fn store_raw<E: EntityMapping + Sync>(
+    async fn store_raw<E: EntityMapping + Sync + Send>(
         &self,
         client: &mut Client,
-        entity_mapping: &E,
+        entity_mapping: &mut E,
         job_id: i64,
         trend_names: &[String],
         records: &[(String, DateTime<chrono::Utc>, Vec<String>)],
