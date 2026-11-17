@@ -7,7 +7,7 @@ use minerva::schema::create_schema;
 pub async fn db_entity_mapping(
     cluster: MinervaClusterConnector,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let entity_mapping = DbEntityMapping {};
+    let mut entity_mapping = DbEntityMapping {};
 
     let test_database = cluster.create_db().await?;
 
@@ -80,7 +80,7 @@ pub async fn db_entity_mapping(
             "n0001".to_string(),
         ];
 
-        let entity_mapping = DbEntityMapping {};
+        let mut entity_mapping = DbEntityMapping {};
         let entities = entity_mapping
             .names_to_entities(&client, &"node".to_string(), &names)
             .await?;

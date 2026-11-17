@@ -62,27 +62,27 @@ impl From<Entity> for LargeEntity {
 
 pub trait EntityMapping {
     fn uses_alias_column<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         entity_type: &EntityTypeName,
         client: &T,
     ) -> impl Future<Output = Result<bool, EntityMappingError>> + Send;
 
     fn names_to_entity_ids<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
     ) -> impl Future<Output = Result<Vec<i64>, EntityMappingError>> + Send;
 
     fn names_to_aliases<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
     ) -> impl Future<Output = Result<Vec<Option<String>>, EntityMappingError>> + Send;
 
     fn names_to_entities<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -93,7 +93,7 @@ pub struct DbEntityMapping {}
 
 impl EntityMapping for DbEntityMapping {
     async fn uses_alias_column<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         entity_type: &EntityTypeName,
         client: &T,
     ) -> Result<bool, EntityMappingError> {
@@ -107,7 +107,7 @@ impl EntityMapping for DbEntityMapping {
     }
 
     async fn names_to_entity_ids<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -150,7 +150,7 @@ impl EntityMapping for DbEntityMapping {
     }
 
     async fn names_to_aliases<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -160,7 +160,7 @@ impl EntityMapping for DbEntityMapping {
     }
 
     async fn names_to_entities<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -268,7 +268,7 @@ impl CachingEntityMapping {
 
 impl EntityMapping for CachingEntityMapping {
     async fn uses_alias_column<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         entity_type: &EntityTypeName,
         client: &T,
     ) -> Result<bool, EntityMappingError> {
@@ -290,7 +290,7 @@ impl EntityMapping for CachingEntityMapping {
     }
 
     async fn names_to_entity_ids<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -352,7 +352,7 @@ impl EntityMapping for CachingEntityMapping {
     }
 
     async fn names_to_aliases<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -423,7 +423,7 @@ impl EntityMapping for CachingEntityMapping {
     }
 
     async fn names_to_entities<T: GenericClient + Sync>(
-        &self,
+        &mut self,
         client: &T,
         entity_type: &EntityTypeName,
         names: &[EntityName],
@@ -514,7 +514,7 @@ impl EntityMapping for CachingEntityMapping {
     }
 }
 
-async fn create_entity<T: GenericClient>(
+pub async fn create_entity<T: GenericClient>(
     client: &T,
     entity_type_table: &str,
     name: &str,
@@ -537,7 +537,7 @@ async fn create_entity<T: GenericClient>(
     }
 }
 
-async fn create_entity_with_alias<T: GenericClient>(
+pub async fn create_entity_with_alias<T: GenericClient>(
     client: &T,
     entity_type_table: &str,
     name: &str,

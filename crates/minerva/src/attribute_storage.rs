@@ -88,20 +88,20 @@ pub struct AttributeDataRow {
 }
 
 pub trait RawAttributeStore {
-    fn store<E: EntityMapping + Sync>(
+    fn store<E: EntityMapping + Sync + Send>(
         &self,
         tx: &Transaction,
-        entity_mapping: &E,
+        entity_mapping: &mut E,
         attributes: Vec<String>,
         rows: Vec<AttributeDataRow>,
     ) -> impl std::future::Future<Output = Result<u64, AttributeStorageError>> + Send;
 }
 
 impl RawAttributeStore for AttributeStore {
-    async fn store<E: EntityMapping + Sync>(
+    async fn store<E: EntityMapping + Sync + Send>(
         &self,
         tx: &Transaction<'_>,
-        entity_mapping: &E,
+        entity_mapping: &mut E,
         attributes: Vec<String>,
         rows: Vec<AttributeDataRow>,
     ) -> Result<u64, AttributeStorageError> {

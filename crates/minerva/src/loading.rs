@@ -145,12 +145,12 @@ pub async fn load_data<P: AsRef<Path>>(
         }
     }
 
-    let entity_mapping = CachingEntityMapping::new(100);
+    let mut entity_mapping = CachingEntityMapping::new(100);
 
     trend_store
         .store_raw(
             client,
-            &entity_mapping,
+            &mut entity_mapping,
             job_id,
             &trends,
             &raw_data_package,
