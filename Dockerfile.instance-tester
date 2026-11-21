@@ -2,7 +2,7 @@
 #
 # Place a Minerva instance in directory '/minerva-instance' and it is loaded on container start.
 
-FROM harbor.hendrikx-itc.nl/1optic/rust-ci:1.99.2 AS build
+FROM harbor.hendrikx-itc.nl/1optic/rust-ci:1.100.1@sha256:cf2d6767de5db8063565f2ac496f256c87fe7e7d3aeaa8a6679746a0f183cb44 AS build
 
 COPY . /src
 WORKDIR /src
