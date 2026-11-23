@@ -23,7 +23,7 @@ reqwest = { version = "0.13.5", features = ["json"] }
 rust_decimal = "1.43.0"
 rust_decimal_macros = "1.40.0"
 testcontainers = "0.28.0"
-url = "2.5.8"
+url = "2.5.9"
 log = "0.4.35"
 async-trait = "0.1.92"
 toxiproxy_rust = "0.1.6"
